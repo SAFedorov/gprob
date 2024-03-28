@@ -1,0 +1,1 @@
+Requires python >= 3.6 (because of relying on order preservation in dictionaries)
