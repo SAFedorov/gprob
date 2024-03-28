@@ -1,6 +1,9 @@
+import sys
+sys.path.append('..')  # Until there is a package structure.
+
 import pytest
 import numpy as np
-from normal import N, join, Normal
+from plaingaussian.normal import N, join, Normal
 from utils import logp_batch
 
 

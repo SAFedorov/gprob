@@ -1,5 +1,10 @@
+import sys
+sys.path.append('..')  # Until there is a package structure.
+
+
 import numpy as np
-from func import logp, dlogp, d2logp, fisher, cholesky_inv
+from plaingaussian.func import logp, dlogp, d2logp, fisher, cholesky_inv
+
 
 def num_dlogp(x, m, cov, dm, dcov, delta=1e-7):
     """Finite-difference implementation of the gradient of the log probability 

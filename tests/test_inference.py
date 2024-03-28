@@ -1,7 +1,11 @@
+import sys
+sys.path.append('..')  # Until there is a package structure.
+
 import pytest
 import numpy as np
-from Infer import Infer
-from normal import N, join
+from external.Infer import Infer
+from plaingaussian.normal import N, join
+
 
 def test_conditioning():
     
