@@ -1,6 +1,5 @@
 import numpy as np
 import scipy as sp
-from scipy.linalg import lapack
 from scipy.linalg import LinAlgError
 
 
@@ -10,19 +9,10 @@ from scipy.linalg import LinAlgError
 def cholesky_inv(mat):
     """Inverts the positive-definite symmetric matrix `mat` using Cholesky 
     decomposition. Marginally faster than `linalg.inv`. """
-
-    # TODO: there are scipy distributions where it actually works slower than np.linalg.inv
-    # TODO: maybe use higher-level methods from scipy for the decomposition, like chol_factor, it may become faster
-    # TODO: check if the upper triangular may contain random data
     
-    lt, status = lapack.dpotrf(mat, lower=True)  #TODO: use scipy.linalg.cho_factor instead
-
-    if status != 0:
-        raise RuntimeError("Cholesky decomposition failed.")  # TODO: expand the error
-    
-    ltinv = sp.linalg.solve_triangular(lt, np.eye(lt.shape[0]), 
+    ltr, _ = sp.linalg.cho_factor(mat, check_finite=False, lower=True)
+    ltinv = sp.linalg.solve_triangular(ltr, np.eye(ltr.shape[0]), 
                                        check_finite=False, lower=True)
-    
     return ltinv.T @ ltinv
 
 
@@ -58,16 +48,10 @@ def fisher(cov, dm, dcov):
 
 def logp(x, m, cov):
 
-    # TODO: ?
-
-    lt, status = lapack.dpotrf(cov, lower=True)
-
-    if status != 0:
-        raise LinAlgError("Cholesky decomposition failed.")  # TODO: this is a temporary fix
-
-    z = sp.linalg.solve_triangular(lt, x - m, check_finite=False, lower=True)
-    rank = cov.shape[0]  # If the solution suceeded, the rank is full.
-    log_sqrt_det = np.sum(np.log(np.diagonal(lt)))
+    ltr, _ = sp.linalg.cho_factor(cov, check_finite=False, lower=True)
+    z = sp.linalg.solve_triangular(ltr, x - m, check_finite=False, lower=True)
+    rank = cov.shape[0]  # Since the solution suceeded, the rank is full.
+    log_sqrt_det = np.sum(np.log(np.diagonal(ltr)))
 
     norm = np.log(np.sqrt(2 * np.pi)) * rank + log_sqrt_det
     return - z @ z / 2 - norm

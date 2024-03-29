@@ -6,6 +6,10 @@ import numpy as np
 from plaingaussian.normal import N, join
 from plaingaussian.func import logp, dlogp, d2logp, fisher, logp_batch
 
+from benchmarks.reffunc import logp as logp_
+from benchmarks.reffunc import dlogp_eigh as dlogp_
+from benchmarks.reffunc import d2logp as d2logp_
+
 
 def num_dlogp(x, m, cov, dm, dcov, delta=1e-7):
     """Finite-difference implementation of the gradient of the log probability 
@@ -82,62 +86,109 @@ def random_d2(sz, npar):
     return random_d1(sz, npar) + (v3, msq3)  # x, m, cov, dm, dcov, d2m, d2cov
 
 
+def test_logp():
+
+    tol = 1e-7  # The actual errors should be in 1e-8 range or below
+
+    v, v1, msq1, _, _ = random_d1(200, 10)
+    llk = logp(v, v1, msq1)
+    ref_llk = logp_(v, v1, msq1)
+
+    assert np.abs((llk - ref_llk)/ref_llk) < tol
+
+    v, v1, msq1, _, _ = random_d1(20, 3)
+    llk = logp(v, v1, msq1)
+    ref_llk = logp_(v, v1, msq1)
+
+    assert np.abs((llk - ref_llk)/ref_llk) < tol
+
+    v, v1, msq1, _, _ = random_d1(40, 100)
+    llk = logp(v, v1, msq1)
+    ref_llk = logp_(v, v1, msq1)
+
+    assert np.abs((llk - ref_llk)/ref_llk) < tol
+
+    v, v1, msq1, _, _ = random_d1(400, 1)
+    llk = logp(v, v1, msq1)
+    ref_llk = logp_(v, v1, msq1)
+
+    assert np.abs((llk - ref_llk)/ref_llk) < tol
+
+
 def test_dlogp():
 
-    tol = 5e-5  # The actual errors should be in 1e-6 - 1e-5 range
+    num_tol = 5e-5  # The actual errors should be in 1e-6 - 1e-5 range
+    ref_tol = 1e-7
 
     v, v1, msq1, v2, msq2 = random_d1(200, 10)
     g = dlogp(v, v1, msq1, v2, msq2)
     num_g = num_dlogp(v, v1, msq1, v2, msq2, delta=1e-9)
+    ref_g = dlogp_(v, v1, msq1, v2, msq2)
 
-    assert np.abs((g - num_g)/num_g).max() < tol
+    assert np.abs((g - num_g)/num_g).max() < num_tol
+    assert np.abs((g - ref_g)/ref_g).max() < ref_tol
 
     v, v1, msq1, v2, msq2 = random_d1(20, 3)
     g = dlogp(v, v1, msq1, v2, msq2)
     num_g = num_dlogp(v, v1, msq1, v2, msq2, delta=1e-9)
+    ref_g = dlogp_(v, v1, msq1, v2, msq2)
 
-    assert np.abs((g - num_g)/num_g).max() < tol
+    assert np.abs((g - num_g)/num_g).max() < num_tol
+    assert np.abs((g - ref_g)/ref_g).max() < ref_tol
 
     v, v1, msq1, v2, msq2 = random_d1(40, 100)
     g = dlogp(v, v1, msq1, v2, msq2)
     num_g = num_dlogp(v, v1, msq1, v2, msq2, delta=1e-9)
+    ref_g = dlogp_(v, v1, msq1, v2, msq2)
 
-    assert np.abs((g - num_g)/num_g).max() < tol
+    assert np.abs((g - num_g)/num_g).max() < num_tol
+    assert np.abs((g - ref_g)/ref_g).max() < ref_tol
 
     v, v1, msq1, v2, msq2 = random_d1(400, 1)
     g = dlogp(v, v1, msq1, v2, msq2)
     num_g = num_dlogp(v, v1, msq1, v2, msq2, delta=1e-9)
+    ref_g = dlogp_(v, v1, msq1, v2, msq2)
 
-    assert np.abs((g - num_g)/num_g).max() < tol
+    assert np.abs((g - num_g)/num_g).max() < num_tol
+    assert np.abs((g - ref_g)/ref_g).max() < ref_tol
 
 
 def test_d2logp():
 
-    tol = 1e-4  # The actual errors are typically around or below 1e-5
+    num_tol = 1e-4  # The actual errors are typically around or below 1e-5
+    ref_tol = 1e-7
 
     v, v1, msq, v2, msq2, v3, msq3 = random_d2(200, 10)
     h = d2logp(v, v1, msq, v2, msq2, v3, msq3)
     num_h = num_d2logp(v, v1, msq, v2, msq2, v3, msq3, delta=1e-10)
+    ref_h = d2logp_(v, v1, msq, v2, msq2, v3, msq3)
     
-    assert np.abs((h - num_h)/num_h).max() < tol
+    assert np.abs((h - num_h)/num_h).max() < num_tol
+    assert np.abs((h - ref_h)/ref_h).max() < ref_tol
 
     v, v1, msq, v2, msq2, v3, msq3 = random_d2(20, 3)
     h = d2logp(v, v1, msq, v2, msq2, v3, msq3)
     num_h = num_d2logp(v, v1, msq, v2, msq2, v3, msq3, delta=1e-10)
+    ref_h = d2logp_(v, v1, msq, v2, msq2, v3, msq3)
     
-    assert np.abs((h - num_h)/num_h).max() < tol
+    assert np.abs((h - num_h)/num_h).max() < num_tol
+    assert np.abs((h - ref_h)/ref_h).max() < ref_tol
 
     v, v1, msq, v2, msq2, v3, msq3 = random_d2(40, 100)
     h = d2logp(v, v1, msq, v2, msq2, v3, msq3)
     num_h = num_d2logp(v, v1, msq, v2, msq2, v3, msq3, delta=1e-10)
+    ref_h = d2logp_(v, v1, msq, v2, msq2, v3, msq3)
     
-    assert np.abs((h - num_h)/num_h).max() < tol
+    assert np.abs((h - num_h)/num_h).max() < num_tol
+    assert np.abs((h - ref_h)/ref_h).max() < ref_tol
 
     v, v1, msq, v2, msq2, v3, msq3 = random_d2(400, 1)
     h = d2logp(v, v1, msq, v2, msq2, v3, msq3)
     num_h = num_d2logp(v, v1, msq, v2, msq2, v3, msq3, delta=1e-10)
+    ref_h = d2logp_(v, v1, msq, v2, msq2, v3, msq3)
     
-    assert np.abs((h - num_h)/num_h).max() < tol
+    assert np.abs((h - num_h)/num_h).max() < num_tol
+    assert np.abs((h - ref_h)/ref_h).max() < ref_tol
 
 
 def test_fisher():
@@ -146,11 +197,6 @@ def test_fisher():
     # and
     # FI[i, j] = - <d2logp/dtheta_i dtheta_j>
 
-    pass
-
-
-def test_logp():
-    # TODO: add
     pass
 
 
