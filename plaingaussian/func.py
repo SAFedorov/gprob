@@ -90,7 +90,7 @@ def dlogp(x, m, cov, dm, dcov):
     """
 
     cov_inv = cholesky_inv(cov)
-    dnorm = -0.5 * np.einsum("ij, kji -> k", cov_inv, dcov)
+    dnorm = -0.5 * np.einsum("ij, kij -> k", cov_inv, dcov)
     y = cov_inv @ (x - m)
     
     return 0.5 * y.T @ dcov @ y + dm @ y + dnorm
