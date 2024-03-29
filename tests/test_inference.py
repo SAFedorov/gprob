@@ -95,7 +95,7 @@ def test_linear_regression():
     # Comparison to a vectorized calculation using this package
 
     fv = a * xs + b
-    mnv = N(0, 0.1, dim=len(xs))
+    mnv = N(0, 0.1, size=len(xs))
 
     ab2 = (a & b) | {fv: ys + mnv}
     jointd2 = join(a, b, mnv) | {fv: ys + mnv}

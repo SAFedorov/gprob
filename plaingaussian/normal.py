@@ -1,13 +1,14 @@
-import numpy as np
-from plaingaussian.func import logp
-
 import itertools
 
-# TODO: sampling and logp would be very slow for large-aspect-ratio variables [[a0, a1, a2, a3, .. an]] for n >> 1
-# TODO: remove normal-normal arithmetic operations
-# TODO: move the meat of logp into the functional file
+import numpy as np
+from numpy.linalg import LinAlgError
 
-# TODO: make it a named tuple?
+from plaingaussian.func import logp
+
+# TODO: sampling would be very slow for large-aspect-ratio variables [[a0, a1, a2, a3, .. an]] for n >> 1
+# TODO: remove normal-normal arithmetic operations
+# TODO: clean up repr
+# TODO: add power operator
 
 class Normal:
     """Vector-valued normally-distributed random variable,
@@ -18,7 +19,7 @@ class Normal:
     iids[k] ~ N(0, 1) for all k.
     """
 
-    __slots__ = ("a", "b", "iids", "dim")
+    __slots__ = ("a", "b", "iids")
     __array_ufunc__ = None
     id_counter = itertools.count()
 
@@ -29,7 +30,6 @@ class Normal:
 
         self.a = a  # matrix defining the linear map iids -> v
         self.b = b  # mean vector
-        self.dim = a.shape[-2]
 
         if iids is None:
             # Allocates new independent random variables.
@@ -52,7 +52,7 @@ class Normal:
             A new `a` matrix.
         """
         
-        new_a = np.zeros((self.dim, len(new_iids)))
+        new_a = np.zeros((len(self), len(new_iids)))
         idx = [new_iids[k] for k in self.iids]
 
         new_a[:, idx] = self.a
@@ -64,14 +64,14 @@ class Normal:
         
         return new_a
     
-    def _compatible_maps(self, other):
+    def _complete_maps(self, other):
         """Extends `self.a` and `other.a` to the union of their iids."""
 
         if self.iids is other.iids:
-            # The maps operating on the same iids are already compatible.
+            # The maps are already compatible.
             return self.a, other.a, self.iids
 
-        # The largest go first, because its iid variable map remains unmodified.
+        # The largest go first, because its iid variable map remains unchanged.
         if len(self.iids) >= len(other.iids):
             op1, op2 = self, other
         else:
@@ -96,17 +96,17 @@ class Normal:
             # Linearized product  x * y = <x><y> + <y>dx + <x>dy,
             # for  x = <x> + dx  and  y = <y> + dy.
             
-            a1, a2, new_iids = self._compatible_maps(other)
+            a1, a2, new_iids = self._complete_maps(other)
             a = (a1.T * other.b + a2.T * self.b).T
             b = self.b * other.b
 
             return Normal(a, b, new_iids)
         
         # Scalar variables span over sequences
-        if self.dim == 1 and isinstance(other, np.ndarray) and other.ndim == 1:
+        if len(self) == 1 and isinstance(other, np.ndarray) and len(other) == 1:
             return Normal(np.outer(other, self.a), self.b * other, self.iids)
         
-        if self.dim == 1 and isinstance(other, (list, tuple)):
+        if len(self) == 1 and isinstance(other, (list, tuple)):
             return Normal(np.outer(other, self.a), self.b * other, self.iids)
 
         # Otherwise other must be a number or vector of numbers
@@ -117,7 +117,7 @@ class Normal:
             # Linearized fraction  x/y = <x>/<y> + dx/<y> - dy<x>/<y>^2,
             # for  x = <x> + dx  and  y = <y> + dy.
             
-            a1, a2, new_iids = self._compatible_maps(other)
+            a1, a2, new_iids = self._complete_maps(other)
             a = (a1.T / other.b - a2.T * self.b / other.b**2).T
             b = self.b / other.b
 
@@ -140,7 +140,7 @@ class Normal:
             # Other must be a number or numeric vector.
             return Normal(self.a, self.b + other, self.iids)
 
-        a1, a2, new_iids = self._compatible_maps(other)
+        a1, a2, new_iids = self._complete_maps(other)
         return Normal(a1 + a2, self.b + other.b, new_iids)
 
     def __radd__(self, other):
@@ -154,7 +154,7 @@ class Normal:
             # Assuming that other is a number or numeric vector.
             return Normal(self.a, self.b - other, self.iids)
 
-        a1, a2, new_iids = self._compatible_maps(other)
+        a1, a2, new_iids = self._complete_maps(other)
         return Normal(a1 - a2, self.b - other.b, new_iids)
     
     def __rsub__(self, other):
@@ -167,10 +167,10 @@ class Normal:
 
         #TODO: add tests, for zero dimensions and empty matrices
 
-        if self.dim == 0:
+        if len(self) == 0:
             return ""
         
-        if self.dim == 1:
+        if len(self) == 1:
             mu = self.b[0]
             sigmasq = (self.a @ self.a.T)[0, 0] if self.a.size != 0 else 0
             return f"~ normal({mu:0.3g}, {sigmasq:0.3g})"
@@ -193,11 +193,8 @@ class Normal:
             raise ValueError("The iids of the assignment target and the operand"
                              " must be the same to assign at an index.")   
     
-    def __len__(self): 
-        # Defining length makes the class interact slower with numpy arrays 
-        # (inclusing scalars) upon right-multiplication, because the class 
-        # starts looking like a sequence type.
-        raise NotImplementedError() # TODO should rather set __len__ = None
+    def __len__(self):
+        return self.b.size
     
     def __or__(self, observations: dict):
         """Conditioning operation.
@@ -212,7 +209,7 @@ class Normal:
         """
 
         condition = join([k-v for k, v in observations.items()])
-        av, ac, new_iids = self._compatible_maps(condition)
+        av, ac, new_iids = self._complete_maps(condition)
 
         sol_b, res, _, _ = np.linalg.lstsq(ac, -condition.b, rcond=None) 
         new_b = self.b + np.dot(av, sol_b)
@@ -230,7 +227,7 @@ class Normal:
     def __and__(self, other):
         """Combines two random variables into one vector."""
 
-        a1, a2, new_iids = self._compatible_maps(other)
+        a1, a2, new_iids = self._complete_maps(other)
         new_a = np.concatenate([a1, a2], axis=0)
         new_b = np.concatenate([self.b, other.b], axis=0)
         return Normal(new_a, new_b, new_iids)
@@ -240,14 +237,14 @@ class Normal:
 
     def mean(self):
         """Mean"""
-        if self.dim == 1:
+        if len(self) == 1:
             return self.b[0]
         return self.b
 
     def var(self):
         """Variance"""
         variance = np.einsum("ij, ij -> i", self.a, self.a)
-        if self.dim == 1:
+        if len(self) == 1:
             return variance[0]
         return variance
     
@@ -256,11 +253,13 @@ class Normal:
         return self.a @ self.a.T
     
     def sample(self, n=1):
+        """Samples the random variable `n` times."""
+
         r = np.random.normal(size=(len(self.iids), n))
         samples = np.dot(self.a, r).T + self.b
 
         # The return formats differ depending on the dimension.
-        if self.dim == 1:
+        if len(self) == 1:
             if n == 1:
                 return samples[0, 0]
 
@@ -280,7 +279,7 @@ class Normal:
         Returns:
             Natural logarithm of the probability density at the sample value - 
             a single number for single sample inputs, and an array for sequence 
-            of inputs.
+            inputs.
         """
 
         m = self.b
@@ -299,11 +298,11 @@ def join(*args):
         if isinstance(args[0], (tuple, list)):
             vs = args[0]
         else:
-            return as_normal(args[0])
+            return asnormal(args[0])
     else:
         vs = args
 
-    vsl = [as_normal(v) for v in vs]
+    vsl = [asnormal(v) for v in vs]
 
     s = set().union(*[v.iids.keys() for v in vsl])
     iids = {k: i for i, k in enumerate(s)}  # The values of iids must be range(len(iids)) TODO: move this to Normal class 
@@ -314,7 +313,7 @@ def join(*args):
     return Normal(a, b, iids)
 
 
-def as_normal(v):
+def asnormal(v):
     if isinstance(v, Normal):
         return v
 
@@ -324,7 +323,7 @@ def as_normal(v):
 
 # TODO: rename to normal()
 
-def N(mu=0, sigmasq=1, dim=1, lu=None):
+def N(mu=0, sigmasq=1, size=1):
     """Creates a new normal random variable.
     
     Args:
@@ -340,41 +339,34 @@ def N(mu=0, sigmasq=1, dim=1, lu=None):
 
     # Handles the scalar case when mu and sigmasq are simple numbers 
     if sigmasq.shape == (1, 1):
-        if dim == 1:
+        if size == 1:
             # Single scalar variable
             if sigmasq[0, 0] < 0:
                 raise ValueError("Negative scalar sigmasq")
             return Normal(np.sqrt(sigmasq), mu)
         
         # Vector of independt identically-distributed variables
-        return Normal(np.sqrt(sigmasq) * np.eye(dim, dim), mu * np.ones(dim))
+        return Normal(np.sqrt(sigmasq) * np.eye(size, size), mu * np.ones(size))
     
     # If sigmasq is not a scalar, the external value of the argument is ignored.
-    dim = sigmasq.shape[0]
+    size = sigmasq.shape[0]
 
-    if len(mu) != dim:
-        mu = mu * np.ones(dim)  # Expands the dimensions of mu. 
+    if len(mu) != size:
+        mu = mu * np.ones(size)  # Expands the dimensions of mu. 
                                  # This allows, in particular, to not explicitly 
                                  # supply mu when creating zero-mean vector 
                                  # variables.      
 
-    if (lu is None) or lu:
-        try:
-            # LU decomposition
-            a = np.linalg.cholesky(sigmasq)
-            return Normal(a, mu)
-        except np.linalg.LinAlgError as e:  # TODO: just LinAlgError
-            # LU decomposition fails if the covariance matrix is not strictly
-            # positive-definite, while we also allow positive-semidefinite
-            # matrices, unless lu=True.
-            if lu is True:
-                raise e
+    try:
+        a = np.linalg.cholesky(sigmasq)
+        return Normal(a, mu)
+    except LinAlgError:
+        # Cholesky decomposition fails if the covariance matrix is not strictly
+        # positive-definite.
+        pass
 
-    # TODO: change to SVD? Then the matrix structure will always be the same, and lu argument won't be needed. Need to time just for curiosity.
-
-    # If lu is False, or the LU decomposition failed, 
-    # do the orthogonal decomposition sigmasq = Q D Q'
-    eigvals, eigvects = np.linalg.eigh(sigmasq)
+    # To handle the positive-semidefinite case, do the orthogonal decomposition. 
+    eigvals, eigvects = np.linalg.eigh(sigmasq)  # sigmasq = V D V.T
 
     if (eigvals < 0).any():
         raise ValueError("Negative eigenvalue in sigmasq matrix")

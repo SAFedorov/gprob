@@ -224,7 +224,7 @@ def test_logp_batch():
                                      + np.log(1/np.sqrt(2 * np.pi * 3.3)))
 
     # Vector variables
-    xi = N(0.9, 3.3, dim=2)
+    xi = N(0.9, 3.3, size=2)
     m, cov = xi.mean(), xi.cov()
 
     res = (-(2-0.9)**2/(2 * 3.3)-(1-0.9)**2/(2 * 3.3) 
@@ -239,7 +239,7 @@ def test_logp_batch():
 
     assert (logp([[3.2, 1.2], [-1., -2.2]], m, cov) == np.array(res)).all()
 
-    xi = N(0.9, 3.3, dim=2)
+    xi = N(0.9, 3.3, size=2)
     m, cov = xi.mean(), xi.cov()
     with pytest.raises(ValueError):
         logp(0, m, cov)

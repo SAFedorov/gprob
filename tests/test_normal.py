@@ -15,7 +15,7 @@ def test_N():
     assert (xi.a == np.array([[2.]])).all()
     assert (xi.b == np.array([1.3])).all()
 
-    xi = N(0, 4, dim=3)
+    xi = N(0, 4, size=3)
     assert (xi.a == 2 * np.eye(3)).all()
     assert (xi.b == np.zeros(3)).all()
 
@@ -41,19 +41,11 @@ def test_N():
     # Covariance matrices with negative eigenvalues are not allowed
     with pytest.raises(ValueError):
         N(0, [[0, 1], [1, 0]])
-    with pytest.raises(ValueError):
-        N(0, [[0, 1], [1, 0]], lu=False)
-    with pytest.raises(np.linalg.LinAlgError):
-        N(0, [[0, 1], [1, 0]], lu=True)
 
     # But covariance matrices with zero eigenvalues are.
     cov = [[1., 0.], [0., 0.]]
     xi = N(0, cov)
     assert (xi.a @ xi.a.T == np.array(cov)).all()
-
-    # Unless lu decomposition is explicitly requested.
-    with pytest.raises(np.linalg.LinAlgError):
-        N(0, [[0, 1], [1, 0]], lu=True)
 
 
 def test_logp():
@@ -71,11 +63,11 @@ def test_logp():
                           + np.log(1/np.sqrt(2 * np.pi * 3.3)))
 
     # Vector variables
-    xi = N(0.9, 3.3, dim=2)
+    xi = N(0.9, 3.3, size=2)
     assert xi.logp([2, 1]) == (-(2-0.9)**2/(2 * 3.3)-(1-0.9)**2/(2 * 3.3) 
                                + 2 * np.log(1/np.sqrt(2 * np.pi * 3.3)))
 
-    xi = N(0.9, 3.3, dim=2)
+    xi = N(0.9, 3.3, size=2)
     with pytest.raises(ValueError):
         xi.logp(0)
     with pytest.raises(ValueError):
@@ -104,10 +96,11 @@ def test_logp():
 
 
 def test_len():
-    xi = N(0, 2, dim=2)
+    xi = N(0, 2, size=2)
+    assert len(xi) == 2
 
-    with pytest.raises(NotImplementedError):
-        len(xi)
+    xi = (N() & N() & N() & N())
+    assert len(xi) == 4
 
 
 def test_sample():
@@ -121,7 +114,7 @@ def test_sample():
     s = v.sample(3)
     assert s.shape == (3,)
 
-    v = N(0, 1, dim=5)
+    v = N(0, 1, size=5)
     s = v.sample()
     assert s.shape == (5,)
 
@@ -132,7 +125,7 @@ def test_sample():
 def test_join():
 
     x = join(1)
-    assert isinstance(x, Normal) and x.dim == 1
+    assert isinstance(x, Normal) and len(x) == 1
 
     v1 = N()
     v2 = N()
@@ -146,17 +139,17 @@ def test_join():
     assert vm.a == v1.a and vm.b == v1.b and vm.iids == v1.iids
 
     vm = join(v1, v2, v3)  # sequence input
-    assert isinstance(vm, Normal) and vm.dim == 3
+    assert isinstance(vm, Normal) and len(vm) == 3
 
     vm = join([v1, v2, v3])  # list input
-    assert isinstance(vm, Normal) and vm.dim == 3
+    assert isinstance(vm, Normal) and len(vm) == 3
 
     vm = join((v1, v2, v3))  # tuple input
-    assert isinstance(vm, Normal) and vm.dim == 3
+    assert isinstance(vm, Normal) and len(vm) == 3
 
-    v4 = N(0, 2, dim=2)
+    v4 = N(0, 2, size=2)
     vm = join(v1, v2, v4)
-    assert isinstance(vm, Normal) and vm.dim == 4 and len(vm.iids) == 4
+    assert isinstance(vm, Normal) and len(vm) == 4 and len(vm.iids) == 4
 
 
 def test_iids_ordering():
@@ -237,13 +230,13 @@ def test_iids_ordering():
 
     # Vectors
 
-    vl1 = [N(0.3, 12., dim=3) for _ in range(nrv)]
+    vl1 = [N(0.3, 12., size=3) for _ in range(nrv)]
     assert isordered(join(vl1))
 
-    vl2 = [N(dim=3) for _ in range(nrv)]
+    vl2 = [N(size=3) for _ in range(nrv)]
     assert isordered(join(vl2))
 
-    vl3 = [N(-3, 2., dim=3) for _ in range(nrv // 2)]  # A shorter list.
+    vl3 = [N(-3, 2., size=3) for _ in range(nrv // 2)]  # A shorter list.
     assert isordered(join(vl3))
 
     assert isordered(join(vl1 + vl2))
@@ -293,23 +286,23 @@ def test_operations():
         return ((np.abs(v1.a - v2.a) < tol).all() 
                 and (np.abs(v1.b - v2.b) < tol).all())
 
-    v1 = [2, 3] - N(0, 1, dim=2)
-    v2 = np.array([2, 3]) - N(0, 1, dim=2)
+    v1 = [2, 3] - N(0, 1, size=2)
+    v2 = np.array([2, 3]) - N(0, 1, size=2)
     assert isclose(v1, v2)
 
-    v1 = -N(0, 1, dim=2) + np.array([2, 3])
-    v2 = np.array([2, 3]) - N(0, 1, dim=2)
+    v1 = -N(0, 1, size=2) + np.array([2, 3])
+    v2 = np.array([2, 3]) - N(0, 1, size=2)
     assert isclose(v1, v2)
 
-    v1 = [2, 3] * N(0, 1, dim=2)
-    v2 = np.array([2, 3]) * N(0, 1, dim=2)
+    v1 = [2, 3] * N(0, 1, size=2)
+    v2 = np.array([2, 3]) * N(0, 1, size=2)
     assert isclose(v1, v2)
 
-    v1 = N(0, 1, dim=2) * np.array([2, 3])
-    v2 = np.array([2, 3]) * N(0, 1, dim=2)
+    v1 = N(0, 1, size=2) * np.array([2, 3])
+    v2 = np.array([2, 3]) * N(0, 1, size=2)
     assert isclose(v1, v2)
 
-    v1 = N(0, 1, dim=2) * np.sqrt(2)
-    v2 = np.sqrt(2) * N(0, 1, dim=2)
+    v1 = N(0, 1, size=2) * np.sqrt(2)
+    v2 = np.sqrt(2) * N(0, 1, size=2)
     assert isclose(v1, v2)
 
