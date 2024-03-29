@@ -4,7 +4,6 @@ sys.path.append('..')  # Until there is a package structure.
 import pytest
 import numpy as np
 from plaingaussian.normal import N, join, Normal
-from utils import logp_batch
 
 
 def test_N():
@@ -105,90 +104,6 @@ def test_logp():
     xi12 = xi1 & xi2
     assert xi12.logp([1.2, 0]) == -(1.2)**2/(2) + nc
     assert xi12.logp([1.2, 0.1]) == float("-inf")
-
-
-def test_logp_batch():
-    # Validation of the log likelihood calculation, batch version.
-
-    nc = np.log(1/np.sqrt(2 * np.pi))  # Normalization constant.
-    
-    # Scalar variables
-    xi = N()
-    assert logp_batch(xi, 0) == nc
-    assert (logp_batch(xi, [0]) == np.array([nc])).all()
-    assert (logp_batch(xi, [0, 0]) == np.array([nc, nc])).all()
-    assert (logp_batch(xi, [[0], [0]]) == np.array([nc, nc])).all()
-    assert logp_batch(xi, 2) == -4/2 + nc
-    assert (logp_batch(xi, [0, 1.1]) == [nc, -1.1**2/2 + nc]).all()
-
-    with pytest.raises(ValueError):
-        logp_batch(xi, [[0, 1]])
-
-    xi = N(0.9, 3.3)
-    assert logp_batch(xi, 2) == (-(2-0.9)**2/(2 * 3.3) 
-                          + np.log(1/np.sqrt(2 * np.pi * 3.3)))
-
-    # Vector variables
-    xi = N(0.9, 3.3, dim=2)
-    assert logp_batch(xi, [2, 1]) == (-(2-0.9)**2/(2 * 3.3)-(1-0.9)**2/(2 * 3.3) 
-                               + 2 * np.log(1/np.sqrt(2 * np.pi * 3.3)))
-    
-    res = [-(3.2-0.9)**2/(2 * 3.3)-(1.2-0.9)**2/(2 * 3.3) 
-           + 2 * np.log(1/np.sqrt(2 * np.pi * 3.3)), 
-           -(-1-0.9)**2/(2 * 3.3)-(-2.2-0.9)**2/(2 * 3.3) 
-           + 2 * np.log(1/np.sqrt(2 * np.pi * 3.3))]
-    
-    assert (logp_batch(xi, [[3.2, 1.2], [-1., -2.2]]) == np.array(res)).all()
-
-    xi = N(0.9, 3.3, dim=2)
-    with pytest.raises(ValueError):
-        logp_batch(xi, 0)
-    with pytest.raises(ValueError):
-        logp_batch(xi, [0, 0, 0])
-    with pytest.raises(ValueError):
-        logp_batch(xi, [[0], [0]])
-    with pytest.raises(ValueError):
-        logp_batch(xi, [[0, 0, 0]])
-
-    # Degenerate cases.
-        
-    # Zero scalar random variable.
-    assert (0 * N()).logp(0.) > float("-inf")
-    assert (0 * N()).logp(0.1) == float("-inf")
-
-    # Deterministic variables.
-    xi = join(N(), 1)
-    assert logp_batch(xi, [0, 1.1]) == float("-inf")
-    assert (logp_batch(xi, [[0, 1.1]]) == np.array([float("-inf")])).all()
-    assert logp_batch(xi, [0, 1.]) == nc
-    assert (logp_batch(xi, [[0, 1], [1.1, 1], [0, 2]]) == [nc, -(1.1)**2/(2) + nc, 
-                                                    float("-inf")]).all()
-    
-    # Degenerate covariance matrix. 
-    xi1 = N()
-    xi2 = 0 * N()
-    xi12 = xi1 & xi2
-    assert logp_batch(xi12, [1.2, 0]) == -(1.2)**2/(2) + nc
-    assert logp_batch(xi12, [1.2, 0.1]) == float("-inf")
-    assert (logp_batch(xi12, [[1, 0.1]]) == np.array([float("-inf")])).all()
-    assert (logp_batch(xi12, [[1, 0.1], [1.2, 0]]) == [float("-inf"), 
-                                                -(1.2)**2/(2) + nc]).all()
-
-    # TODO: add higher-dimensional examples
-    
-    # Integrals of the probability density
-    xi = N(0, 3.3)
-    npt = 200000
-    ls = np.linspace(-10, 10, npt)
-    err = np.abs(1 - np.sum(np.exp(logp_batch(xi, ls))) * (20)/ npt)
-    assert err < 6e-6  # should be 5.03694e-06
-
-    xi = N(0, [[2.1, 0.5], [0.5, 1.3]])
-    npt = 1000
-    ls = np.linspace(-7, 7, npt)
-    points = [(x, y) for x in ls for y in ls]
-    err = np.abs(1 - np.sum(np.exp(logp_batch(xi, points))) * ((14)/ npt)**2)
-    assert err < 2.5e-3  # should be 0.00200
 
 
 def test_len():

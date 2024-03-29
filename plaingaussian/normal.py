@@ -410,7 +410,7 @@ def N(mu=0, sigmasq=1, dim=1, lu=None):
             # LU decomposition
             a = np.linalg.cholesky(sigmasq)
             return Normal(a, mu)
-        except np.linalg.LinAlgError as e:
+        except np.linalg.LinAlgError as e:  # TODO: just LinAlgError
             # LU decomposition fails if the covariance matrix is not strictly
             # positive-definite, while we also allow positive-semidefinite
             # matrices, unless lu=True.
