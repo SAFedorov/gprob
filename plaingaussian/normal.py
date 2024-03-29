@@ -1,6 +1,5 @@
 import numpy as np
-import scipy as sp
-from scipy.linalg import lapack
+from plaingaussian.func import logp
 
 import itertools
 
@@ -274,65 +273,19 @@ class Normal:
 
     def logp(self, x):
         """Log likelihood of a sample.
-        
+    
         Args:
-            x: Sample value.
+            x: Sample value or a sequence of sample values.
 
         Returns:
-            Natural logarithm of the probability density at the sample value.
+            Natural logarithm of the probability density at the sample value - 
+            a single number for single sample inputs, and an array for sequence 
+            of inputs.
         """
 
-        # TODO: return batching?
-
-        x = np.array(x, ndmin=1)
-
-        if len(x) != self.dim or x.ndim != 1:
-            # Raises error because relying on Numpy broadcusting rules in this 
-            # case can result in counter-intuitive behavior like constants  
-            # being treated as vectors with all identical components.
-
-            raise ValueError("The dimension of the sample vector "
-                             f"({len(x)}) does not match the dimension " 
-                             f"of the random variable ({self.dim}).") 
-        
-        covm = self.a @ self.a.T
-        lt, status = lapack.dpotrf(covm, lower=True)
-
-        if status == 0:
-            sol = sp.linalg.solve_triangular(lt, x - self.b, 
-                                             check_finite=False, lower=True)
-            
-            rank = self.dim  # If the solution suceeded, the rank is full.
-            log_sqrt_det = np.sum(np.log(np.diag(lt)))
-        
-        else:
-            # The covariance matrix is probably degenerate.
-             
-            sol, res, rank, sv = np.linalg.lstsq(self.a, x - self.b, rcond=None)
-            sv = sv[:rank]  # Selects only non-zero singular values.
-            log_sqrt_det = np.sum(np.log(sv))
-
-        norm = np.log(np.sqrt(2 * np.pi)) * rank + log_sqrt_det
-        llk = - sol @ sol / 2 - norm  # log likelihood
-
-        if rank == self.dim:
-            # The solution must be good.
-            return llk
-        
-        # If the rank is not full, checks the residual error.
-        # May need to calculate it, as it is not always returned by lstsq.
-        
-        if res.size == 0:
-            delta = sol - (x - self.b)
-            res = (delta @ delta,)  # Put in tuple for shape compatibility.
-
-        eps = np.finfo(float).eps * max(self.a.shape[-2:]) 
-
-        if np.abs(res[0]) > eps:
-            # The input is a zero-probability sample.
-            llk = float("-inf")
-
-        return llk
+        m = self.b
+        cov = self.a @ self.a.T
+        return logp(x, m, cov)
 
 
 def join(*args):

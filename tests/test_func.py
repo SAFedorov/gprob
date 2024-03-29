@@ -4,7 +4,7 @@ sys.path.append('..')  # Until there is a package structure.
 import pytest
 import numpy as np
 from plaingaussian.normal import N, join
-from plaingaussian.func import logp, dlogp, d2logp, fisher, logp_batch
+from plaingaussian.func import logp, dlogp, d2logp, fisher
 
 from benchmarks.reffunc import logp as logp_
 from benchmarks.reffunc import dlogp_eigh as dlogp_
@@ -208,19 +208,19 @@ def test_logp_batch():
     # Scalar variables
     xi = N()
     m, cov = xi.mean(), xi.cov()
-    assert logp_batch(0, m, cov) == nc
-    assert (logp_batch([0], m, cov) == np.array([nc])).all()
-    assert (logp_batch([0, 0], m, cov) == np.array([nc, nc])).all()
-    assert (logp_batch([[0], [0]], m, cov) == np.array([nc, nc])).all()
-    assert logp_batch(2, m, cov) == -4/2 + nc
-    assert (logp_batch([0, 1.1], m, cov) == [nc, -1.1**2/2 + nc]).all()
+    assert logp(0, m, cov) == nc
+    assert (logp([0], m, cov) == np.array([nc])).all()
+    assert (logp([0, 0], m, cov) == np.array([nc, nc])).all()
+    assert (logp([[0], [0]], m, cov) == np.array([nc, nc])).all()
+    assert logp(2, m, cov) == -4/2 + nc
+    assert (logp([0, 1.1], m, cov) == [nc, -1.1**2/2 + nc]).all()
 
     with pytest.raises(ValueError):
-        logp_batch([[0, 1]], m, cov)
+        logp([[0, 1]], m, cov)
 
     xi = N(0.9, 3.3)
     m, cov = xi.mean(), xi.cov()
-    assert logp_batch(2, m, cov) == (-(2-0.9)**2/(2 * 3.3)
+    assert logp(2, m, cov) == (-(2-0.9)**2/(2 * 3.3)
                                      + np.log(1/np.sqrt(2 * np.pi * 3.3)))
 
     # Vector variables
@@ -230,35 +230,35 @@ def test_logp_batch():
     res = (-(2-0.9)**2/(2 * 3.3)-(1-0.9)**2/(2 * 3.3) 
            + 2 * np.log(1/np.sqrt(2 * np.pi * 3.3)))
     
-    assert logp_batch([2, 1], m, cov) == res
+    assert logp([2, 1], m, cov) == res
     
     res = [-(3.2-0.9)**2/(2 * 3.3)-(1.2-0.9)**2/(2 * 3.3) 
            + 2 * np.log(1/np.sqrt(2 * np.pi * 3.3)), 
            -(-1-0.9)**2/(2 * 3.3)-(-2.2-0.9)**2/(2 * 3.3) 
            + 2 * np.log(1/np.sqrt(2 * np.pi * 3.3))]
 
-    assert (logp_batch([[3.2, 1.2], [-1., -2.2]], m, cov) == np.array(res)).all()
+    assert (logp([[3.2, 1.2], [-1., -2.2]], m, cov) == np.array(res)).all()
 
     xi = N(0.9, 3.3, dim=2)
     m, cov = xi.mean(), xi.cov()
     with pytest.raises(ValueError):
-        logp_batch(0, m, cov)
+        logp(0, m, cov)
     with pytest.raises(ValueError):
-        logp_batch([0, 0, 0], m, cov)
+        logp([0, 0, 0], m, cov)
     with pytest.raises(ValueError):
-        logp_batch([[0], [0]], m, cov)
+        logp([[0], [0]], m, cov)
     with pytest.raises(ValueError):
-        logp_batch([[0, 0, 0]], m, cov)
+        logp([[0, 0, 0]], m, cov)
 
     # Degenerate cases.
 
     # Deterministic variables.
     xi = join(N(), 1)
     m, cov = xi.mean(), xi.cov()
-    assert logp_batch([0, 1.1], m, cov) == float("-inf")
-    assert (logp_batch([[0, 1.1]], m, cov) == np.array([float("-inf")])).all()
-    assert logp_batch([0, 1.], m, cov) == nc
-    assert (logp_batch([[0, 1], [1.1, 1], [0, 2]], m, cov) == 
+    assert logp([0, 1.1], m, cov) == float("-inf")
+    assert (logp([[0, 1.1]], m, cov) == np.array([float("-inf")])).all()
+    assert logp([0, 1.], m, cov) == nc
+    assert (logp([[0, 1], [1.1, 1], [0, 2]], m, cov) == 
             [nc, -(1.1)**2/(2) + nc, float("-inf")]).all()
     
     # Degenerate covariance matrix. 
@@ -266,10 +266,10 @@ def test_logp_batch():
     xi2 = 0 * N()
     xi12 = xi1 & xi2
     m, cov = xi12.mean(), xi12.cov()
-    assert logp_batch([1.2, 0], m, cov) == -(1.2)**2/(2) + nc
-    assert logp_batch([1.2, 0.1], m, cov) == float("-inf")
-    assert (logp_batch([[1, 0.1]], m, cov) == np.array([float("-inf")])).all()
-    assert (logp_batch([[1, 0.1], [1.2, 0]], m, cov) == 
+    assert logp([1.2, 0], m, cov) == -(1.2)**2/(2) + nc
+    assert logp([1.2, 0.1], m, cov) == float("-inf")
+    assert (logp([[1, 0.1]], m, cov) == np.array([float("-inf")])).all()
+    assert (logp([[1, 0.1], [1.2, 0]], m, cov) == 
             [float("-inf"), -(1.2)**2/(2) + nc]).all()
 
     # TODO: add higher-dimensional examples
@@ -279,7 +279,7 @@ def test_logp_batch():
     m, cov = xi.mean(), xi.cov()
     npt = 200000
     ls = np.linspace(-10, 10, npt)
-    err = np.abs(1 - np.sum(np.exp(logp_batch(ls, m, cov))) * (20)/ npt)
+    err = np.abs(1 - np.sum(np.exp(logp(ls, m, cov))) * (20)/ npt)
     assert err < 6e-6  # should be 5.03694e-06
 
     xi = N(0, [[2.1, 0.5], [0.5, 1.3]])
@@ -287,5 +287,5 @@ def test_logp_batch():
     npt = 1000
     ls = np.linspace(-7, 7, npt)
     points = [(x, y) for x in ls for y in ls]
-    err = np.abs(1 - np.sum(np.exp(logp_batch(points, m, cov))) * ((14)/ npt)**2)
+    err = np.abs(1 - np.sum(np.exp(logp(points, m, cov))) * ((14)/ npt)**2)
     assert err < 2.5e-3  # should be 0.00200

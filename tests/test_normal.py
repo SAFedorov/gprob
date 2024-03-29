@@ -66,9 +66,6 @@ def test_logp():
     assert xi.logp(0) == nc
     assert xi.logp(1.1) == -1.1**2/2 + nc
 
-    with pytest.raises(ValueError):
-        xi.logp([0, 1])
-
     xi = N(0.9, 3.3)
     assert xi.logp(2) == (-(2-0.9)**2/(2 * 3.3) 
                           + np.log(1/np.sqrt(2 * np.pi * 3.3)))

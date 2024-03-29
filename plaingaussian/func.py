@@ -46,17 +46,6 @@ def fisher(cov, dm, dcov):
     return dm @ cov_inv @ dm.T + 0.5 * prod2
 
 
-def logp(x, m, cov):
-
-    ltr, _ = sp.linalg.cho_factor(cov, check_finite=False, lower=True)
-    z = sp.linalg.solve_triangular(ltr, x - m, check_finite=False, lower=True)
-    rank = cov.shape[0]  # Since the solution suceeded, the rank is full.
-    log_sqrt_det = np.sum(np.log(np.diagonal(ltr)))
-
-    norm = np.log(np.sqrt(2 * np.pi)) * rank + log_sqrt_det
-    return - z @ z / 2 - norm
-
-
 def dlogp(x, m, cov, dm, dcov):
     """Calculates the derivatives of the logarithmic probability density with 
     respect to the parameters.
@@ -105,7 +94,7 @@ def d2logp(x, m, cov, dm, dcov, d2m, d2cov):
     return term1 + term2 + term3 + term4 + term5 + term5.T
 
 
-# ---------- batch versions ----------
+# ---------- versions supporting batching ----------
 
 def logp_sc(x, mu, sigmasq):
     """The scalar version of logp."""
@@ -179,7 +168,7 @@ def logp_lstsq(x, m, cov):
     return np.where(valid_idx, llk, float("-inf"))
 
 
-def logp_batch(x, m, cov):
+def logp(x, m, cov):
 
     x = np.array(x)
     m = np.array(m)
