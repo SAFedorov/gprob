@@ -25,8 +25,9 @@ class Normal:
 
     def __init__(self, a, b, iids=None):
         if a.shape[-2] != b.shape[-1]:
-            raise ValueError("The shapes of a and b do not agree. The shape of "
-                             f"a is {a.shape} and the shape of b is {b.shape}.")
+            a = np.broadcast_to(a, (b.shape[-1], a.shape[-1]))
+            #raise ValueError("The shapes of a and b do not agree. The shape of "
+            #                 f"a is {a.shape} and the shape of b is {b.shape}.")  TODO: remove
 
         self.a = a  # matrix defining the linear map iids -> v
         self.b = b  # mean vector
@@ -56,11 +57,12 @@ class Normal:
         idx = [new_iids[k] for k in self.iids]
 
         new_a[:, idx] = self.a
-        # For python >= 3.6, the dictionaries are order-preserving, 
-        # which means that the values for iids are always their sequential 
-        # numers. If the dictionaries are not order-preserving, can use this:
+        # This works for for python >= 3.6, where the dictionaries are 
+        # order-preserving, which guarantees that the values in the iid dict 
+        # are always sequential integers starting from zero. 
+        # For non-order-preserving dictionaries, can use this instead:
         # new_a[:, idx] = np.take(self.a, list(self.iids.values()), axis=1)
-        # which is only 20% slower in my benchmark.
+        # which was 20% slower in my benchmarks.
         
         return new_a
     
@@ -102,15 +104,7 @@ class Normal:
 
             return Normal(a, b, new_iids)
         
-        # Scalar variables span over sequences
-        if len(self) == 1 and isinstance(other, np.ndarray) and len(other) == 1:
-            return Normal(np.outer(other, self.a), self.b * other, self.iids)
-        
-        if len(self) == 1 and isinstance(other, (list, tuple)):
-            return Normal(np.outer(other, self.a), self.b * other, self.iids)
-
-        # Otherwise other must be a number or vector of numbers
-        return Normal(self.a * other, self.b * other, self.iids)
+        return Normal((self.a.T * other).T, self.b * other, self.iids)
     
     def __truediv__(self, other):
         if isinstance(other, Normal):
@@ -122,10 +116,8 @@ class Normal:
             b = self.b / other.b
 
             return Normal(a, b, new_iids)
-
-        # TODO: add sequences
         
-        return Normal(self.a / other, self.b / other, self.iids)
+        return Normal((self.a.T / other).T, self.b / other, self.iids)
     
     def __rtruediv__(self, other):
         # Linearized fraction  x/y = <x>/<y> - dy<x>/<y>^2,
@@ -281,10 +273,7 @@ class Normal:
             a single number for single sample inputs, and an array for sequence 
             inputs.
         """
-
-        m = self.b
-        cov = self.a @ self.a.T
-        return logp(x, m, cov)
+        return logp(x, self.b, self.cov())
 
 
 def join(*args):

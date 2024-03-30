@@ -285,10 +285,53 @@ def test_operations():
     def isclose(v1, v2, tol=1e-14):
         return ((np.abs(v1.a - v2.a) < tol).all() 
                 and (np.abs(v1.b - v2.b) < tol).all())
+    
+    # 0d-1d
+    v = N(8, 1)
+    x_li = [2, 3]
+    x_tu = tuple(x_li)
+    x_ar = np.array(x_li)
 
-    v1 = [2, 3] - N(0, 1, size=2)
-    v2 = np.array([2, 3]) - N(0, 1, size=2)
-    assert isclose(v1, v2)
+    assert np.all((x_li + v).b == [10, 11])
+    assert np.all((x_li * v).b == [16, 24])
+    
+    assert isclose(x_li + v, x_ar + v)
+    assert isclose(x_tu + v, x_ar + v)
+    assert isclose(v + x_li, x_ar + v)
+
+    assert isclose(x_li - v, x_ar - v)
+    assert isclose(x_tu - v, x_ar - v)
+    assert isclose((-1) * v + x_li, x_ar - v)
+    assert isclose((-1) * (x_li - v), v - x_ar)
+
+    assert isclose(x_li * v, x_ar * v)
+    assert isclose(x_tu * v, x_ar * v)
+    assert isclose(v * x_li, x_ar * v)
+
+    assert isclose(v / x_li,  v / x_ar)
+    assert isclose(v / x_tu, v / x_ar)
+
+    # 1d-1d
+    v = N(0, 1, size=2)
+    x_li = [2, 3]
+    x_tu = tuple(x_li)
+    x_ar = np.array(x_li) 
+
+    assert isclose(x_li + v, x_ar + v)
+    assert isclose(x_tu + v, x_ar + v)
+    assert isclose(v + x_li, x_ar + v)
+
+    assert isclose(x_li - v, x_ar - v)
+    assert isclose(x_tu - v, x_ar - v)
+    assert isclose((-1) * v + x_li, x_ar - v)
+    assert isclose((-1) * (x_li - v), v - x_ar)
+
+    assert isclose(x_li * v, x_ar * v)
+    assert isclose(x_tu * v, x_ar * v)
+    assert isclose(v * x_li, x_ar * v)
+
+    assert isclose(v / x_li,  v / x_ar)
+    assert isclose(v / x_tu, v / x_ar)
 
     v1 = -N(0, 1, size=2) + np.array([2, 3])
     v2 = np.array([2, 3]) - N(0, 1, size=2)
