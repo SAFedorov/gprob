@@ -8,7 +8,8 @@ from scipy.linalg import LinAlgError
 
 def cholesky_inv(mat):
     """Inverts the positive-definite symmetric matrix `mat` using Cholesky 
-    decomposition. Marginally faster than `linalg.inv`. """
+    decomposition. A bit faster than `linalg.inv` and gives a bit smaller error. 
+    """
     
     ltr, _ = sp.linalg.cho_factor(mat, check_finite=False, lower=True)
     ltinv = sp.linalg.solve_triangular(ltr, np.eye(ltr.shape[0]), 
