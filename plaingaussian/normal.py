@@ -330,4 +330,6 @@ def normal(mu=0, sigmasq=1, size=1):
 
 
 def broadcast_a(a, b):
-    return np.broadcast_to(a, (a.shape[0], *b.shape))
+    if a.ndim != b.ndim + 1:
+        a = np.broadcast_to(a, (a.shape[0], *b.shape))
+    return a
