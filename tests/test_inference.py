@@ -4,7 +4,7 @@ sys.path.append('..')  # Until there is a package structure.
 import pytest
 import numpy as np
 from external.Infer import Infer
-from plaingaussian.normal import N, join
+from plaingaussian.normal import normal, join, ConditionError
 
 
 def test_conditioning():
@@ -14,11 +14,11 @@ def test_conditioning():
     # Single constraint
 
     # This package
-    v1 = N(0.93, 1)
-    v2 = N(0, 1)
-    v3 = N(0, 1)
+    v1 = normal(0.93, 1)
+    v2 = normal(0, 1)
+    v3 = normal(0, 1)
 
-    vm = join(v1, v2, v3)
+    vm = join([v1, v2, v3])
     vc = vm | {v1 + 0.2*v2 + 0.4*v3: 1.4}
 
 
@@ -47,8 +47,8 @@ def test_conditioning():
     assert (np.abs(vc2.mean() - m2.b[:, 0]) < tol).all()
 
     # Incompatible conditions
-    with pytest.raises(RuntimeError):
-        join(v1, v2, v3) | {v2: 0, v3: 1, v1:0, v1+v2:1}
+    with pytest.raises(ConditionError):
+        join([v1, v2, v3]) | {v2: 0, v3: 1, v1:0, v1+v2:1}
 
 
 def test_linear_regression():
@@ -77,15 +77,15 @@ def test_linear_regression():
 
     # Comparison to a non-vectorized calculation using this package
 
-    mn = [N(0, 0.1) for _ in range(len(xs))]
+    mn = [normal(0, 0.1) for _ in range(len(xs))]
 
-    a = N(0, 10)
-    b = N(0, 10)
+    a = normal(0, 10)
+    b = normal(0, 10)
 
     cond = {f(x): y + n for (x, y, n) in zip(xs, ys, mn)}
 
     ab = (a & b) | cond
-    jointd = join(a, b, *mn) | cond
+    jointd = join([a, b, *mn]) | cond
 
     assert (np.abs(mfull.Sigma - jointd.cov()) < tol).all()
     assert (np.abs(mfull.b[:, 0] - jointd.mean()) < tol).all()
@@ -95,10 +95,10 @@ def test_linear_regression():
     # Comparison to a vectorized calculation using this package
 
     fv = a * xs + b
-    mnv = N(0, 0.1, size=len(xs))
+    mnv = normal(0, 0.1, size=len(xs))
 
     ab2 = (a & b) | {fv: ys + mnv}
-    jointd2 = join(a, b, mnv) | {fv: ys + mnv}
+    jointd2 = join([a, b, mnv]) | {fv: ys + mnv}
 
     assert (np.abs(mfull.Sigma - jointd2.cov()) < tol).all()
     assert (np.abs(mfull.b[:, 0] - jointd2.mean()) < tol).all()

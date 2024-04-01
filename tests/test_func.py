@@ -3,7 +3,7 @@ sys.path.append('..')  # Until there is a package structure.
 
 import pytest
 import numpy as np
-from plaingaussian.normal import N, join
+from plaingaussian.normal import normal, join
 from plaingaussian.func import logp, dlogp, d2logp, fisher
 
 from benchmarks.reffunc import logp as logp_
@@ -206,7 +206,7 @@ def test_logp_batch():
     nc = np.log(1/np.sqrt(2 * np.pi))  # Normalization constant.
     
     # Scalar variables
-    xi = N()
+    xi = normal()
     m, cov = xi.mean(), xi.cov()
     assert logp(0, m, cov) == nc
     assert (logp([0], m, cov) == np.array([nc])).all()
@@ -218,13 +218,13 @@ def test_logp_batch():
     with pytest.raises(ValueError):
         logp([[0, 1]], m, cov)
 
-    xi = N(0.9, 3.3)
+    xi = normal(0.9, 3.3)
     m, cov = xi.mean(), xi.cov()
     assert logp(2, m, cov) == (-(2-0.9)**2/(2 * 3.3)
                                      + np.log(1/np.sqrt(2 * np.pi * 3.3)))
 
     # Vector variables
-    xi = N(0.9, 3.3, size=2)
+    xi = normal(0.9, 3.3, size=2)
     m, cov = xi.mean(), xi.cov()
 
     res = (-(2-0.9)**2/(2 * 3.3)-(1-0.9)**2/(2 * 3.3) 
@@ -239,7 +239,7 @@ def test_logp_batch():
 
     assert (logp([[3.2, 1.2], [-1., -2.2]], m, cov) == np.array(res)).all()
 
-    xi = N(0.9, 3.3, size=2)
+    xi = normal(0.9, 3.3, size=2)
     m, cov = xi.mean(), xi.cov()
     with pytest.raises(ValueError):
         logp(0, m, cov)
@@ -253,7 +253,7 @@ def test_logp_batch():
     # Degenerate cases.
 
     # Deterministic variables.
-    xi = join(N(), 1)
+    xi = join([normal(), 1])
     m, cov = xi.mean(), xi.cov()
     assert logp([0, 1.1], m, cov) == float("-inf")
     assert (logp([[0, 1.1]], m, cov) == np.array([float("-inf")])).all()
@@ -262,8 +262,8 @@ def test_logp_batch():
             [nc, -(1.1)**2/(2) + nc, float("-inf")]).all()
     
     # Degenerate covariance matrix. 
-    xi1 = N()
-    xi2 = 0 * N()
+    xi1 = normal()
+    xi2 = 0 * normal()
     xi12 = xi1 & xi2
     m, cov = xi12.mean(), xi12.cov()
     assert logp([1.2, 0], m, cov) == -(1.2)**2/(2) + nc
@@ -275,14 +275,14 @@ def test_logp_batch():
     # TODO: add higher-dimensional examples
     
     # Integrals of the probability density
-    xi = N(0, 3.3)
+    xi = normal(0, 3.3)
     m, cov = xi.mean(), xi.cov()
     npt = 200000
     ls = np.linspace(-10, 10, npt)
     err = np.abs(1 - np.sum(np.exp(logp(ls, m, cov))) * (20)/ npt)
     assert err < 6e-6  # should be 5.03694e-06
 
-    xi = N(0, [[2.1, 0.5], [0.5, 1.3]])
+    xi = normal(0, [[2.1, 0.5], [0.5, 1.3]])
     m, cov = xi.mean(), xi.cov()
     npt = 1000
     ls = np.linspace(-7, 7, npt)
