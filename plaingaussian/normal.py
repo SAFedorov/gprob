@@ -149,6 +149,11 @@ class Elementary:
         return cat_a, union_iids
 
 
+class ConditionError(Exception):
+    """Error raised for incompatible conditions."""
+    pass
+
+
 class Normal:
 
     __slots__ = ("a", "b", "iids", "size", "shape", "ndim")
@@ -207,7 +212,7 @@ class Normal:
     def __sub__(self, other):
         if isinstance(other, Normal):
             a, iids = Elementary.add((self.a, self.iids), (-other.a, other.iids))
-            return Normal(a, self.b + other.b, iids)
+            return Normal(a, self.b - other.b, iids)
         
         return Normal(self.a, self.b - other, self.iids)
     
@@ -276,36 +281,52 @@ class Normal:
         """Conditioning operation.
         
         Args:
-            observations: A dictionary of observations {variable: value, ...}, 
-                where variables are normal random variables, and values can be 
-                deterministic or random variables.
+            observations: A dictionary of observations in the format 
+                {`variable`: `value`, ...}, where `variable`s are normal 
+                variables, and `value`s can be constants or normal variables.
         
         Returns:
             Conditional normal variable.
+
+        Raises:
+            ConditionError when the observations are incompatible.
         """
 
         cond = join([k-v for k, v in observations.items()])
 
+        # The calculation is performed on flattened arrays.
         av, ac, union_iids = Elementary.complete_maps((self._a2d, self.iids), 
                                                       (cond._a2d, cond.iids))
+        
+        u, s, vh = np.linalg.svd(ac, compute_uv=True)
+        tol = np.finfo(float).eps * np.max(ac.shape)
+        snz = s[s > (tol * np.max(s))]  # non-zero singular values
+        r = len(snz)  # rank of ac
 
-        sol, _, rank, _ = np.linalg.lstsq(ac.T, -cond._b1d, rcond=None)  # TODO: right now SVD is performed twice on ac
-        new_b = self._b1d + sol @ av
+        u = u[:, :r]
+        vh = vh[:r] 
 
-        if rank < cond.size:
-            delta = (cond._b1d + ac.T @ sol) 
-            res = delta @ delta
-            eps = np.finfo(float).eps * max(ac.shape)  # TODO: need to multiply be the singular value
+        m = u @ ((vh @ (-cond._b1d)) / snz)
+        # lstsq solution of m @ ac = -cond.b
 
-            if res > eps:
-                raise RuntimeError("Conditions cannot be simultaneously satisfied.") 
+        if r < cond.size:
+            nsq = cond._b1d @ cond._b1d
+            d = (cond._b1d + m @ ac)  # residual
 
-        # Computes the projection of the column vectors of `a` on the subspace 
-        # orthogonal to the constraints. 
-        sol_, _, _, _ = np.linalg.lstsq(ac, av, rcond=None)
-        new_a = av - ac @ sol_
+            if nsq > 0 and (d @ d) > (tol**2 * nsq):
+                raise ConditionError("The conditions could not be satisfied. "
+                                     f"Got {(d @ d):0.3e} for the residual and "
+                                     f"{nsq:0.5e} for |bc|**2.")
+                # nsq=0 is always solvable
 
-        # Reshapes the result
+        proj = (vh.T / snz) @ (u.T @ av) 
+        # lstsq solution of ac @ proj = av that projects the column vectors 
+        # of av on the subspace spanned by the constraints.
+
+        new_a = av - ac @ proj
+        new_b = self._b1d + m @ av
+
+        # Shaping back
         new_a = np.reshape(new_a, self.a.shape)
         new_b = np.reshape(new_b, self.b.shape)
 
