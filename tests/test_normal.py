@@ -357,6 +357,10 @@ def test_broadcasting():
     assert np.abs(xi2.b - (-0.3, -0.4)).max() < tol
     assert np.abs(xi2.a[0] - (-3, -4)).max() < tol
 
+    xi = normal(1, 1)**[2, 0]
+    assert xi.shape == (2,)
+    assert np.abs(xi.a - np.array([[2., 0.]])).max() < tol
+
     m = np.array([[1, 0], [0, 1], [2, 2]])
     xi1 = Normal(a=np.array([[1, 0.5], [0, -1]]), b=np.array([0.3, -0.3]))
     xi2 = xi1 * m
