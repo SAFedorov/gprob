@@ -22,7 +22,8 @@ class Normal:
 
     def __init__(self, a, b, iids=None):
         if a.shape[1:] != b.shape:
-            a = np.broadcast_to(a, (a.shape[0], *b.shape))
+            raise ValueError(f"The shapes of `a` ({a.shape}) and "
+                             f"`b` ({b.shape}) do not agree.")
 
         self.a = a
         self.b = b
@@ -65,7 +66,9 @@ class Normal:
             a, iids = add_maps((self.a, self.iids), (other.a, other.iids))
             return Normal(a, self.b + other.b, iids)
         
-        return Normal(self.a, self.b + other, self.iids)
+        b = self.b + other
+        a = broadcast_a(self.a, b)
+        return Normal(a, b, self.iids)
 
     def __radd__(self, other):
         return self + other
@@ -75,7 +78,9 @@ class Normal:
             a, iids = add_maps((self.a, self.iids), (-other.a, other.iids))
             return Normal(a, self.b - other.b, iids)
         
-        return Normal(self.a, self.b - other, self.iids)
+        b = self.b - other
+        a = broadcast_a(self.a, b)
+        return Normal(a, b, self.iids)
     
     def __rsub__(self, other):
         return -self + other
@@ -88,12 +93,10 @@ class Normal:
             a, iids = add_maps((self.a * other.b, self.iids),
                                (other.a * self.b, other.iids))
             b = self.b * other.b
-
             return Normal(a, b, iids)
         
         b = self.b * other 
-        a = other * np.broadcast_to(self.a, (self.a.shape[0], *b.shape))
-        
+        a = other * broadcast_a(self.a, b)
         return Normal(a, b, self.iids)
     
     def __rmul__(self, other):
@@ -107,21 +110,19 @@ class Normal:
             a, iids = add_maps((self.a / other.b, self.iids),
                                (other.a * (-self.b) / other.b**2, other.iids))
             b = self.b / other.b
-
             return Normal(a, b, iids)
         
         b = self.b / other 
-        a = np.broadcast_to(self.a, (self.a.shape[0], *b.shape)) / other
-        
+        a = broadcast_a(self.a, b) / other
         return Normal(a, b, self.iids)
     
     def __rtruediv__(self, other):
         # Linearized fraction  x/y = <x>/<y> - dy<x>/<y>^2,
         # for  x = <x>  and  y = <y> + dy.
-        # Only need co cover the case when `other`` is a number or sequence.
+        # Only need co cover the case when `other` is a number or sequence.
         
-        a = self.a * (-other) / self.b**2
         b = other / self.b
+        a = broadcast_a(self.a, b) * (-other) / self.b**2
         return Normal(a, b, self.iids)
     
     # TODO:
@@ -132,13 +133,13 @@ class Normal:
     #    return Normal(other @ self.a, other @ self.b, self.iids)
 
     def __getitem__(self, key):
-        a = self.a[..., key]
+        a = self.a[:, key]
         b = self.b[key]
         return Normal(a, b, self.iids)
 
     def __setitem__(self, key, value):
         if self.iids == value.iids:
-            self.a[..., key] = value.a
+            self.a[:, key] = value.a
             self.b[key] = value.b
         else:
             raise ValueError("The iids of the assignment target and the operand"
@@ -326,3 +327,7 @@ def normal(mu=0, sigmasq=1, size=1):
     atr = eigvects @ np.diag(np.sqrt(eigvals))
 
     return Normal(atr.T, mu)
+
+
+def broadcast_a(a, b):
+    return np.broadcast_to(a, (a.shape[0], *b.shape))
