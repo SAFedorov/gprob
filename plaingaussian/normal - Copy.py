@@ -91,7 +91,7 @@ class Normal:
             return Normal(a, b, iids)
         
         b = self.b * other 
-        a = other * unsqueeze_a(self.a, b)
+        a = other * broadcast_a(self.a, b)
         return Normal(a, b, self.iids)
     
     def __rmul__(self, other):
@@ -108,7 +108,7 @@ class Normal:
             return Normal(a, b, iids)
         
         b = self.b / other 
-        a = unsqueeze_a(self.a, b) / other
+        a = broadcast_a(self.a, b) / other
         return Normal(a, b, self.iids)
     
     def __rtruediv__(self, other):
@@ -117,7 +117,7 @@ class Normal:
         # Only need the case when `other` is not a normal variable.
         
         b = other / self.b
-        a = unsqueeze_a(self.a, b) * (-other) / self.b**2
+        a = broadcast_a(self.a, b) * (-other) / self.b**2
         return Normal(a, b, self.iids)
     
     def __pow__(self, other):
@@ -131,7 +131,7 @@ class Normal:
             return Normal(a, b, iids)
         
         b = self.b ** other 
-        a = other * unsqueeze_a(self.a, b) ** np.where(other, other-1, 1.)
+        a = other * broadcast_a(self.a, b) ** np.where(other, other-1, 1.)
         return Normal(a, b, self.iids)
 
     def __rpow__(self, other):
@@ -139,26 +139,19 @@ class Normal:
         # Only need the case when `other` is not a normal variable.
 
         b = other ** self.b
-        a = unsqueeze_a(self.a, b) * (np.log(np.where(other, other, 1.)) * b)
+        a = broadcast_a(self.a, b) * (np.log(np.where(other, other, 1.)) * b)
         return Normal(a, b, self.iids)
 
-    def __matmul__(self, other):  # TODO: add tests for this operation
+    def __matmul__(self, other):
         if isinstance(other, Normal):
             raise NotImplementedError
         
         b = self.b @ other
-        a = unsqueeze_a(self.a, b) @ other
+        a = self.a @ other  # TODO: this does not work yet
         return Normal(a, b, self.iids)
 
-    def __rmatmul__(self, other):
-
-        b = other @ self.b
-        if self.ndim == 1:
-            a = (other @ self.a.T).T
-        else:
-            a = other @ unsqueeze_a(self.a, b)
-
-        return Normal(a, b, self.iids)
+    #def __rmatmul__(self, other):
+    #    return Normal(other @ self.a, other @ self.b, self.iids)
 
     def __getitem__(self, key):
         a = self.a[:, key]
@@ -357,15 +350,6 @@ def normal(mu=0, sigmasq=1, size=1):
     atr = eigvects @ np.diag(np.sqrt(eigvals))
 
     return Normal(atr.T, mu)
-
-
-def unsqueeze_a(a, b):
-    dn = (b.ndim + 1) - a.ndim
-    if dn != 0:
-        sh = list(a.shape)
-        sh[1:1] = (1,) * dn
-        a = a.reshape(sh)
-    return a
 
 
 def broadcast_a(a, b):
