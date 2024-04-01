@@ -318,34 +318,42 @@ def asnormal(v):
 
 # TODO: by supplying sigmasq one now now can only create 0 and 1d variables
 
-def normal(mu=0, sigmasq=1, size=1):
+def normal(mu=0, sigmasq=1, size=None):
     """Creates a new normal random variable.
     
     Args:
-        mu: scalar or vector mean value
+        mu: mean value
         sigmasq: scalar variance or covariance matrix
 
     Returns:
-        Normal random variable, scalar or vector.
+        Normal random variable.
     """
 
-    sigmasq = np.array(sigmasq)
+    sigmasq = np.array(sigmasq, ndmin=1)  # 1d to avoid reshaping scalars
     mu = np.array(mu)
 
-    if sigmasq.size == 1: # TODO: this broadcasting rule is very limited. It does not allow, in particular, omitting sigma.
-
-        sigmasq = sigmasq.reshape((1,))
-        mu = mu.reshape(tuple())  # makes scalar
+    if sigmasq.ndim == 1:
+        if sigmasq[0] < 0:
+            raise ValueError("Negative value for the variance.")
         
-        if size == 1:
-            # Single scalar variable
-            if sigmasq < 0:
-                raise ValueError("Negative scalar sigmasq")
-            
-            return Normal(np.sqrt(sigmasq), mu)
+        sigma = np.sqrt(sigmasq)
+    
+        if mu.ndim == 0:
+            if not size:
+                return Normal(sigma, mu)
+            elif isinstance(size, int):
+                a = sigma * np.eye(size, size)
+                return Normal(a, np.broadcast_to(mu, (size,)))
+            else:
+                b = np.broadcast_to(mu, size)
+                a = sigma * np.eye(b.size, b.size).reshape((b.size, *b.shape))
+                return Normal(a, b)
+        else:
+            a = sigma * np.eye(mu.size, mu.size).reshape(mu.size, *mu.shape)
+            return Normal(a, mu)
         
-        # Vector of independent identically-distributed variables.
-        return Normal(np.sqrt(sigmasq) * np.eye(size, size), mu * np.ones(size))
+    if sigmasq.ndim != 2:
+        raise ValueError("Only 0 and 2 dimensional covariance matrices are presently supported.")
 
     mu = np.broadcast_to(mu, (sigmasq.shape[0],))
         
