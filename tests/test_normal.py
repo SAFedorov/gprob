@@ -343,3 +343,73 @@ def test_operations():
     v2 = np.sqrt(2) * normal(0, 1, size=2)
     assert isclose(v1, v2)
 
+
+def test_broadcasting():
+
+    # In this test, a normal array interacts with a higher-dimensional constant
+    # that broadcasts it to a new shape.
+
+    tol = 1e-15
+
+    xi1 = normal(mu=0.1)
+    xi2 = xi1 * (-3, -4)
+    assert xi2.shape == (2,)
+    assert np.abs(xi2.b - (-0.3, -0.4)).max() < tol
+    assert np.abs(xi2.a[0] - (-3, -4)).max() < tol
+
+    m = np.array([[1, 0], [0, 1], [2, 2]])
+    xi1 = Normal(a=np.array([[1, 0.5], [0, -1]]), b=np.array([0.3, -0.3]))
+    xi2 = xi1 * m
+    assert xi2.shape == (3, 2)
+    assert np.abs(xi2.b - [[0.3, 0], [0, -0.3], [0.6, -0.6]]).max() < tol
+    for r1, r2 in zip(xi1.a, xi2.a):
+        assert np.abs(r2 - r1 * m).max() < tol
+
+    xi2 = m * xi1
+    assert xi2.shape == (3, 2)
+    assert np.abs(xi2.b - [[0.3, 0], [0, -0.3], [0.6, -0.6]]).max() < tol
+    for r1, r2 in zip(xi1.a, xi2.a):
+        assert np.abs(r2 - r1 * m).max() < tol
+
+    # random nd shapes
+    xi1 = Normal(a=np.array([[1, 0.5], [0, -1], [8., 9.]]), 
+                 b=np.array([0.3, -0.3]))
+    
+    # addition
+    sh = tuple(np.random.randint(1, 4, 8))
+    m = np.random.rand(*(sh + (2,)))
+
+    xi2 = m + xi1
+    assert xi2.shape == sh + (2,)
+    assert xi2.a.shape == (3,) + sh + (2,)
+    rng = int(np.prod(sh))
+    a2_fl = np.reshape(xi2.a, (3, rng, 2))
+    for i in range(rng):
+        assert np.abs(a2_fl[:, i, :] - xi1.a).max() < tol
+
+    # multiplication
+    sh = tuple(np.random.randint(1, 4, 9))
+    m = np.random.rand(*(sh + (2,)))
+
+    xi2 = m * xi1
+    assert xi2.shape == sh + (2,)
+    assert xi2.a.shape == (3,) + sh + (2,)
+    rng = int(np.prod(sh))
+    m_fl = np.reshape(m, (rng, 2))
+    a2_fl = np.reshape(xi2.a, (3, rng, 2))
+    for i in range(rng):
+        assert np.abs(a2_fl[:, i, :] - m_fl[i] * xi1.a).max() < tol
+
+    # division
+    sh = tuple(np.random.randint(1, 4, 7))
+    m = np.random.rand(*(sh + (2,))) + 0.1
+
+    xi2 =  xi1 / m
+    assert xi2.shape == sh + (2,)
+    assert xi2.a.shape == (3,) + sh + (2,)
+    rng = int(np.prod(sh))
+    m_fl = np.reshape(m, (rng, 2))
+    a2_fl = np.reshape(xi2.a, (3, rng, 2))
+    for i in range(rng):
+        assert np.abs(a2_fl[:, i, :] -  xi1.a / m_fl[i]).max() < tol
+    

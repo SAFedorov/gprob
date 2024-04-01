@@ -12,6 +12,14 @@ class ConditionError(Exception):
 
 
 class Normal:
+    """Array of normally-distributed random variables, represented as
+    
+    x[...] = b[...] + sum_k a[i...] xi[i],
+    
+    where and `xi`s are elementary Gaussian variables that are independent and 
+    identically-distributed, `xi`[i] ~ N(0, 1) for all i, and ... is a 
+    multi-dimensional index.
+    """
 
     __slots__ = ("a", "b", "iids", "size", "shape", "ndim")
     __array_ufunc__ = None
@@ -20,7 +28,6 @@ class Normal:
         if a.shape[1:] != b.shape:
             raise ValueError(f"The shapes of `a` ({a.shape}) and "
                              f"`b` ({b.shape}) do not agree.")
-
         self.a = a
         self.b = b
 
@@ -34,7 +41,7 @@ class Normal:
             raise ValueError(f"The length of iids ({len(iids)}) does not match "
                              f"the outer dimension of `a` ({a.shape[0]}).")
 
-        self.iids = iids  # Dictionary {id -> index, ...}
+        self.iids = iids  # Dictionary of elementary variables {id -> k, ...}
 
     @property
     def _a2d(self): return self.a.reshape((self.a.shape[0], self.b.size))
@@ -130,6 +137,7 @@ class Normal:
             a, iids = add_maps((a1, self.iids), (a2, other.iids))
             return Normal(a, b, iids)
         
+        other = np.array(other)  # because a number will be subtracted from it
         b = self.b ** other 
         a = other * unsqueeze_a(self.a, b) ** np.where(other, other-1, 1.)
         return Normal(a, b, self.iids)
