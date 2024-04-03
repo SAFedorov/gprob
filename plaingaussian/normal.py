@@ -139,7 +139,8 @@ class Normal:
         
         other = np.array(other)  # because a number will be subtracted from it
         b = self.b ** other 
-        a = other * unsqueeze_a(self.a, b) ** np.where(other, other-1, 1.)
+        gb = other * self.b ** np.where(other, other-1, 1.)
+        a = gb * unsqueeze_a(self.a, b)
         return Normal(a, b, self.iids)
 
     def __rpow__(self, other):
@@ -322,14 +323,16 @@ def normal(mu=0, sigmasq=1, size=None):
     """Creates a new normal random variable.
     
     Args:
-        mu: mean value
-        sigmasq: scalar variance or covariance matrix
+        mu: mean value.
+        sigmasq: scalar variance or matrix covariance.
 
     Returns:
         Normal random variable.
     """
 
-    sigmasq = np.array(sigmasq, ndmin=1)  # 1d to avoid reshaping scalars
+    sigmasq = np.array(sigmasq, ndmin=1)  
+    # ndmin=1 to avoid further reshaping in the scalar case
+    
     mu = np.array(mu)
 
     if sigmasq.ndim == 1:
@@ -364,11 +367,11 @@ def normal(mu=0, sigmasq=1, size=None):
         # The covariance matrix is not strictly positive-definite.
         pass
 
-    # To handle the positive-semidefinite case, do the orthogonal decomposition. 
+    # Handles the positive-semidefinite case using orthogonal decomposition. 
     eigvals, eigvects = np.linalg.eigh(sigmasq)  # sigmasq = V D V.T
 
     if (eigvals < 0).any():
-        raise ValueError("Negative eigenvalue in sigmasq matrix.")
+        raise ValueError("Negative eigenvalue(s) in the covariance matrix.")
     
     atr = eigvects @ np.diag(np.sqrt(eigvals))
 

@@ -276,6 +276,8 @@ def test_elementary_ordering():
 
 
 def test_operations():
+    # arithmetic operations between normal variables and other types
+
     def isclose(v1, v2, tol=1e-14):
         return ((np.abs(v1.a - v2.a) < tol).all() 
                 and (np.abs(v1.b - v2.b) < tol).all())
@@ -342,6 +344,21 @@ def test_operations():
     v1 = normal(0, 1, size=2) * np.sqrt(2)
     v2 = np.sqrt(2) * normal(0, 1, size=2)
     assert isclose(v1, v2)
+
+
+def test_normal_operations():
+    # normal-normal operations
+
+    tol = 1e-14
+
+    f = lambda x: 0.1 + x**0. - 2.5 * x**2 + x*x*x * 4 + 1/(4. + x)**3 - 0.5**x
+    df = lambda x: -5 * x + 12. * x**2 - 3 * (4.+x)**(-4) - 0.5**x * np.log(0.5)
+
+    x = np.linspace(-3, 3, 100) 
+    v = normal(0, 0.3, size=100) + x
+    v_ = f(v)
+    assert np.abs((v_.mean() - f(x))/f(x)).max() < tol
+    assert np.abs((v_.var() - df(x)**2 * v.var())/v_.var()).max() < tol
 
 
 def test_broadcasting():
