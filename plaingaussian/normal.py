@@ -322,7 +322,7 @@ def asnormal(v):
 
 # TODO: by supplying sigmasq one now now can only create 0 and 1d variables
 
-def normal(mu=0, sigmasq=1, size=None):
+def normal(mu=0., sigmasq=1., size=None):
     """Creates a new normal random variable.
     
     Args:

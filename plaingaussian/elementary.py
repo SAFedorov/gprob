@@ -59,6 +59,13 @@ def complete_maps(op1, op2):
     return a1_, a2_, union_iids
 
 
+def u_complete_maps(ops):
+
+    union_iids = Elementary.uunion(*[iids for _, iids in ops])
+    as_ = tuple(extend_map(*op, union_iids) for op in ops)
+    return as_, union_iids
+
+
 def add_maps(op1, op2):
 
     (a1, iids1), (a2, iids2) = op1, op2
