@@ -52,10 +52,13 @@ class Normal:
     def __repr__(self):
         csn = self.__class__.__name__
 
-        if self.ndim < 2:
-            return (f"{csn}(mean={self.mean()}, var={self.var()})")
+        meanstr = str(self.mean())
+        varstr = str(self.var())
+
+        if "\n" not in meanstr:
+            return (f"{csn}(mean={meanstr}, var={varstr})")
         
-        return (f"{csn}(mean=\n{self.mean()},\nvar=\n{self.var()})")
+        return (f"{csn}(mean=\n{meanstr},\nvar=\n{varstr})")
 
     def __len__(self):
         return len(self.b)
