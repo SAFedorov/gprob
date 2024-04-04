@@ -58,7 +58,8 @@ def pnormal(f, input_vs, jit=True):
         bfun = lambda p: f(p, inbs)
     elif isinstance(input_vs, Normal):
         iids = input_vs.iids
-        afun = lambda p: jmp(lambda v: f(p, v), (force_float(input_vs.b),), (input_vs.a,))
+        afun = lambda p: jmp(lambda v: f(p, v), (force_float(input_vs.b),),
+                             (input_vs.a,))
         bfun = lambda p: f(p, input_vs.b)
     else:
         raise ValueError("vs must be a normal variable or a sequence of normal "

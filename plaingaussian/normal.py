@@ -294,11 +294,18 @@ class Normal:
             a single number for single sample inputs, and an array for sequence 
             inputs.
         """
+        
+        x = np.array(x)
+        if self.ndim > 1:
+            if x.ndim == self.ndim:
+                x = x.reshape((x.size,))
+            else:
+                x = x.reshape((x.shape[0], -1)) 
         return logp(x, self._b1d, self.cov())
 
 
 def join(args):
-    """Combines several of random (and possibly deterministic) variables
+    """Combines several random (and possibly deterministic) variables
     into one vector."""
 
     if isinstance(args, Normal):

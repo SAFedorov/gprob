@@ -3,9 +3,6 @@ import scipy as sp
 from scipy.linalg import LinAlgError
 
 
-# Note: the choice of the parameter dimension order is made to fascilitate 
-# broadcasting in matrix multiplication.
-
 def cholesky_inv(mat):
     """Inverts the positive-definite symmetric matrix `mat` using Cholesky 
     decomposition. A bit faster than `linalg.inv` and gives a bit smaller error. 
@@ -18,14 +15,14 @@ def cholesky_inv(mat):
 
 
 def fisher(cov, dm, dcov):
-    """Calculates the Fisher information matrix of an `n`-dimensional normal
-    distribution depending on `k` parameters.
+    """Calculates the Fisher information matrix of an n-dimensional normal
+    distribution depending on k parameters.
     
     Args:
-        cov: Covariance matrix (n, n), non-degenerate.
+        cov: Covariance matrix, (n, n), non-degenerate.
         dm: Derivatives of the mean with respect to the parameters, (k, n).
-        dcov: Derivatives of the covariance matrix with respect to 
-            the parameters, (k, n, n).
+        dcov: Derivatives of the covariance matrix with respect to the 
+            parameters, (k, n, n).
 
     Returns:
         Fisher information matrix, (k, k).
@@ -48,19 +45,21 @@ def fisher(cov, dm, dcov):
 
 
 def dlogp(x, m, cov, dm, dcov):
-    """Calculates the derivatives of the logarithmic probability density with 
+    """Calculates the derivatives of the logarithmic probability density of 
+    an n-dimensional normal distribution depending on k parameters with 
     respect to the parameters.
 
     Args:
-        x: Sample value.
-        m: Mean vector (n).
-        cov: Covariance matrix (n, n), non-degenerate.
+        x: Sample value, (n,).
+        m: Mean vector, (n,).
+        cov: Covariance matrix, (n, n), non-degenerate.
         dm: Derivatives of the mean with respect to the parameters, (k, n).
-        dcov: Derivatives of the covariance matrix with respect to 
-            the parameters, (k, n, n).
+        dcov: Derivatives of the covariance matrix with respect to the 
+            parameters, (k, n, n).
 
     Returns:
-        Gradient vector of the natural logarithm of the probability at x, (k).
+        The gradient vector of the natural logarithm of the probability density 
+        at `x` - an array with the shape (k,).
     """
 
     cov_inv = cholesky_inv(cov)
@@ -71,6 +70,26 @@ def dlogp(x, m, cov, dm, dcov):
 
 
 def d2logp(x, m, cov, dm, dcov, d2m, d2cov):
+    """Calculates the second derivatives of the logarithmic probability density 
+    of an n-dimensional normal distribution depending on k parameters with 
+    respect to the parameters.
+
+    Args:
+        x: Sample value, (n,).
+        m: Mean vector, (n,).
+        cov: Covariance matrix, (n, n), non-degenerate.
+        dm: Derivatives of the mean with respect to the parameters, (k, n).
+        dcov: Derivatives of the covariance matrix with respect to the 
+            parameters, (k, n, n).
+        d2m: Second derivatives of the mean vector with respect to the 
+            parameters, (k, k, n)
+        d2cov: Second derivatives of the covariance matrix with respect to 
+            the parameters, (k, k, n, n).
+    
+    Returns:
+        The Hessian of the natural logarithm of the probability density 
+        at `x` - an array with the shape (k, k).
+    """
 
     k, n, _ = dcov.shape
 
@@ -86,7 +105,7 @@ def d2logp(x, m, cov, dm, dcov, d2m, d2cov):
     # prod2 = prod1 @ (0.5 * np.eye(n) - np.outer(y, (x - m)))
     # term3 = np.einsum('kij, lji -> kl', prod1, prod2)
     prod1_flat = np.reshape(prod1, (k, n**2))
-    prod1tr_flat = np.reshape(np.transpose(prod1, axes=(0, 2, 1)), (k, n**2))
+    prod1tr_flat = np.reshape(np.transpose(prod1, axes=(0, 2, 1)), (k, n**2))       #TODO: check this optimization, maybe only the transposition is enough
     term3 = 0.5 * prod1tr_flat @ prod1_flat.T - ((x-m) @ prod1) @ (prod1 @ y).T
 
     term4 = 0.5 * np.einsum('klij, ij -> kl', d2cov, np.outer(y, y) - cov_inv)
@@ -95,12 +114,50 @@ def d2logp(x, m, cov, dm, dcov, d2m, d2cov):
     return term1 + term2 + term3 + term4 + term5 + term5.T
 
 
-# ---------- versions supporting batching ----------
+# ---------- functions supporting batching ----------
 
-def logp_sc(x, mu, sigmasq):
-    """The scalar version of logp."""
+def logp(x, m, cov):
+    """Calculates the logarithmic probability density of an n-dimensional normal
+    distribution at the sample value
+    
+    Args:
+        x: The sample(s) at which the likelihood is evaluated. Should be a 
+            scalar or an array with the shape (ns,), (n,) or (ns, n), where ns 
+            is the number of samples and n is the dimension of the distribution.
+        m: The mean vector of the distribution. A scalar or an (n,) array.
+        cov: The covariance matrix of the distribution, a scalar or a (n, n) 
+            2d array.
+        
+    Returns:
+        The value of logp, or an array of values for each of the input samples.
+    """
 
     x = np.array(x)
+    m = np.array(m)
+
+    dd = 1 if m.ndim == 0 else len(m)  # distribution dimension
+
+    if dd == 1:
+        sd = 1 if x.ndim <= 1 else x.shape[-1]  # sample dimension
+    else:
+        sd = 1 if x.ndim == 0 else x.shape[-1]
+    
+    if sd != dd:
+        raise ValueError(f"The dimension of the sample vector ({sd}) does not "
+                         f"match the dimension of the distribution ({dd}).")
+    
+    if dd == 1:
+        return logp_sc(x, m, cov)
+    
+    try:
+        return logp_cho(x, m, cov)
+    except LinAlgError:
+        return logp_lstsq(x, m, cov)
+
+
+def logp_sc(x, mu, sigmasq):
+    """logp for scalar inputs."""
+
     eps = np.finfo(float).eps
     
     if sigmasq < eps:
@@ -115,13 +172,8 @@ def logp_sc(x, mu, sigmasq):
 
 
 def logp_cho(x, m, cov):
-    """
-
-    Args:
-        x: Numpy array (n,) or (m, n).
-    
-    Fast for positive-definite covariance matrices.
-    Supports batching.
+    """logp implemented via Cholesky decomposition. Fast for positive-definite 
+    covariance matrices, raises LinAlgError for degenerate covariance matrices.
     """
 
     ltr, _ = sp.linalg.cho_factor(cov, check_finite=False, lower=True)
@@ -136,18 +188,8 @@ def logp_cho(x, m, cov):
 
 
 def logp_lstsq(x, m, cov):
-    """Log likelihood of a sample.
-
-    Works for degenerate covariance matrices.
-    Supports batching.
-    
-    Args:
-        x: Sample value or a sequence of sample values. Numpy array (n,) or (m, n)
-
-    Returns:
-        Natural logarithm of the probability density at the sample value - 
-        a single number for a single sample, and an array for a sequence 
-        of samples.
+    """logp implemented via singular value decomposition. Works for arbitrary
+    covariance matrices.
     """
 
     y, _, rank, sv = np.linalg.lstsq(cov, (x - m).T, rcond=None)
@@ -167,28 +209,3 @@ def logp_lstsq(x, m, cov):
     valid_idx = np.abs(res) < eps
 
     return np.where(valid_idx, llk, float("-inf"))
-
-
-def logp(x, m, cov):
-
-    x = np.array(x)
-    m = np.array(m)
-    dd = 1 if m.ndim == 0 else len(m)  # Distribution dimension.
-
-    # Sample dimension.
-    if dd == 1:
-        sd = 1 if x.ndim <= 1 else x.shape[-1]
-    else:
-        sd = 1 if x.ndim == 0 else x.shape[-1]
-    
-    if sd != dd:
-        raise ValueError(f"The dimension of the sample vector ({sd}) does not "
-                         f"match the dimension of the distribution ({dd}).")
-    
-    if dd == 1:
-        return logp_sc(x, m, cov)
-    
-    try:
-        return logp_cho(x, m, cov)
-    except LinAlgError:
-        return logp_lstsq(x, m, cov)

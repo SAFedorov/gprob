@@ -49,7 +49,9 @@ def test_normal():
 
 
 def test_logp():
-    # Validation of the log likelihood calculation
+    # The validation of the log likelihood calculation
+
+    tol = 1e-15
 
     nc = np.log(1/np.sqrt(2 * np.pi))  # Normalization constant.
     
@@ -94,6 +96,12 @@ def test_logp():
     assert xi12.logp([1.2, 0]) == -(1.2)**2/(2) + nc
     assert xi12.logp([1.2, 0.1]) == float("-inf")
 
+    # Higher-dimensional examples
+    xi1 = normal([[0.1, 0.2], [0.3, 0.4]], 2)
+    xi2 = normal([0.1, 0.2, 0.3, 0.4], 2)
+    assert np.abs(xi1.logp(np.ones((2, 2))) - xi2.logp(np.ones((4,)))) < tol
+    assert np.abs(xi1.logp([np.ones((2, 2)), 0.5 * np.ones((2, 2))]) 
+                  - xi2.logp([np.ones((4,)), 0.5 * np.ones((4,))])).max() < tol
 
 def test_len():
     xi = normal(0, 2, size=2)
