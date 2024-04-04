@@ -105,7 +105,7 @@ def d2logp(x, m, cov, dm, dcov, d2m, d2cov):
     # prod2 = prod1 @ (0.5 * np.eye(n) - np.outer(y, (x - m)))
     # term3 = np.einsum('kij, lji -> kl', prod1, prod2)
     prod1_flat = np.reshape(prod1, (k, n**2))
-    prod1tr_flat = np.reshape(np.transpose(prod1, axes=(0, 2, 1)), (k, n**2))       #TODO: check this optimization, maybe only the transposition is enough
+    prod1tr_flat = np.reshape(np.transpose(prod1, axes=(0, 2, 1)), (k, n**2))
     term3 = 0.5 * prod1tr_flat @ prod1_flat.T - ((x-m) @ prod1) @ (prod1 @ y).T
 
     term4 = 0.5 * np.einsum('klij, ij -> kl', d2cov, np.outer(y, y) - cov_inv)
@@ -132,8 +132,8 @@ def logp(x, m, cov):
         The value of logp, or an array of values for each of the input samples.
     """
 
-    x = np.array(x)
-    m = np.array(m)
+    x = np.asanyarray(x)
+    m = np.asanyarray(m)
 
     dd = 1 if m.ndim == 0 else len(m)  # distribution dimension
 

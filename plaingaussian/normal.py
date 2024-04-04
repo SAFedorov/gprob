@@ -140,7 +140,7 @@ class Normal:
             a, iids = add_maps((a1, self.iids), (a2, other.iids))
             return Normal(a, b, iids)
         
-        other = np.array(other)  # because a number will be subtracted from it
+        other = np.asanyarray(other)  # because a number will be subtracted from it
         b = self.b ** other 
         gb = other * self.b ** np.where(other, other-1, 1.)
         a = gb * unsqueeze_a(self.a, b)
@@ -295,7 +295,7 @@ class Normal:
             inputs.
         """
         
-        x = np.array(x)
+        x = np.asanyarray(x)
         if self.ndim > 1:
             if x.ndim == self.ndim:
                 x = x.reshape((x.size,))
@@ -314,7 +314,7 @@ def join(args):
     nvs = [asnormal(v) for v in args]
     ops = [(v._a2d, v.iids) for v in nvs]
     a, iids = u_join_maps(ops)
-    b = np.concatenate([np.array(v.b, ndmin=1) for v in nvs])
+    b = np.concatenate([v.b.reshape((v.b.size,)) for v in nvs])
 
     return Normal(a, b, iids)
 
@@ -324,7 +324,7 @@ def asnormal(v):
         return v
 
     # v is a number or sequence of numbers
-    return Normal(a=np.array([]), b=np.array(v), iids={})
+    return Normal(a=np.array([]), b=np.asanyarray(v), iids={})
 
 
 # TODO: by supplying sigmasq one now now can only create 0 and 1d variables
@@ -333,27 +333,27 @@ def normal(mu=0., sigmasq=1., size=None):
     """Creates a new normal random variable.
     
     Args:
-        mu: mean value.
-        sigmasq: scalar variance or matrix covariance.
+        mu: Mean value, a scalar or an array.
+        sigmasq: Scalar variance or matrix covariance.
+        size: Optional integer or tuple specifying the size and shape of 
+            the variable. Only has an effect with scalar mean and variance. 
 
     Returns:
         Normal random variable.
     """
 
-    sigmasq = np.array(sigmasq, ndmin=1)  
-    # ndmin=1 to avoid further reshaping in the scalar case
-    
-    mu = np.array(mu)
+    sigmasq = np.asanyarray(sigmasq)
+    mu = np.asanyarray(mu)
 
-    if sigmasq.ndim == 1:
-        if sigmasq[0] < 0:
+    if sigmasq.ndim == 0:
+        if sigmasq < 0:
             raise ValueError("Negative value for the variance.")
         
         sigma = np.sqrt(sigmasq)
     
         if mu.ndim == 0:
             if not size:
-                return Normal(sigma, mu)
+                return Normal(sigma[None], mu)  # expanding sigma to 1d
             elif isinstance(size, int):
                 a = sigma * np.eye(size, size)
                 return Normal(a, np.broadcast_to(mu, (size,)))
