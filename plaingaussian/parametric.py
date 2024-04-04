@@ -8,17 +8,30 @@ from .elementary import u_complete_maps
 from .func import logp, dlogp, fisher
 
 
-def jmp(f, primals, tangents):
-    """Jacobain-matrix product."""
+def jmp(fun, primals, tangents):
+    """Forward mode jacobain-matrix product for `fun`. Spans over the 0-th 
+    dimension of each of the arrays in `tangents`, and stacks the results 
+    the along the 0-th dimension of the output.
+    
+    Args:
+        primals: A list or tuple of positional arguments to `fun` at which its 
+            Jacobian should be evaluated.
+        tangents: A list or tuple of arrays of positional tangent vectors with
+            the same structure as primals, and each array shape being augmented 
+            by one outer-most dimension compared to primals.
 
-    # Note: operates on transposed matrices and calculates m_out = J @ m.T,
-    # because vmap works the fastest along the inner-most axis,
+    Returns:
+        Jacobian-matrix product.
+    """
+
+    # The function operates on transposed input matrices and calculates
+    # m_out = J @ m.T, because vmap works the fastest along the inner-most axis.
     #
     # The function can handle multiple arguments, but otherwise the same as in
     # https://jax.readthedocs.io/en/latest/notebooks/autodiff_cookbook.html
 
-    jvp = lambda t: jax.jvp(f, primals, t)[1]  # TODO: specify the axes explicitly
-    return jax.vmap(jvp)(tangents)
+    jvp = lambda t: jax.jvp(fun, primals, t)[1]
+    return jax.vmap(jvp, in_axes=0, out_axes=0)(tangents)
 
 
 def pnormal(f, input_vs, jit=True):
@@ -39,13 +52,13 @@ def pnormal(f, input_vs, jit=True):
     # `p` is limited to 1D with the scipy minimize signature in mind
 
     if isinstance(input_vs, (list, tuple)):
-        inbs = tuple(v.b.astype('float') for v in input_vs)                   #TODO: fix the type handling
+        inbs = tuple(force_float(v.b) for v in input_vs)
         inas, iids = u_complete_maps([(v.a, v.iids) for v in input_vs])
         afun = lambda p: jmp(lambda *v: f(p, v), inbs, inas)
         bfun = lambda p: f(p, inbs)
     elif isinstance(input_vs, Normal):
         iids = input_vs.iids
-        afun = lambda p: jmp(lambda v: f(p, v), (input_vs.b,), (input_vs.a,))
+        afun = lambda p: jmp(lambda v: f(p, v), (force_float(input_vs.b),), (input_vs.a,))
         bfun = lambda p: f(p, input_vs.b)
     else:
         raise ValueError("vs must be a normal variable or a sequence of normal "
@@ -141,7 +154,7 @@ class ParametricNormal:
 
         dm = self.dmean(p)
         cov, dcov = self.d01cov(p)
-        
+
         return fisher(cov, dm, dcov)
     
     def natdlogp(self, p, x):
@@ -155,3 +168,9 @@ class ParametricNormal:
         fimat = fisher(cov, dm, dcov)
 
         return np.linalg.solve(fimat, g)
+    
+
+def force_float(x):
+    if np.issubdtype(x.dtype, np.integer):
+        x = x.astype(np.float64)
+    return x
