@@ -95,9 +95,9 @@ class Normal:
             # Linearized product  x * y = <x><y> + <y>dx + <x>dy,
             # for  x = <x> + dx  and  y = <y> + dy.
 
-            a, iids = add_maps((self.a * other.b, self.iids),
-                               (other.a * self.b, other.iids))
             b = self.b * other.b
+            a, iids = add_maps((unsqueeze_a(self.a, b) * other.b, self.iids),
+                               (unsqueeze_a(other.a, b) * self.b, other.iids))
             return Normal(a, b, iids)
         
         b = self.b * other 
@@ -112,9 +112,10 @@ class Normal:
             # Linearized fraction  x/y = <x>/<y> + dx/<y> - dy<x>/<y>^2,
             # for  x = <x> + dx  and  y = <y> + dy.
 
-            a, iids = add_maps((self.a / other.b, self.iids),
-                               (other.a * (-self.b) / other.b**2, other.iids))
             b = self.b / other.b
+            a1 = unsqueeze_a(self.a, b) / other.b
+            a2 = unsqueeze_a(other.a, b) * (-self.b) / other.b**2
+            a, iids = add_maps((a1, self.iids), (a2, other.iids))
             return Normal(a, b, iids)
         
         b = self.b / other 
@@ -135,8 +136,8 @@ class Normal:
             # x^y = <x>^<y> + dx <y> <x>^(<y>-1) + dy ln(<x>) <x>^<y>
             
             b = self.b ** other.b
-            a1 = self.a * (other.b * self.b ** np.where(other.b, other.b-1, 1.))
-            a2 = other.a * (np.log(np.where(self.b, self.b, 1.)) * b)
+            a1 = unsqueeze_a(self.a, b) * (other.b * self.b ** np.where(other.b, other.b-1, 1.))
+            a2 = unsqueeze_a(other.a, b) * (np.log(np.where(self.b, self.b, 1.)) * b)
             a, iids = add_maps((a1, self.iids), (a2, other.iids))
             return Normal(a, b, iids)
         
@@ -163,6 +164,8 @@ class Normal:
         return Normal(a, b, self.iids)
 
     def __rmatmul__(self, other):
+        if isinstance(other, Normal):
+            raise NotImplementedError
 
         b = other @ self.b
         if self.ndim == 1:
@@ -246,13 +249,12 @@ class Normal:
         if not isinstance(other, Normal):
             other = asnormal(other)
 
-        if self.b.ndim > 1 or other.b.ndim > 1:
-            raise ValueError("& operation is only applicable to 0- and 1-d arrays.")
+        if self.ndim > 1 or other.ndim > 1:
+            raise ValueError("& is only applicable to 0- and 1-d arrays.")
         
-        cat_a, iids = join_maps((self._a2d, self.iids),(other._a2d, other.iids))
-        cat_b = np.concatenate([self._b1d, other._b1d], axis=0)
-
-        return Normal(cat_a, cat_b, iids)  
+        a, iids = join_maps((self._a2d, self.iids), (other._a2d, other.iids))
+        b = np.concatenate([self._b1d, other._b1d], axis=0)
+        return Normal(a, b, iids)  
     
     def __rand__(self, other):
         return self & other
@@ -326,8 +328,6 @@ def asnormal(v):
     # v is a number or sequence of numbers
     return Normal(a=np.array([]), b=np.asanyarray(v), iids={})
 
-
-# TODO: by supplying sigmasq one now now can only create 0 and 1d variables
 
 def normal(mu=0., sigmasq=1., size=None):
     """Creates a new normal random variable.

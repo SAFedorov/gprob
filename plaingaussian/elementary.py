@@ -50,7 +50,7 @@ def complete_maps(op1, op2):
     (a1, iids1), (a2, iids2), swapped = longer_first(op1, op2)
         
     union_iids = Elementary.union(iids1, iids2)
-    a1_ = pad_map(a1, len(union_iids))
+    a1_ = pad_map(a1, (len(union_iids), *a1.shape[1:]))
     a2_ = extend_map(a2, iids2, union_iids)
 
     if swapped:
@@ -76,20 +76,19 @@ def add_maps(op1, op2):
     (a1, iids1), (a2, iids2), _ = longer_first(op1, op2)
         
     union_iids = Elementary.union(iids1, iids2)
-    sum_a = pad_map(a1, len(union_iids))
-
+    sum_shape = (len(union_iids), *np.broadcast(a1[0], a2[0]).shape)
+    sum_a = pad_map(a1, sum_shape)
     idx = [union_iids[k] for k in iids2]
-    sum_a[idx] += a2
+    sum_a[idx] += unsqueeze_map(a2, sum_a.ndim)
 
     return sum_a, union_iids
 
 
-def pad_map(a, new_len):
+def pad_map(a, new_shape):
 
     len_ = a.shape[0]
-    new_shape = (new_len, *a.shape[1:])
     new_a = np.zeros(new_shape)
-    new_a[:len_] = a
+    new_a[:len_] = unsqueeze_map(a, len(new_shape))
 
     return new_a
 
@@ -147,3 +146,15 @@ def u_join_maps(ops):
         n1 = n2
 
     return cat_a, union_iids
+
+
+def unsqueeze_map(a, new_ndim):
+    """Enables broadcasting."""
+    dn = new_ndim - a.ndim
+
+    if dn != 0:
+        sh = list(a.shape)
+        sh[1:1] = (1,) * dn
+        a = a.reshape(sh)
+    
+    return a

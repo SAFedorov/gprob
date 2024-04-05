@@ -371,8 +371,8 @@ def test_normal_operations():
 
 def test_broadcasting():
 
-    # In this test, a normal array interacts with a higher-dimensional constant
-    # that broadcasts it to a new shape.
+    # In this test, normal arrays interacts with a higher-dimensional constant
+    # or normal arrays that broadcast them to new shapes.
 
     tol = 1e-15
 
@@ -441,4 +441,24 @@ def test_broadcasting():
     a2_fl = np.reshape(xi2.a, (3, rng, 2))
     for i in range(rng):
         assert np.abs(a2_fl[:, i, :] -  xi1.a / m_fl[i]).max() < tol
-    
+
+    # normal-normal operations
+
+    sz1 = (20, 5, 5)
+    sz2 = (5,)
+
+    xi1, xi2 = normal(size=sz1), normal(size=sz2)
+    assert (xi1 + xi2).shape == sz1
+    assert (xi1 - xi2).shape == sz1
+    assert (xi1 * xi2).shape == sz1
+    assert (xi1 / (xi2 + 2.)).shape == sz1
+
+    # inverting the order by changing the length of the elementaries
+    sz1 = (10, 5, 5)
+    sz2 = (5,)
+
+    xi1, xi2 = normal(size=sz1), Normal(np.ones((500, 5)), np.zeros((5,)))
+    assert (xi1 + xi2).shape == sz1
+    assert (xi1 - xi2).shape == sz1
+    assert (xi1 * xi2).shape == sz1
+    assert (xi1 / (xi2 + 2.)).shape == sz1
