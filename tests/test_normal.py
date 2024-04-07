@@ -464,7 +464,7 @@ def test_broadcasting():
     assert (xi1 / (xi2 + 2.)).shape == sz1
 
 
-def test_getindex():
+def test_getitem():
     v = normal(size=(2, 3, 4))
     assert (v[:, 0].mean() == np.zeros((2, 4))).all()
     assert (v[:, 0].var() == np.ones((2, 4))).all()

@@ -187,7 +187,6 @@ class Normal:
         a = np.moveaxis(a_[key_a], -1, 0)
         return Normal(a, b, self.iids)
 
-
     def __or__(self, observations: dict):
         """Conditioning operation.
         
@@ -265,12 +264,20 @@ class Normal:
 
     def var(self):
         """Variance"""
-        var = np.einsum("ij, ij -> j", self._a2d, self._a2d)
-        return var.reshape(self.shape)
+
+        if np.iscomplexobj(self.a):
+            cvar = np.einsum("i..., i... -> ...", self.a.conj(), self.a)
+            return np.real(cvar)
+        
+        return np.einsum("i..., i... -> ...", self.a, self.a)
     
     def cov(self):
         """Covariance"""
         a_ = self._a2d
+
+        if np.iscomplexobj(a_):
+            return a_.T.conj() @ a_
+
         return a_.T @ a_
     
     def sample(self, n=None):
