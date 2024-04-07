@@ -50,6 +50,10 @@ class Normal:
     def _b1d(self): return self.b.reshape((self.b.size,))
 
     def __repr__(self):
+        def rpad(sl):
+            max_len = max(len(l) for l in sl)
+            return [l.ljust(max_len, " ") for l in sl]
+        
         csn = self.__class__.__name__
 
         meanstr = str(self.mean())
@@ -58,7 +62,18 @@ class Normal:
         if "\n" not in meanstr:
             return (f"{csn}(mean={meanstr}, var={varstr})")
         
-        return (f"{csn}(mean=\n{meanstr},\nvar=\n{varstr})")
+        meanln = rpad(meanstr.splitlines())
+        varln = rpad(varstr.splitlines())
+
+        start = f"{csn}(mean="
+        mid = ", var="
+        end = ")"
+        
+        ln = [start + meanln[0] + mid + varln[0] + end]
+        ln.extend((" " * len(start)) + ml + (" " * len(mid)) + vl
+                  for ml, vl in zip(meanln[1:], varln[1:]))
+
+        return "\n".join(ln)
 
     def __len__(self):
         return len(self.b)
