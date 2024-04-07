@@ -176,17 +176,17 @@ class Normal:
         return Normal(a, b, self.iids)
 
     def __getitem__(self, key):
-        a = self.a[:, key]
         b = self.b[key]
+
+        if isinstance(key, tuple) and Ellipsis in key:
+            key_a = key + (slice(None, None, None),)
+        else:
+            key_a = key
+        
+        a_ = np.moveaxis(self.a, 0, -1)
+        a = np.moveaxis(a_[key_a], -1, 0)
         return Normal(a, b, self.iids)
 
-    def __setitem__(self, key, value):
-        if self.iids == value.iids:
-            self.a[:, key] = value.a
-            self.b[key] = value.b
-        else:
-            raise ValueError("The iids of the assignment target and the operand"
-                             " must be the same to assign at an index.")
 
     def __or__(self, observations: dict):
         """Conditioning operation.
