@@ -1,8 +1,9 @@
 import numpy as np
 from numpy.linalg import LinAlgError
 
-from .elementary import (Elementary, add_maps, complete_maps, 
-                         join_maps, u_join_maps)
+from . import emaps
+from .emaps import ElementaryMap
+
 from .func import logp
 
 
@@ -12,39 +13,39 @@ class ConditionError(Exception):
 
 
 class Normal:
-    """Array of normally-distributed random variables, represented as
-    
-    x[...] = b[...] + sum_k a[i...] xi[i],
-    
-    where and `xi`s are elementary Gaussian variables that are independent and 
-    identically-distributed, `xi`[i] ~ N(0, 1) for all i, and ... is a 
-    multi-dimensional index.
-    """
+    """Array of normal random variables."""
 
-    __slots__ = ("a", "b", "iids", "size", "shape", "ndim")
+    __slots__ = ("emap", "b", "size", "shape", "ndim")
     __array_ufunc__ = None
 
-    def __init__(self, a, b, iids=None):
-        if a.shape[1:] != b.shape:
-            raise ValueError(f"The shapes of `a` ({a.shape}) and "
-                             f"`b` ({b.shape}) do not agree.")
-        self.a = a
+    def __init__(self, emap, b): # TODO: Change to Normal(mu, emap)? -------------------
+        if not isinstance(emap, ElementaryMap):
+            emap = ElementaryMap(emap)
+
+        if emap.vshape != b.shape:
+            raise ValueError(f"The shapes of the map ({emap.vshape}) and "
+                             f"the mean ({b.shape}) do not agree.")
+        self.emap = emap
         self.b = b
 
         self.size = b.size
         self.shape = b.shape
         self.ndim = b.ndim
 
-        if iids is None:
-            iids = Elementary.create(a.shape[0])
-        elif len(iids) != a.shape[0]:
-            raise ValueError(f"The length of iids ({len(iids)}) does not match "
-                             f"the outer dimension of `a` ({a.shape[0]}).")
-
-        self.iids = iids  # Dictionary of elementary variables {id -> k, ...}
+    @property
+    def real(self):
+        return Normal(self.emap.real, self.b.real)
+    
+    @property
+    def imag(self):
+        return Normal(self.emap.imag, self.b.imag)
+    
+    @property
+    def T(self):
+        return Normal(self.emap.transpose(), self.b.T)
 
     @property
-    def _a2d(self): return self.a.reshape((self.a.shape[0], self.b.size))
+    def _a2d(self): return self.emap.a.reshape((self.emap.a.shape[0], -1))
     
     @property
     def _b1d(self): return self.b.reshape((self.b.size,))
@@ -79,28 +80,26 @@ class Normal:
         return len(self.b)
 
     def __neg__(self):
-        return Normal(-self.a, -self.b, self.iids)
+        return Normal(-self.emap, -self.b)
 
     def __add__(self, other):
         if isinstance(other, Normal):
-            a, iids = add_maps((self.a, self.iids), (other.a, other.iids))
-            return Normal(a, self.b + other.b, iids)
+            return Normal(self.emap + other.emap, self.b + other.b)
         
         b = self.b + other
-        a = broadcast_a(self.a, b)
-        return Normal(a, b, self.iids)
+        em = self.emap.broadcast_to(b.shape)
+        return Normal(em, b)
 
     def __radd__(self, other):
-        return self + other
+        return self.__add__(other)
     
     def __sub__(self, other):
         if isinstance(other, Normal):
-            a, iids = add_maps((self.a, self.iids), (-other.a, other.iids))
-            return Normal(a, self.b - other.b, iids)
+            return Normal(self.emap + (-other.emap), self.b - other.b)
         
         b = self.b - other
-        a = broadcast_a(self.a, b)
-        return Normal(a, b, self.iids)
+        em = self.emap.broadcast_to(b.shape)
+        return Normal(em, b)
     
     def __rsub__(self, other):
         return -self + other
@@ -111,13 +110,10 @@ class Normal:
             # for  x = <x> + dx  and  y = <y> + dy.
 
             b = self.b * other.b
-            a, iids = add_maps((unsqueeze_a(self.a, b) * other.b, self.iids),
-                               (unsqueeze_a(other.a, b) * self.b, other.iids))
-            return Normal(a, b, iids)
+            em = self.emap * other.b + other.emap * self.b
+            return Normal(em, b)
         
-        b = self.b * other 
-        a = other * unsqueeze_a(self.a, b)
-        return Normal(a, b, self.iids)
+        return Normal(self.emap * other, self.b * other)
     
     def __rmul__(self, other):
         return self * other
@@ -128,14 +124,10 @@ class Normal:
             # for  x = <x> + dx  and  y = <y> + dy.
 
             b = self.b / other.b
-            a1 = unsqueeze_a(self.a, b) / other.b
-            a2 = unsqueeze_a(other.a, b) * (-self.b) / other.b**2
-            a, iids = add_maps((a1, self.iids), (a2, other.iids))
-            return Normal(a, b, iids)
+            em = self.emap / other.b + other.emap * ((-self.b) / other.b**2)
+            return Normal(em, b)
         
-        b = self.b / other 
-        a = unsqueeze_a(self.a, b) / other
-        return Normal(a, b, self.iids)
+        return Normal(self.emap / other, self.b / other)
     
     def __rtruediv__(self, other):
         # Linearized fraction  x/y = <x>/<y> - dy<x>/<y>^2,
@@ -143,32 +135,30 @@ class Normal:
         # Only need the case when `other` is not a normal variable.
         
         b = other / self.b
-        a = unsqueeze_a(self.a, b) * (-other) / self.b**2
-        return Normal(a, b, self.iids)
+        em = self.emap * ((-other) / self.b**2)
+        return Normal(em, b)
     
     def __pow__(self, other):
         if isinstance(other, Normal):
             # x^y = <x>^<y> + dx <y> <x>^(<y>-1) + dy ln(<x>) <x>^<y>
             
             b = self.b ** other.b
-            a1 = unsqueeze_a(self.a, b) * (other.b * self.b ** np.where(other.b, other.b-1, 1.))
-            a2 = unsqueeze_a(other.a, b) * (np.log(np.where(self.b, self.b, 1.)) * b)
-            a, iids = add_maps((a1, self.iids), (a2, other.iids))
-            return Normal(a, b, iids)
+            em1 = self.emap * (other.b * self.b ** np.where(other.b, other.b-1, 1.))
+            em2 = other.emap * (np.log(np.where(self.b, self.b, 1.)) * b)
+            return Normal(em1 + em2, b)
         
-        other = np.asanyarray(other)  # because a number will be subtracted from it
+        other = np.asanyarray(other)  # a number will be subtracted from it
         b = self.b ** other 
-        gb = other * self.b ** np.where(other, other-1, 1.)
-        a = gb * unsqueeze_a(self.a, b)
-        return Normal(a, b, self.iids)
+        em = self.emap * (self.b ** np.where(other, other-1, 1.))
+        return Normal(em, b)
 
     def __rpow__(self, other):
         # x^y = <x>^<y> + dy ln(<x>) <x>^<y>
         # Only need the case when `other` is not a normal variable.
 
         b = other ** self.b
-        a = unsqueeze_a(self.a, b) * (np.log(np.where(other, other, 1.)) * b)
-        return Normal(a, b, self.iids)
+        em = self.emap * (np.log(np.where(other, other, 1.)) * b)
+        return Normal(em, b)
 
     def __matmul__(self, other):  # TODO: add tests for this operation
         if isinstance(other, Normal):
@@ -191,16 +181,7 @@ class Normal:
         return Normal(a, b, self.iids)
 
     def __getitem__(self, key):
-        b = self.b[key]
-
-        if isinstance(key, tuple) and Ellipsis in key:
-            key_a = key + (slice(None, None, None),)
-        else:
-            key_a = key
-        
-        a_ = np.moveaxis(self.a, 0, -1)
-        a = np.moveaxis(a_[key_a], -1, 0)
-        return Normal(a, b, self.iids)
+        return Normal(self.emap[key], self.b[key])
 
     def __or__(self, observations: dict):
         """Conditioning operation.
@@ -218,10 +199,11 @@ class Normal:
         """
 
         cond = join([k-v for k, v in observations.items()])
+        emv, emc = emaps.complete((self.emap, cond.emap))
 
         # The calculation is performed on flattened arrays.
-        av, ac, union_iids = complete_maps((self._a2d, self.iids),
-                                           (cond._a2d, cond.iids))
+        av = emv.a.reshape((emv.a.shape[0], -1))
+        ac = emc.a.reshape((emc.a.shape[0], -1))
         
         u, s, vh = np.linalg.svd(ac, compute_uv=True)
         tol = np.finfo(float).eps * np.max(ac.shape)
@@ -252,26 +234,56 @@ class Normal:
         new_b = self._b1d + m @ av
 
         # Shaping back
-        new_a = np.reshape(new_a, (av.shape[0], *self.a.shape[1:]))
+        new_a = np.reshape(new_a, emv.a.shape)
         new_b = np.reshape(new_b, self.b.shape)
 
-        return Normal(new_a, new_b, union_iids)
+        return Normal(ElementaryMap(new_a, emv.elem), new_b)
     
     def __and__(self, other):
         """Combines two random variables into one vector."""
 
-        if not isinstance(other, Normal):
-            other = asnormal(other)
+        other = asnormal(other)
 
         if self.ndim > 1 or other.ndim > 1:
             raise ValueError("& is only applicable to 0- and 1-d arrays.")
         
-        a, iids = join_maps((self._a2d, self.iids), (other._a2d, other.iids))
         b = np.concatenate([self._b1d, other._b1d], axis=0)
-        return Normal(a, b, iids)  
+        em = emaps.join([self.emap, other.emap])
+        return Normal(em, b)  
     
     def __rand__(self, other):
-        return self & other
+        """Combines two random variables into one vector.""" # TODO: add test cases for this
+
+        other = asnormal(other)  # other is always a constant
+
+        if self.ndim > 1 or other.ndim > 1:
+            raise ValueError("& is only applicable to 0- and 1-d arrays.")
+        
+        b = np.concatenate([other._b1d, self._b1d], axis=0)
+        em = emaps.join([other.emap, self.emap])
+        return Normal(em, b)
+
+    # ---------- array methods ----------
+
+    def conj(self):
+        return Normal(self.emap.conj(), self.b.conj())
+    
+    def cumsum(self, axis=None, dtype=None):    
+        b = self.b.cumsum(axis, dtype=dtype)
+        em = self.emap.cumsum(axis, dtype=dtype)
+        return Normal(em, b)
+    
+    def reshape(self, newshape, order="C"):
+        b = self.b.reshape(newshape, order=order)
+        em = self.emap.reshape(newshape, order=order)
+        return Normal(em, b)
+    
+    def transpose(x, axes=None):
+        b = x.b.transpose(axes)
+        em = x.emap.transpose(axes)
+        return Normal(em, b)
+
+    # ---------- probability-related methods ----------
 
     def mean(self):
         """Mean"""
@@ -279,12 +291,13 @@ class Normal:
 
     def var(self):
         """Variance"""
+        a = self.emap.a
 
-        if np.iscomplexobj(self.a):
-            cvar = np.einsum("i..., i... -> ...", self.a.conj(), self.a)
+        if np.iscomplexobj(a):
+            cvar = np.einsum("i..., i... -> ...", a.conj(), a)
             return np.real(cvar)
         
-        return np.einsum("i..., i... -> ...", self.a, self.a)
+        return np.einsum("i..., i... -> ...", a, a)
     
     def cov(self):
         """Covariance"""
@@ -304,8 +317,9 @@ class Normal:
         else:
             nshape = (n,)
         
-        r = np.random.normal(size=(*nshape, len(self.iids)))
-        return (r @ self._a2d + self._b1d).reshape((*nshape, *self.shape))  
+        a = self._a2d
+        r = np.random.normal(size=(*nshape, a.shape[0]))
+        return (r @ a + self._b1d).reshape((*nshape, *self.shape))
     
     def logp(self, x):
         """Log likelihood of a sample.
@@ -328,7 +342,7 @@ class Normal:
         return logp(x, self._b1d, self.cov())
 
 
-def join(args):
+def join(args): # TODO: remove
     """Combines several random (and possibly deterministic) variables
     into one vector."""
 
@@ -336,19 +350,20 @@ def join(args):
         return args
 
     nvs = [asnormal(v) for v in args]
-    ops = [(v._a2d, v.iids) for v in nvs]
-    a, iids = u_join_maps(ops)
+    em = emaps.join([v.emap for v in nvs])
     b = np.concatenate([v.b.reshape((v.b.size,)) for v in nvs])
 
-    return Normal(a, b, iids)
+    return Normal(em, b)
 
 
 def asnormal(v):
     if isinstance(v, Normal):
         return v
 
-    # v is a number or sequence of numbers
-    return Normal(a=np.array([]), b=np.asanyarray(v), iids={})
+    # v is a number or array
+    b = np.asanyarray(v)
+    em = ElementaryMap(np.zeros((0, *b.shape)))
+    return Normal(em, b)
 
 
 def normal(mu=0., sigmasq=1., size=None):
@@ -408,21 +423,3 @@ def normal(mu=0., sigmasq=1., size=None):
     atr = eigvects @ np.diag(np.sqrt(eigvals))
 
     return Normal(atr.T, mu)
-
-
-def unsqueeze_a(a, b):
-    dn = (b.ndim + 1) - a.ndim
-    if dn != 0:
-        sh = list(a.shape)
-        sh[1:1] = (1,) * dn
-        a = a.reshape(sh)
-    return a
-
-
-def broadcast_a(a, b):
-    dn = (b.ndim + 1) - a.ndim
-    if dn != 0:
-        sh = list(a.shape)
-        sh[1:1] = (1,) * dn
-        a = np.broadcast_to(a.reshape(sh), (a.shape[0], *b.shape))
-    return a

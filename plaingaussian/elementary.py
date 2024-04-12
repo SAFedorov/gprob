@@ -1,160 +1,33 @@
 import itertools
-import numpy as np
 
 
-class Elementary:
-
-    id_counter = itertools.count()
-
-    @staticmethod
-    def create(n: int):
-        return {next(Elementary.id_counter): i for i in range(n)}
-    
-    @staticmethod
-    def union(iids1: dict, iids2: dict):
-        """Ordered union of two dictionaries of elementary variables."""
-
-        diff = set(iids2) - set(iids1)   
-        offs = len(iids1)
-
-        union_iids = iids1.copy()
-        union_iids.update({xi: (offs + i) for i, xi in enumerate(diff)}) 
-
-        return union_iids
-    
-    @staticmethod
-    def uunion(*args):
-        """Unordered union of multiple dictionaries of elementary variables."""
-        s = set().union(*args)
-        return {k: i for i, k in enumerate(s)}
+id_counter = itertools.count()
 
 
-# --- Operations on elementary maps ---
-
-def longer_first(op1, op2):
-    (_, iids1), (_, iids2) = op1, op2
-
-    if len(iids1) >= len(iids2):
-        return op1, op2, False
-    
-    return op2, op1, True
+def create(n: int):
+    return {next(id_counter): i for i in range(n)}
 
 
-def complete_maps(op1, op2):
+def ounion(elem1: dict, elem2: dict):
+    """Ordered union of two dictionaries of elementary variables, where the 
+    longer dictionary goes untoched into the beginning of the combined one."""
 
-    (a1, iids1), (a2, iids2) = op1, op2
+    swapped = False
 
-    if iids1 is iids2:
-        return a1, a2, iids1
+    if len(elem2) > len(elem1):
+        swapped = True
+        elem1, elem2 = elem2, elem1
 
-    (a1, iids1), (a2, iids2), swapped = longer_first(op1, op2)
-        
-    union_iids = Elementary.union(iids1, iids2)
-    a1_ = pad_map(a1, (len(union_iids), *a1.shape[1:]))
-    a2_ = extend_map(a2, iids2, union_iids)
+    diff = set(elem2) - set(elem1)   
+    offs = len(elem1)
 
-    if swapped:
-        a1_, a2_ = a2_, a1_
+    union_elem = elem1.copy()
+    union_elem.update({xi: (offs + i) for i, xi in enumerate(diff)}) 
 
-    return a1_, a2_, union_iids
-
-
-def u_complete_maps(ops):
-
-    union_iids = Elementary.uunion(*[iids for _, iids in ops])
-    as_ = tuple(extend_map(*op, union_iids) for op in ops)
-    return as_, union_iids
+    return union_elem, swapped
 
 
-def add_maps(op1, op2):
-
-    (a1, iids1), (a2, iids2) = op1, op2
-
-    if iids1 is iids2:
-        return a1 + a2, iids1
-
-    (a1, iids1), (a2, iids2), _ = longer_first(op1, op2)
-        
-    union_iids = Elementary.union(iids1, iids2)
-    sum_shape = (len(union_iids), *np.broadcast(a1[0], a2[0]).shape)
-    sum_a = pad_map(a1, sum_shape)
-    idx = [union_iids[k] for k in iids2]
-    sum_a[idx] += unsqueeze_map(a2, sum_a.ndim)
-
-    return sum_a, union_iids
-
-
-def pad_map(a, new_shape):
-
-    len_ = a.shape[0]
-    new_a = np.zeros(new_shape)
-    new_a[:len_] = unsqueeze_map(a, len(new_shape))
-
-    return new_a
-
-
-def extend_map(a, iids: dict, new_iids: dict):
-
-    new_shape = (len(new_iids), *a.shape[1:])
-    new_a = np.zeros(new_shape)
-    idx = [new_iids[k] for k in iids]
-    new_a[idx] = a
-
-    return new_a
-
-
-def join_maps(op1, op2):
-
-    # Works for strictly two-dimensional matrices. Preserves the iids order.
-
-    (a1, iids1), (a2, iids2) = op1, op2
-
-    if iids1 is iids2:
-        return a1 + a2, iids1
-
-    (a1, iids1), (a2, iids2), swapped = longer_first(op1, op2)
-        
-    union_iids = Elementary.union(iids1, iids2)
-    l1, l2 = a1.shape[1], a2.shape[1]
-    cat_a = np.zeros((len(union_iids), l1 + l2))
-
-    idx = [union_iids[k] for k in iids2]
-
-    if swapped:
-        cat_a[:len(iids1), l2:] = a1
-        cat_a[idx, :l2] = a2
-    else:
-        cat_a[:len(iids1), :l1] = a1
-        cat_a[idx, l1:] = a2
-
-    return cat_a, union_iids
-
-
-def u_join_maps(ops):
-    # ops is a sequence ((a1, iids1), (a2, iids2), ...), where `a`s are 
-    # strictly two-dimensional matrices.  
-
-    union_iids = Elementary.uunion(*[iids for _, iids in ops])
-
-    dims = [a.shape[1] for a, _ in ops]
-    cat_a = np.zeros((len(union_iids), sum(dims)))
-    n1 = 0
-    for i, (a, iids) in enumerate(ops):
-        n2 = n1 + dims[i]
-        idx = [union_iids[k] for k in iids]
-        cat_a[idx, n1: n2] = a
-        n1 = n2
-
-    return cat_a, union_iids
-
-
-def unsqueeze_map(a, new_ndim):
-    """Enables broadcasting."""
-    dn = new_ndim - a.ndim
-
-    if dn != 0:
-        sh = list(a.shape)
-        sh[1:1] = (1,) * dn
-        a = a.reshape(sh)
-    
-    return a
+def uunion(*args):
+    """Unordered union of multiple dictionaries of elementary variables."""
+    s = set().union(*args)
+    return {k: i for i, k in enumerate(s)}
