@@ -45,10 +45,13 @@ class Normal:
         return Normal(self.emap.transpose(), self.b.T)
 
     @property
-    def _a2d(self): return self.emap.a.reshape((self.emap.a.shape[0], -1))
+    def _a2d(self): 
+        a2d = self.emap.a.reshape((self.emap.a.shape[0], -1))
+        return np.ascontiguousarray(a2d)
     
     @property
-    def _b1d(self): return self.b.reshape((self.b.size,))
+    def _b1d(self): 
+        return np.ascontiguousarray(self.b.reshape((self.b.size,))) # The same as self.b.ravel()
 
     def __repr__(self):
         def rpad(sl):
@@ -163,22 +166,12 @@ class Normal:
     def __matmul__(self, other):  # TODO: add tests for this operation
         if isinstance(other, Normal):
             raise NotImplementedError
-        
-        b = self.b @ other
-        a = unsqueeze_a(self.a, b) @ other
-        return Normal(a, b, self.iids)
+        return Normal(self.emap @ other, self.b @ other)
 
     def __rmatmul__(self, other):
         if isinstance(other, Normal):
             raise NotImplementedError
-
-        b = other @ self.b
-        if self.ndim == 1:
-            a = (other @ self.a.T).T
-        else:
-            a = other @ unsqueeze_a(self.a, b)
-
-        return Normal(a, b, self.iids)
+        return Normal(other @ self.emap, other @ self.b)
 
     def __getitem__(self, key):
         return Normal(self.emap[key], self.b[key])
@@ -268,6 +261,11 @@ class Normal:
     def conj(self):
         return Normal(self.emap.conj(), self.b.conj())
     
+    def flatten(self, order="C"):
+        b = self.b.flatten(order=order)
+        em = self.emap.flatten(order=order)
+        return Normal(em, b)
+    
     def cumsum(self, axis=None, dtype=None):    
         b = self.b.cumsum(axis, dtype=dtype)
         em = self.emap.cumsum(axis, dtype=dtype)
@@ -276,6 +274,11 @@ class Normal:
     def reshape(self, newshape, order="C"):
         b = self.b.reshape(newshape, order=order)
         em = self.emap.reshape(newshape, order=order)
+        return Normal(em, b)
+    
+    def sum(self, axis=None, dtype=None, keepdims=False):
+        b = self.b.sum(axis, dtype=dtype, keepdims=keepdims)
+        em = self.emap.sum(axis, dtype=dtype, keepdims=keepdims)
         return Normal(em, b)
     
     def transpose(x, axes=None):

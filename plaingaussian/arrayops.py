@@ -56,69 +56,23 @@ def conj(x): return conjugate(x)  # In numpy, conjugate (not conj) is a ufunc
 
 # ---------- linear array functions ----------
 
-# TODO: change to method calls
-def sum(x):
-    pass
+
+def sum(x, axis=None, dtype=None, keepdims=False):
+    # "where" is absent because its broadcasting is not implemented.
+    # "initial" is also not implemented.
+    return x.sum(axis=axis, dtype=dtype, keepdims=keepdims)
 
 
-def cumsum(x, axis=None, dtype=None):    
-    b = np.cumsum(x.b, axis, dtype=dtype)
-    em = x.emap.cumsum(axis, dtype=dtype)
-    return Normal(em, b)
+def cumsum(x, axis=None, dtype=None):
+    return x.cumsum(axis=axis, dtype=dtype)
 
 
 def reshape(x, newshape, order="C"):
-    b = np.reshape(x.b, newshape, order=order)
-    em = x.emap.reshape(newshape, order=order)
-    return Normal(em, b)
+    return x.reshape(newshape, order=order)
 
 
 def transpose(x, axes=None):
-    b = np.transpose(x.b, axes=axes)
-    em = x.emap.transpose(axes)
-    return Normal(em, b)
-
-
-def ravel(x, order="C"):
-    pass
-
-
-
-"""
-# TODO: remove
-def concatenate(arrays, axis=0, out=None, dtype=None, casting="same_kind"):
-    assert_none_out(out)
-    arrays = [asnormal(ar) for ar in arrays]
-    em = emaps.concatenate([x.emap for x in arrays], axis, 
-                           dtype=dtype, casting=casting)
-    b = np.concatenate([x.b for x in arrays], axis, 
-                       dtype=dtype, casting=casting)
-    return Normal(em, b)
-
-
-def stack(arrays, axis=0, out=None, *, dtype=None, casting="same_kind"):
-    assert_none_out(out)
-    arrays = [asnormal(ar) for ar in arrays]
-    em = emaps.stack([x.emap for x in arrays], axis, 
-                     dtype=dtype, casting=casting)
-    b = np.stack([x.b for x in arrays], axis, dtype=dtype, casting=casting)
-    return Normal(em, b)
-"""
-
-
-# TODO: function that applies to the concatenate mode family: concatenate, stack, hstack, vstack, dstack
-def _concatfunc(funcnm, arrays, *args, **kwargs):
-    arrays = [asnormal(ar) for ar in arrays]
-    
-    if len(arrays) == 0:
-        raise ValueError("Need at least one array.")
-    elif len(arrays) == 1:
-        return arrays[0]
-    
-    b = getattr(np, funcnm)([x.b for x in arrays], *args, **kwargs)
-    em = getattr(emaps, funcnm)([x.emap for x in arrays], *args, **kwargs)
-
-    return Normal(em, b)
+    return x.transpose(axes=axes)
 
 
 def concatenate(arrays, axis=0, dtype=None):
@@ -141,24 +95,36 @@ def dstack(arrays, dtype=None):
     return _concatfunc("dstack", arrays, dtype=dtype)
 
 
+# Function that applies to the concatenate mode family: concatenate, stack, hstack, vstack, dstack
+def _concatfunc(name, arrays, *args, **kwargs):
+    arrays = [asnormal(ar) for ar in arrays]
+    
+    if len(arrays) == 0:
+        raise ValueError("Need at least one array.")
+    elif len(arrays) == 1:
+        return arrays[0]
+    
+    b = getattr(np, name)([x.b for x in arrays], *args, **kwargs)
+    em = getattr(emaps, name)([x.emap for x in arrays], *args, **kwargs)
+
+    return Normal(em, b)
+
+
 # TODO: split family: split, hsplit, vsplit, dsplit
 
 # TODO: linear algebra family: dot, matmul, einsum, inner, outer, kron
 def einsum(subs, op1, op2):
-    parsed_subs = parse_einsum_inputs(subs)
-
     if isinstance(op2, Normal) and isinstance(op1, Normal):
         raise NotImplementedError("Einsums between two normal variables are not implemented.")
 
     if isinstance(op1, Normal) and not isinstance(op2, Normal):
         b = np.einsum(subs, op1.b, op2)
-        em = op1.emap.einsum(parsed_subs, op2)
+        em = op1.emap.einsum(subs, op2)
         return Normal(em, b)
     
     if isinstance(op2, Normal) and not isinstance(op1, Normal):
         b = np.einsum(subs, op1, op2.b)
-        parsed_subs = parsed_subs[1], parsed_subs[0], parsed_subs[2]
-        em = op2.emap.einsum(parsed_subs, op1)
+        em = op2.emap.einsum(subs, op1, otherfirst=True)
         return Normal(em, b)
 
     return np.einsum(subs, op1, op2)

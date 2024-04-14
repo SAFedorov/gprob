@@ -2,6 +2,7 @@ from itertools import zip_longest
 import numpy as np
 
 from . import elementary
+from .external import einsubs
 
 
 class ElementaryMap:
@@ -67,16 +68,31 @@ class ElementaryMap:
         other = np.asanyarray(other)
         return ElementaryMap(self.unsqueezed_a(other.ndim) / other, self.elem)
     
-    def __getitem__(self, key):
+    def __matmul__(self, other):
+        """Matrix-multiplies the map by a constant array."""
+        other = np.asanyarray(other)
+        new_a = self.unsqueezed_a(other.ndim - 1) @ other
+        return ElementaryMap(new_a, self.elem)
 
-        if isinstance(key, tuple) and Ellipsis in key:
-            key_a = key + (slice(None),)
+    def __rmatmul__(self, other):
+        """Right matrix-multiplies the map by a constant array."""
+        other = np.asanyarray(other)
+
+        if self.vndim == 1:
+            new_a = np.moveaxis(other @ self.a.T, -1, 0)  # TODO: test this implementation for broadcasting
+        elif self.vndim >= 2:
+            new_a = other @ self.unsqueezed_a(other.ndim)
         else:
-            key_a = key
+            raise ValueError("Scalars cannot be matrix-multiplied.")
+
+        return ElementaryMap(new_a, self.elem)
+    
+    def __getitem__(self, key):
+        if not isinstance(key, tuple):
+            key = (key,)
         
-        a_ = np.moveaxis(self.a, 0, -1)
-        a = np.moveaxis(a_[key_a], -1, 0)  # TODO: clean this up
-        return ElementaryMap(a, self.elem)
+        key = (slice(None),) + key
+        return ElementaryMap(self.a[key], self.elem)
 
     def extend_to(self, new_elem):
         
@@ -132,6 +148,11 @@ class ElementaryMap:
     def imag(self):
         return ElementaryMap(self.a.imag, self.elem)
     
+    def flatten(self, **kwargs):
+        # Flattens first to create a copy.
+        new_a = self.a.flatten(**kwargs).reshape((len(self.elem), -1))
+        return ElementaryMap(new_a, self.elem)
+    
     def cumsum(self, vaxis=None, **kwargs):
         if vaxis is None:
             a = self.a.reshape((self.a.shape[0], -1))
@@ -151,21 +172,31 @@ class ElementaryMap:
         new_a = self.a.reshape((self.a.shape[0], *newvshape), **kwargs)
         return ElementaryMap(new_a, self.elem)
     
+    def sum(self, vaxis=None, **kwargs):
+        if vaxis is None:
+            vaxis = tuple(range(self.vndim))
+        elif not isinstance(vaxis, tuple):
+            vaxis = (vaxis,)
+
+        axis = tuple(ax + 1 if ax >= 0 else ax for ax in vaxis)
+        new_a = self.a.sum(axis, **kwargs)
+
+        return ElementaryMap(new_a, self.elem)
+    
     def transpose(self, vaxes):
         if vaxes is None:
             vaxes = tuple(range(self.vndim))[::-1]
         new_a = self.a.transpose((0, *vaxes))
         return ElementaryMap(new_a, self.elem)
     
-    def einsum(self, vsubs_seq, other):
-        """ Computes einsum
+    def einsum(self, vsubs, other, otherfirst=False):
+        if not otherfirst:
+            (ssu, osu), outsu = einsubs.parse(vsubs, (self.vshape, other.shape))
+        else:
+            (osu, ssu), outsu = einsubs.parse(vsubs, (other.shape, self.vshape))
 
-        Args:
-            vsubs_seq (Sequence[str]): parsed subscripts without ellipses, 
-                (self_vsubs, other_subs, out_subs).
-            other: constant array.
-        """
-        subs = f"...{vsubs_seq[0]},{vsubs_seq[1]}->...{vsubs_seq[2]}"
+        subs = f"...{ssu},{osu}->...{outsu}"
+
         new_a = np.einsum(subs, self.a, other)
         return ElementaryMap(new_a, self.elem)
 
