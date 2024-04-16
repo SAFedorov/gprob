@@ -1,6 +1,8 @@
 import numpy as np
 from numpy.linalg import LinAlgError
 
+import scipy as sp
+
 from . import emaps
 from .emaps import ElementaryMap
 
@@ -56,7 +58,7 @@ class Normal:
     def __repr__(self):
         def rpad(sl):
             max_len = max(len(l) for l in sl)
-            return [l.ljust(max_len, " ") for l in sl]
+            return [l.ljust(max_len, " ") for l in sl] # TODO: fix for the case when one array starts wrapping and the other does not
         
         csn = self.__class__.__name__
 
@@ -191,7 +193,7 @@ class Normal:
             ConditionError when the observations are incompatible.
         """
 
-        cond = join([k-v for k, v in observations.items()])
+        cond = join([(k-v) for k, v in observations.items()]) # TODO: revise this part, replace it with stack
         emv, emc = emaps.complete((self.emap, cond.emap))
 
         # The calculation is performed on flattened arrays.
@@ -271,6 +273,12 @@ class Normal:
         em = self.emap.cumsum(axis, dtype=dtype)
         return Normal(em, b)
     
+    def ravel(self):
+        # Order is always "C"
+        b = self.b.ravel()
+        em = self.emap.vravel()
+        return Normal(em, b)
+    
     def reshape(self, newshape, order="C"):
         b = self.b.reshape(newshape, order=order)
         em = self.emap.reshape(newshape, order=order)
@@ -345,12 +353,15 @@ class Normal:
         return logp(x, self._b1d, self.cov())
 
 
-def join(args): # TODO: remove
+def join(args): # TODO: remove-------------------------------------------------------------
     """Combines several random (and possibly deterministic) variables
     into one vector."""
 
     if isinstance(args, Normal):
         return args
+    
+    if len(args) == 1:
+        return args[0]
 
     nvs = [asnormal(v) for v in args]
     em = emaps.join([v.emap for v in nvs])

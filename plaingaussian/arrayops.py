@@ -67,6 +67,10 @@ def cumsum(x, axis=None, dtype=None):
     return x.cumsum(axis=axis, dtype=dtype)
 
 
+def ravel(x):
+    return x.ravel()
+
+
 def reshape(x, newshape, order="C"):
     return x.reshape(newshape, order=order)
 

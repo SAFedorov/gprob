@@ -199,6 +199,9 @@ class ElementaryMap:
 
         new_a = np.einsum(subs, self.a, other)
         return ElementaryMap(new_a, self.elem)
+    
+    def vravel(self):
+        return np.ascontiguousarray(self.a.reshape((self.a.shape[0], -1)))
 
 
 def complete(ops):
