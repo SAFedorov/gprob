@@ -183,9 +183,9 @@ class ElementaryMap:
 
         return ElementaryMap(new_a, self.elem)
     
-    def transpose(self, vaxes):
+    def transpose(self, vaxes=None):
         if vaxes is None:
-            vaxes = tuple(range(self.vndim))[::-1]
+            vaxes = tuple(range(1, self.vndim + 1))[::-1]
         new_a = self.a.transpose((0, *vaxes))
         return ElementaryMap(new_a, self.elem)
     
