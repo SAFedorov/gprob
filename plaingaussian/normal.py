@@ -199,14 +199,19 @@ class Normal:
     def conj(self):
         return Normal(self.emap.conj(), self.b.conj())
     
+    def cumsum(self, axis=None, dtype=None):    
+        b = self.b.cumsum(axis, dtype=dtype)
+        em = self.emap.cumsum(axis, dtype=dtype)
+        return Normal(em, b)
+
     def flatten(self, order="C"):
         b = self.b.flatten(order=order)
         em = self.emap.flatten(order=order)
         return Normal(em, b)
     
-    def cumsum(self, axis=None, dtype=None):    
-        b = self.b.cumsum(axis, dtype=dtype)
-        em = self.emap.cumsum(axis, dtype=dtype)
+    def moveaxis(self, source, destination):
+        b = np.moveaxis(self.b, source, destination)
+        em = self.emap.moveaxis(source, destination)
         return Normal(em, b)
     
     def ravel(self):
@@ -226,7 +231,7 @@ class Normal:
         b = self.b.sum(axis, dtype=dtype, keepdims=keepdims)
         em = self.emap.sum(axis, dtype=dtype, keepdims=keepdims)
         return Normal(em, b)
-    
+
     def transpose(x, axes=None):
         b = x.b.transpose(axes)
         em = x.emap.transpose(axes)
@@ -439,6 +444,12 @@ def cumsum(x, axis=None, dtype=None):
     return x.cumsum(axis=axis, dtype=dtype)
 
 
+def moveaxis(x, source, destination):
+    if not isinstance(x, Normal):
+        return np.moveaxis(x, source, destination)
+    return x.moveaxis(source, destination)
+
+
 def ravel(x):
     return x.ravel()
 
@@ -471,7 +482,6 @@ def dstack(arrays, dtype=None):
     return _concatfunc("dstack", arrays, dtype=dtype)
 
 
-# Encompasses concatenate, stack, hstack, vstack, dstack
 def _concatfunc(name, arrays, *args, **kwargs):
     arrays = [asnormal(ar) for ar in arrays]
     
@@ -488,11 +498,10 @@ def _concatfunc(name, arrays, *args, **kwargs):
 
 # TODO: split family: split, hsplit, vsplit, dsplit
 
-# TODO: linear algebra family: dot, matmul, einsum, inner, outer, kron
-
 def einsum(subs, op1, op2):
     if isinstance(op2, Normal) and isinstance(op1, Normal):
-        raise NotImplementedError("Einsums between two normal variables are not implemented.")
+        raise NotImplementedError("Einsums between two normal variables "
+                                  "are not implemented.")
 
     if isinstance(op1, Normal) and not isinstance(op2, Normal):
         b = np.einsum(subs, op1.b, op2)
@@ -505,3 +514,47 @@ def einsum(subs, op1, op2):
         return Normal(em, b)
 
     return np.einsum(subs, op1, op2)
+
+
+def dot(op1, op2):
+    return _bilinearfunc("dot", op1, op2)
+
+
+def matmul(op1, op2):
+    return op1 @ op2
+
+
+def inner(op1, op2):
+    return _bilinearfunc("inner", op1, op2)
+
+
+def outer(op1, op2):
+    return _bilinearfunc("outer", op1, op2)
+
+
+def kron(op1, op2):
+    return _bilinearfunc("kron", op1, op2)
+
+
+def tensordot(op1, op2, axes=2):
+    return _bilinearfunc("tensordot", op1, op2, axes=axes)
+
+
+def _bilinearfunc(name, op1, op2, *args, **kwargs):
+    if isinstance(op2, Normal) and isinstance(op1, Normal):
+        raise NotImplementedError(f"{name} is not implemented for inputs "
+                                  "containing more than one normal variable.")
+
+    if isinstance(op1, Normal) and not isinstance(op2, Normal):
+        b = getattr(np, name)(op1.b, op2, *args, **kwargs)
+        em = getattr(op1.emap, name)(op2, *args, **kwargs)
+        return Normal(em, b)
+    
+    if isinstance(op2, Normal) and not isinstance(op1, Normal):
+        b = getattr(np, name)(op1, op2.b, *args, **kwargs)
+
+        kwargs.update(otherfirst=True)
+        em = getattr(op2.emap, name)(op1, *args, **kwargs)
+        return Normal(em, b)
+
+    return getattr(np, name)(op1, op2, *args, **kwargs)

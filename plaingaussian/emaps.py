@@ -152,11 +152,6 @@ class ElementaryMap:
     def imag(self):
         return ElementaryMap(self.a.imag, self.elem)
     
-    def flatten(self, **kwargs):
-        # Flattens first to create a copy.
-        new_a = self.a.flatten(**kwargs).reshape((len(self.elem), -1))
-        return ElementaryMap(new_a, self.elem)
-    
     def cumsum(self, vaxis=None, **kwargs):
         if vaxis is None:
             a = self.a.reshape((self.a.shape[0], -1))
@@ -169,6 +164,25 @@ class ElementaryMap:
                 axis = vaxis
 
         new_a = np.cumsum(a, axis=axis, **kwargs)
+        return ElementaryMap(new_a, self.elem)
+    
+    def flatten(self, **kwargs):
+        # Flattens first to create a copy.
+        new_a = self.a.flatten(**kwargs).reshape((len(self.elem), -1))
+        return ElementaryMap(new_a, self.elem)
+    
+    def moveaxis(self, vsource, vdestination):
+        if vsource >= 0:
+            source = vsource + 1
+        else:
+            source = vsource
+
+        if vdestination >= 0:
+            destination = vdestination + 1
+        else:
+            destination = vdestination
+
+        new_a = np.moveaxis(self.a, source, destination)
         return ElementaryMap(new_a, self.elem)
     
     def ravel(self):
@@ -198,6 +212,8 @@ class ElementaryMap:
         new_a = self.a.transpose((0, *vaxes))
         return ElementaryMap(new_a, self.elem)
     
+    # ---------- tensor products with numeric arrays ----------
+    
     def einsum(self, vsubs, other, otherfirst=False):
         if not otherfirst:
             (ssu, osu), outsu = einsubs.parse(vsubs, (self.vshape, other.shape))
@@ -207,6 +223,84 @@ class ElementaryMap:
         subs = f"...{ssu},{osu}->...{outsu}"
 
         new_a = np.einsum(subs, self.a, other)
+        return ElementaryMap(new_a, self.elem)
+    
+    def inner(self, other, otherfirst=False):
+        other = np.asanyarray(other)
+
+        if other.ndim == 0:
+            return ElementaryMap(self.a * other, self.elem)
+        
+        if self.vndim == 0:
+            new_a = np.einsum("i, ... -> i...", self.a, other)
+            return ElementaryMap(new_a, self.elem)
+
+        if not otherfirst:
+            new_a = np.inner(self.a, other)
+        else:
+            new_a = np.moveaxis(np.inner(other, self.a), other.ndim - 1, 0)
+
+        return ElementaryMap(new_a, self.elem)
+    
+    def dot(self, other, otherfirst=False):
+        other = np.asanyarray(other)
+
+        if other.ndim == 0:
+            return ElementaryMap(self.a * other, self.elem)
+        
+        if self.vndim == 0:
+            new_a = np.einsum("i, ... -> i...", self.a, other)
+            return ElementaryMap(new_a, self.elem)
+        
+        if not otherfirst:
+            new_a = np.dot(self.a, other)
+        else:
+            if self.vndim == 1:
+                new_a = np.einsum("...j, ij -> i...", other, self.a)
+            else:
+                new_a = np.moveaxis(np.dot(other, self.a), other.ndim - 1, 0)
+
+        return ElementaryMap(new_a, self.elem)
+    
+    def outer(self, other, otherfirst=False):
+        other = np.ravel(other)
+
+        if not otherfirst:
+            new_a = np.einsum("ij, k -> ijk", self.a2d, other)
+        else:
+            new_a = np.einsum("k, ij -> ikj", other, self.a2d)
+
+        return ElementaryMap(new_a, self.elem)
+    
+    def kron(self, other, otherfirst=False):
+        other = np.asanyarray(other)
+
+        if not otherfirst:
+            new_a = np.kron(self.unsqueezed_a(other.ndim), other)
+        else:
+            new_a = np.kron(other, self.unsqueezed_a(other.ndim))
+
+        return ElementaryMap(new_a, self.elem)
+    
+    def tensordot(self, other, otherfirst=False, axes=2):
+
+        # This is the same how numpy.tensordot handles the axes.
+        try:
+            iter(axes)
+        except Exception:
+            axes1 = list(range(-axes, 0))
+            axes2 = list(range(0, axes))
+        else:
+            axes1, axes2 = axes
+
+        if not otherfirst:
+            axes1 = [a + 1 if a >= 0 else a for a in axes1]
+            new_a = np.tensordot(self.a, other, axes=(axes1, axes2))
+        else:
+            axes2 = [a + 1 if a >= 0 else a for a in axes2]
+            new_a = np.tensordot(other, self.a, axes=(axes1, axes2))
+            new_a = np.moveaxis(new_a, -self.vndim + len(axes2), 0)
+
         return ElementaryMap(new_a, self.elem)
 
 
