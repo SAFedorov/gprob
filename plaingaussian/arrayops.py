@@ -1,6 +1,5 @@
 import numpy as np
-from .normal import Normal, asnormal
-from . import emaps
+from .normal import Normal
 
 
 # ---------- linear and linearized array ufuncs ----------
@@ -52,83 +51,3 @@ def arctanh(x): return Normal(x.emap / (1 - x.b**2), np.arctanh(x.b))
 
 def conjugate(x): return Normal(x.emap.conj(), x.b.conj())
 def conj(x): return conjugate(x)  # In numpy, conjugate (not conj) is a ufunc
-
-
-# ---------- linear array functions ----------
-
-
-def sum(x, axis=None, dtype=None, keepdims=False):
-    # "where" is absent because its broadcasting is not implemented.
-    # "initial" is also not implemented.
-    return x.sum(axis=axis, dtype=dtype, keepdims=keepdims)
-
-
-def cumsum(x, axis=None, dtype=None):
-    return x.cumsum(axis=axis, dtype=dtype)
-
-
-def ravel(x):
-    return x.ravel()
-
-
-def reshape(x, newshape, order="C"):
-    return x.reshape(newshape, order=order)
-
-
-def transpose(x, axes=None):
-    return x.transpose(axes=axes)
-
-
-def concatenate(arrays, axis=0, dtype=None):
-    return _concatfunc("concatenate", arrays, axis, dtype=dtype)
-
-
-def stack(arrays, axis=0, dtype=None):
-    return _concatfunc("stack", arrays, axis, dtype=dtype)
-
-
-def hstack(arrays, dtype=None):
-    return _concatfunc("hstack", arrays, dtype=dtype)
-
-
-def vstack(arrays, dtype=None):
-    return _concatfunc("vstack", arrays, dtype=dtype)
-
-
-def dstack(arrays, dtype=None):
-    return _concatfunc("dstack", arrays, dtype=dtype)
-
-
-# Function that applies to the concatenate mode family: concatenate, stack, hstack, vstack, dstack
-def _concatfunc(name, arrays, *args, **kwargs):
-    arrays = [asnormal(ar) for ar in arrays]
-    
-    if len(arrays) == 0:
-        raise ValueError("Need at least one array.")
-    elif len(arrays) == 1:
-        return arrays[0]
-    
-    b = getattr(np, name)([x.b for x in arrays], *args, **kwargs)
-    em = getattr(emaps, name)([x.emap for x in arrays], *args, **kwargs)
-
-    return Normal(em, b)
-
-
-# TODO: split family: split, hsplit, vsplit, dsplit
-
-# TODO: linear algebra family: dot, matmul, einsum, inner, outer, kron
-def einsum(subs, op1, op2):
-    if isinstance(op2, Normal) and isinstance(op1, Normal):
-        raise NotImplementedError("Einsums between two normal variables are not implemented.")
-
-    if isinstance(op1, Normal) and not isinstance(op2, Normal):
-        b = np.einsum(subs, op1.b, op2)
-        em = op1.emap.einsum(subs, op2)
-        return Normal(em, b)
-    
-    if isinstance(op2, Normal) and not isinstance(op1, Normal):
-        b = np.einsum(subs, op1, op2.b)
-        em = op2.emap.einsum(subs, op1, otherfirst=True)
-        return Normal(em, b)
-
-    return np.einsum(subs, op1, op2)

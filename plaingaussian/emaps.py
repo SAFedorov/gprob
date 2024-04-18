@@ -31,6 +31,10 @@ class ElementaryMap:
         self.vndim = a.ndim - 1
         self.elem = elem  # Dictionary of elementary variables {id -> k, ...}
 
+    @property
+    def a2d(self):
+        return np.ascontiguousarray(self.a.reshape((self.a.shape[0], -1)))
+
     def __neg__(self):
         return ElementaryMap(-self.a, self.elem)  # TODO: test how this performs
 
@@ -167,6 +171,11 @@ class ElementaryMap:
         new_a = np.cumsum(a, axis=axis, **kwargs)
         return ElementaryMap(new_a, self.elem)
     
+    def ravel(self):
+        """Flattens the map's `a` to a 2D contiguous array, for which the 
+        variable dimension is 1."""
+        return ElementaryMap(self.a2d, self.elem)
+    
     def reshape(self, newvshape, **kwargs):
         newvshape = np.array(newvshape, ndmin=1)
         new_a = self.a.reshape((self.a.shape[0], *newvshape), **kwargs)
@@ -199,9 +208,6 @@ class ElementaryMap:
 
         new_a = np.einsum(subs, self.a, other)
         return ElementaryMap(new_a, self.elem)
-    
-    def vravel(self):
-        return np.ascontiguousarray(self.a.reshape((self.a.shape[0], -1)))
 
 
 def complete(ops):
@@ -223,38 +229,6 @@ def complete(ops):
         return op1.extend_to(union_elem), op2.pad_to(union_elem)
     
     return op1.pad_to(union_elem), op2.extend_to(union_elem)
-
-
-def join(ops):  #TODO: remove in a future version
-
-    # Stacks the operands along the 0th dimension
-
-    if len(ops) > 2:
-        union_elem = elementary.uunion(*[em.elem for em in ops])
-
-        cat_a = np.zeros((len(union_elem), len(ops), *ops[0].vshape))
-        for i, em in enumerate(ops):
-            idx = [union_elem[k] for k in em.elem]
-            cat_a[idx, i] = em.a
-
-        return ElementaryMap(cat_a, union_elem)
-    
-    # The rest is an optimization for the case of two operands.
-    op1, op2 = ops
-    j1, j2 = 0, 1
-
-    union_elem, swapped = elementary.ounion(op1.elem, op2.elem)
-
-    if swapped:
-        op1, op2 = op2, op1
-        j1, j2 = j2, j1
-    
-    cat_a = np.zeros((len(union_elem), len(ops), *ops[0].vshape))
-    cat_a[:len(op1.elem), j1] = op1.a
-    idx = [union_elem[k] for k in op2.elem]
-    cat_a[idx, j2] = op2.a
-
-    return ElementaryMap(cat_a, union_elem)
 
 
 def _broadcast_shapes(shape1, shape2):

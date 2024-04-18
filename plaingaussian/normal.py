@@ -1,17 +1,12 @@
+from builtins import sum as sum_
+
 import numpy as np
 from numpy.linalg import LinAlgError
-
-import scipy as sp
 
 from . import emaps
 from .emaps import ElementaryMap
 
-from .func import logp
-
-
-class ConditionError(Exception):
-    """Error raised for incompatible conditions."""
-    pass
+from .func import logp, condition
 
 
 class Normal:
@@ -46,15 +41,6 @@ class Normal:
     def T(self):
         return Normal(self.emap.transpose(), self.b.T)
 
-    @property
-    def _a2d(self): 
-        a2d = self.emap.a.reshape((self.emap.a.shape[0], -1))
-        return np.ascontiguousarray(a2d)
-    
-    @property
-    def _b1d(self): 
-        return np.ascontiguousarray(self.b.reshape((self.b.size,))) # The same as self.b.ravel()
-
     def __repr__(self):
         def rpad(sl):
             max_len = max(len(l) for l in sl)
@@ -82,6 +68,8 @@ class Normal:
         return "\n".join(ln)
 
     def __len__(self):
+        if self.ndim == 0:
+            raise TypeError("Scalar arrays have no lengh.")
         return len(self.b)
 
     def __neg__(self):
@@ -179,60 +167,8 @@ class Normal:
         return Normal(self.emap[key], self.b[key])
 
     def __or__(self, observations: dict):
-        """Conditioning operation.
-        
-        Args:
-            observations: A dictionary of observations in the format 
-                {`variable`: `value`, ...}, where `variable`s are normal 
-                variables, and `value`s can be constants or normal variables.
-        
-        Returns:
-            Conditional normal variable.
-
-        Raises:
-            ConditionError when the observations are incompatible.
-        """
-
-        cond = join([(k-v) for k, v in observations.items()]) # TODO: revise this part, replace it with stack
-        emv, emc = emaps.complete((self.emap, cond.emap))
-
-        # The calculation is performed on flattened arrays.
-        av = emv.a.reshape((emv.a.shape[0], -1))
-        ac = emc.a.reshape((emc.a.shape[0], -1))
-        
-        u, s, vh = np.linalg.svd(ac, compute_uv=True)
-        tol = np.finfo(float).eps * np.max(ac.shape)
-        snz = s[s > (tol * np.max(s))]  # non-zero singular values
-        r = len(snz)  # rank of ac
-
-        u = u[:, :r]
-        vh = vh[:r] 
-
-        m = u @ ((vh @ (-cond._b1d)) / snz)
-        # lstsq solution of m @ ac = -cond.b
-
-        if r < cond.size:
-            nsq = cond._b1d @ cond._b1d
-            d = (cond._b1d + m @ ac)  # residual
-
-            if nsq > 0 and (d @ d) > (tol**2 * nsq):
-                raise ConditionError("The conditions could not be satisfied. "
-                                     f"Got {(d @ d):0.3e} for the residual and "
-                                     f"{nsq:0.5e} for |bc|**2.")
-                # nsq=0 is always solvable
-
-        proj = (vh.T / snz) @ (u.T @ av) 
-        # lstsq solution of ac @ proj = av that projects the column vectors 
-        # of av on the subspace spanned by the constraints.
-
-        new_a = av - ac @ proj
-        new_b = self._b1d + m @ av
-
-        # Shaping back
-        new_a = np.reshape(new_a, emv.a.shape)
-        new_b = np.reshape(new_b, self.b.shape)
-
-        return Normal(ElementaryMap(new_a, emv.elem), new_b)
+        """Conditioning operation."""
+        return self.condition(observations)
     
     def __and__(self, other):
         """Combines two random variables into one vector."""
@@ -242,7 +178,7 @@ class Normal:
         if self.ndim > 1 or other.ndim > 1:
             raise ValueError("& is only applicable to 0- and 1-d arrays.")
         
-        b = np.concatenate([self._b1d, other._b1d], axis=0)
+        b = np.concatenate([self.b.ravel(), other.b.ravel()], axis=0)
         em = emaps.join([self.emap, other.emap])
         return Normal(em, b)  
     
@@ -254,7 +190,7 @@ class Normal:
         if self.ndim > 1 or other.ndim > 1:
             raise ValueError("& is only applicable to 0- and 1-d arrays.")
         
-        b = np.concatenate([other._b1d, self._b1d], axis=0)
+        b = np.concatenate([other.b.ravel(), self.b.ravel()], axis=0)
         em = emaps.join([other.emap, self.emap])
         return Normal(em, b)
 
@@ -276,7 +212,7 @@ class Normal:
     def ravel(self):
         # Order is always "C"
         b = self.b.ravel()
-        em = self.emap.vravel()
+        em = self.emap.ravel()
         return Normal(em, b)
     
     def reshape(self, newshape, order="C"):
@@ -285,6 +221,8 @@ class Normal:
         return Normal(em, b)
     
     def sum(self, axis=None, dtype=None, keepdims=False):
+        # "where" is absent because its broadcasting is not implemented.
+        # "initial" is also not implemented.
         b = self.b.sum(axis, dtype=dtype, keepdims=keepdims)
         em = self.emap.sum(axis, dtype=dtype, keepdims=keepdims)
         return Normal(em, b)
@@ -295,6 +233,69 @@ class Normal:
         return Normal(em, b)
 
     # ---------- probability-related methods ----------
+
+    def condition(self, observations: dict, mask=None):
+        """Conditioning operation.
+        
+        Args:
+            observations: 
+                A dictionary of observations {`variable`: `value`, ...}, where 
+                `variable`s are normal variables, and `value`s can be constants 
+                or normal variables.
+            mask (optional): 
+                A 2d bool array, in which `mask[i, j] == False` means that 
+                the `i`-th condition should not affect the `j`-th variable.
+                The 0th axis of `mask` spans over the conditions, and its 1st 
+                axis spans over the variable. To variables and conditions whose 
+                numbers of dimensions are greater than one the mask applies  
+                along their 0-th axes.
+                The mask needs to be generalized upper- or lower- triangular, 
+                meaning that there needs to be a set of indices `i0[j]` such 
+                that either `mask[i, j] == True` for `i > i0[j]` and 
+                `mask[i, j] == False` for `i < i0[j]`, or `mask[i, j] == True` 
+                for `i < i0[j]` and `mask[i, j] == False` for `i > i0[j]`.
+        
+        Returns:
+            Conditional normal variable.
+
+        Raises:
+            ConditionError if the observations are mutually incompatible,
+            or if a mask is given with degenerate observations.
+        """
+
+        if mask is None:
+            cond = concatenate([(k-v).ravel() for k, v in observations.items()])
+        
+        else:
+            # Concatenates preserving the order along the 0th axis.
+
+            if self.ndim < 1:
+                raise ValueError("The variable must have at least one "
+                                 "dimension to be conditioned with a mask.")
+
+            obs = [k-v for k, v in observations.items()]
+            if any(c.ndim < 1 for c in obs):
+                raise ValueError("All conditions must have at least one "
+                                 "dimension to be compatible with masking.")
+            
+            obs = [c.reshape((c.shape[0], -1)) for c in obs]
+            cond = concatenate(obs, axis=1).ravel()
+
+            k = sum_(c.shape[1] for c in obs)
+            l = 1 if self.ndim == 1 else np.prod(self.shape[1:])
+            ms = mask.shape
+
+            mask = np.broadcast_to(mask[:, None, :, None], (ms[0], k, ms[1], l))
+            mask = mask.reshape((ms[0] * k, ms[1] * l))
+
+        emv, emc = emaps.complete((self.emap, cond.emap))
+        new_b, new_a = condition(self.b.ravel(), emv.a2d, cond.b, emc.a, mask)
+
+        # Shaping back
+        new_a = np.reshape(new_a, emv.a.shape)
+        new_b = np.reshape(new_b, self.b.shape)
+
+        return Normal(ElementaryMap(new_a, emv.elem), new_b)
 
     def mean(self):
         """Mean"""
@@ -312,12 +313,12 @@ class Normal:
     
     def cov(self):
         """Covariance"""
-        a_ = self._a2d
+        a = self.emap.a2d
 
-        if np.iscomplexobj(a_):
-            return a_.T.conj() @ a_
+        if np.iscomplexobj(a):
+            return a.T.conj() @ a
 
-        return a_.T @ a_
+        return a.T @ a
     
     def sample(self, n=None):
         """Samples the random variable `n` times."""
@@ -328,9 +329,9 @@ class Normal:
         else:
             nshape = (n,)
         
-        a = self._a2d
+        a = self.emap.a2d
         r = np.random.normal(size=(*nshape, a.shape[0]))
-        return (r @ a + self._b1d).reshape((*nshape, *self.shape))
+        return (r @ a + self.b.ravel()).reshape((*nshape, *self.shape))
     
     def logp(self, x):
         """Log likelihood of a sample.
@@ -350,24 +351,7 @@ class Normal:
                 x = x.reshape((x.size,))
             else:
                 x = x.reshape((x.shape[0], -1)) 
-        return logp(x, self._b1d, self.cov())
-
-
-def join(args): # TODO: remove-------------------------------------------------------------
-    """Combines several random (and possibly deterministic) variables
-    into one vector."""
-
-    if isinstance(args, Normal):
-        return args
-    
-    if len(args) == 1:
-        return args[0]
-
-    nvs = [asnormal(v) for v in args]
-    em = emaps.join([v.emap for v in nvs])
-    b = np.concatenate([v.b.reshape((v.b.size,)) for v in nvs])
-
-    return Normal(em, b)
+        return logp(x, self.b.ravel(), self.cov())
 
 
 def asnormal(v):
@@ -437,3 +421,87 @@ def normal(mu=0., sigmasq=1., size=None):
     atr = eigvects @ np.diag(np.sqrt(eigvals))
 
     return Normal(atr.T, mu)
+
+
+# ---------- linear array functions ----------
+
+# These functions apply to numpy arrays without forcing their convertion 
+# to Normal. At the same time, they omit some arguments supported by 
+# the corresponding numpy functions.
+
+# TODO: concatenate functions actually do force conversion
+
+def sum(x, axis=None, dtype=None, keepdims=False):
+    return x.sum(axis=axis, dtype=dtype, keepdims=keepdims)
+
+
+def cumsum(x, axis=None, dtype=None):
+    return x.cumsum(axis=axis, dtype=dtype)
+
+
+def ravel(x):
+    return x.ravel()
+
+
+def reshape(x, newshape, order="C"):
+    return x.reshape(newshape, order=order)
+
+
+def transpose(x, axes=None):
+    return x.transpose(axes=axes)
+
+
+def concatenate(arrays, axis=0, dtype=None):
+    return _concatfunc("concatenate", arrays, axis, dtype=dtype)
+
+
+def stack(arrays, axis=0, dtype=None):
+    return _concatfunc("stack", arrays, axis, dtype=dtype)
+
+
+def hstack(arrays, dtype=None):
+    return _concatfunc("hstack", arrays, dtype=dtype)
+
+
+def vstack(arrays, dtype=None):
+    return _concatfunc("vstack", arrays, dtype=dtype)
+
+
+def dstack(arrays, dtype=None):
+    return _concatfunc("dstack", arrays, dtype=dtype)
+
+
+# Encompasses concatenate, stack, hstack, vstack, dstack
+def _concatfunc(name, arrays, *args, **kwargs):
+    arrays = [asnormal(ar) for ar in arrays]
+    
+    if len(arrays) == 0:
+        raise ValueError("Need at least one array.")
+    elif len(arrays) == 1:
+        return arrays[0]
+    
+    b = getattr(np, name)([x.b for x in arrays], *args, **kwargs)
+    em = getattr(emaps, name)([x.emap for x in arrays], *args, **kwargs)
+
+    return Normal(em, b)
+
+
+# TODO: split family: split, hsplit, vsplit, dsplit
+
+# TODO: linear algebra family: dot, matmul, einsum, inner, outer, kron
+
+def einsum(subs, op1, op2):
+    if isinstance(op2, Normal) and isinstance(op1, Normal):
+        raise NotImplementedError("Einsums between two normal variables are not implemented.")
+
+    if isinstance(op1, Normal) and not isinstance(op2, Normal):
+        b = np.einsum(subs, op1.b, op2)
+        em = op1.emap.einsum(subs, op2)
+        return Normal(em, b)
+    
+    if isinstance(op2, Normal) and not isinstance(op1, Normal):
+        b = np.einsum(subs, op1, op2.b)
+        em = op2.emap.einsum(subs, op1, otherfirst=True)
+        return Normal(em, b)
+
+    return np.einsum(subs, op1, op2)

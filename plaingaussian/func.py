@@ -114,8 +114,6 @@ def d2logp(x, m, cov, dm, dcov, d2m, d2cov):
     return term1 + term2 + term3 + term4 + term5 + term5.T
 
 
-# ---------- functions supporting batching ----------
-
 def logp(x, m, cov):
     """Calculates the logarithmic probability density of an n-dimensional normal
     distribution at the sample value
@@ -157,14 +155,12 @@ def logp(x, m, cov):
 
 def logp_sc(x, mu, sigmasq):
     """logp for scalar inputs."""
-
-    eps = np.finfo(float).eps
     
-    if sigmasq < eps:
+    if sigmasq == 0:
         # Degenerate case. By our convention, 
         # logp is 1 if x==mu, and -inf otherwise.
 
-        match_idx = np.abs(x - mu) < eps
+        match_idx = np.equal(x, mu)
         llk = np.ones_like(x)
         return np.where(match_idx, llk, float("-inf"))
 
@@ -205,7 +201,126 @@ def logp_lstsq(x, m, cov):
     # Otherwise checks the residual errors.
     delta = (y.T - (x - m)) 
     res = np.einsum("...i, ...i -> ...", delta, delta)
-    eps = np.finfo(float).eps * cov.shape[0] 
+    eps = np.finfo(y.dtype).eps * cov.shape[0] 
     valid_idx = np.abs(res) < eps
 
     return np.where(valid_idx, llk, float("-inf"))
+
+
+class ConditionError(Exception):
+    """Error raised in conditioning."""
+    pass
+
+
+def condition(m, a, mc, ac, mask=None):
+    """Conditions the vandom variable `v` on another random variable, `c`, 
+    being equal to zero. Both variables are defined as Gaussian maps,
+
+    v = m + e @ a,
+    c = mc + e @ ac,
+    
+    where `e` are vectors of elementary independent identically-distributed 
+    normal random variables with zero mean and unit variance, `m` and `mc` are
+    the mean vectors and `a` and `ac` are the map matrices.  
+    
+    Args:
+        m: The mean vector of the variable to be conditioned, a scalar 
+            or an (n,) array.
+        a: The map matrix of the variable to be conditioned, a scalar 
+            or a (ne, n) 2d array.
+        mc: The mean vector of the variable conditioned on, a scalar 
+            or an (nc,) array.
+        ac: The map matrix of the variable conditioned on, a scalar 
+            or a (ne, nc) 2d array.
+        mask (bool array, optional): A 2d mask with the shape (nc, n), where
+            mask[i, j] == False means than the i-th condition does not affect 
+            the j-th variable.
+        
+    Returns:
+        Tuple (conditional mean, conditional map matrix)
+    """
+
+    # TODO: check that it actually works for scalars, and non-array data types.
+
+    try:
+        cond_m, cond_a = condition_qr(m, a, mc, ac, mask)
+    except ConditionError:
+        if mask is not None:
+            raise ConditionError("Masks can only be used with non-degenerate "
+                                 "conditions.")
+        
+        cond_m, cond_a = condition_svd(m, a, mc, ac)
+    
+    return cond_m, cond_a
+
+
+def condition_qr(m, a, mc, ac, mask=None):
+    """Conditioning using QR or RQ decomposition."""
+
+    def ql(a):
+        r, q = sp.linalg.rq(a.T, mode="economic", check_finite=False)
+        return q.T, r.T
+
+    def qu(a):
+        q, r = sp.linalg.qr(a, mode="economic", check_finite=False)
+        return q, r
+
+    qtri = qu
+
+    if mask is not None and not mask[0, -1]:
+        # For lower-triangular masks need to use ql decomposition.
+        qtri = ql
+
+    q, tri = qtri(ac)
+
+    # Checks if there are zero diagonal elements in the triangular matrix, 
+    # which would mean that some colums of `ac` are linearly dependent.
+    diatri = np.abs(np.diag(tri))
+    tol = np.finfo(tri.dtype).eps
+    if (diatri < (tol * np.max(diatri))).any():
+        raise ConditionError("Conditioning via QR decomposition does not work "
+                             "with degenerate constraints. Use SVD instead.")
+
+    es = sp.linalg.solve_triangular(tri.T, -mc, lower=(qtri is qu),
+                                    check_finite=False) # TODO: check the mean for the case with masking
+
+    aproj = (q.T @ a)
+    # The projection of the column vectors of `a` on the subspace spanned by 
+    # the column vectors of the constraint matrix `ac`.
+
+    if mask is not None:
+        aproj = np.where(mask, aproj, 0)
+
+    cond_a = a - q @ aproj
+    cond_m = m + es @ aproj
+
+    return cond_m, cond_a
+
+
+def condition_svd(m, a, mc, ac):
+    u, s, vh = np.linalg.svd(ac, compute_uv=True)
+
+    tol = np.finfo(u.dtype).eps * np.max(ac.shape)
+    snz = s[s > (tol * np.max(s))]  # non-zero singular values
+    r = len(snz)  # rank of ac
+
+    u = u[:, :r]
+    vh = vh[:r] 
+
+    el = u @ ((vh @ (-mc)) / snz)
+    # lstsq solution of el @ ac = -mc
+
+    if r < mc.size:
+        nsq = mc @ mc
+        d = (mc + el @ ac)  # residual
+
+        if nsq > 0 and (d @ d) > (tol**2 * nsq):
+            raise ConditionError("The conditions could not be satisfied. "
+                                    f"Got {(d @ d):0.3e} for the residual and "
+                                    f"{nsq:0.5e} for |mu_c|**2.")
+            # nsq=0 is always solvable
+
+    cond_a = a - u @ (u.T @ a)
+    cond_m = m + el @ a
+
+    return cond_m, cond_a
