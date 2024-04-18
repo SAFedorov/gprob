@@ -166,8 +166,22 @@ class ElementaryMap:
         new_a = np.cumsum(a, axis=axis, **kwargs)
         return ElementaryMap(new_a, self.elem)
     
+    def diagonal(self, offset=0, vaxis1=0, vaxis2=1):
+        if vaxis1 >= 0:
+            axis1 = vaxis1 + 1
+        else:
+            axis1 = vaxis1
+
+        if vaxis2 >= 0:
+            axis2 = vaxis2 + 1
+        else:
+            axis2 = vaxis2
+
+        new_a = self.a.diagonal(offset=offset, axis1=axis1, axis2=axis2)
+        return ElementaryMap(new_a, self.elem)
+    
     def flatten(self, **kwargs):
-        # Flattens first to create a copy.
+        # Flattens to 1d first to create a copy.
         new_a = self.a.flatten(**kwargs).reshape((len(self.elem), -1))
         return ElementaryMap(new_a, self.elem)
     
@@ -212,7 +226,21 @@ class ElementaryMap:
         new_a = self.a.transpose((0, *vaxes))
         return ElementaryMap(new_a, self.elem)
     
-    # ---------- tensor products with numeric arrays ----------
+    def trace(self, offset=0, vaxis1=0, vaxis2=1, **kwargs): # Probably need to introduce a helper to do ax1, ax2 = from_vaxes(vax1, vax2)
+        if vaxis1 >= 0:
+            axis1 = vaxis1 + 1
+        else:
+            axis1 = vaxis1
+
+        if vaxis2 >= 0:
+            axis2 = vaxis2 + 1
+        else:
+            axis2 = vaxis2
+
+        new_a = self.a.trace(offset=offset, axis1=axis1, axis2=axis2, **kwargs)
+        return ElementaryMap(new_a, self.elem)
+    
+    # ---------- bilinear functions with numeric arrays ----------
     
     def einsum(self, vsubs, other, otherfirst=False):
         if not otherfirst:

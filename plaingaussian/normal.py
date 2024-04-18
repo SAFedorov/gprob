@@ -203,6 +203,11 @@ class Normal:
         b = self.b.cumsum(axis, dtype=dtype)
         em = self.emap.cumsum(axis, dtype=dtype)
         return Normal(em, b)
+    
+    def diagonal(self, offset=0, axis1=0, axis2=1):
+        b = self.b.diagonal(offset=offset, axis1=axis1, axis2=axis2)
+        em = self.emap.diagonal(offset=offset, vaxis1=axis1, vaxis2=axis2)
+        return Normal(em, b)
 
     def flatten(self, order="C"):
         b = self.b.flatten(order=order)
@@ -232,9 +237,14 @@ class Normal:
         em = self.emap.sum(axis, dtype=dtype, keepdims=keepdims)
         return Normal(em, b)
 
-    def transpose(x, axes=None):
-        b = x.b.transpose(axes)
-        em = x.emap.transpose(axes)
+    def transpose(self, axes=None):
+        b = self.b.transpose(axes)
+        em = self.emap.transpose(axes)
+        return Normal(em, b)
+    
+    def trace(self, offset=0, axis1=0, axis2=1, dtype=None):
+        b = self.b.trace(offset=offset, axis1=axis1, axis2=axis2, dtype=dtype)
+        em = self.emap.trace(offset, axis1, axis2, dtype=dtype)
         return Normal(em, b)
 
     # ---------- probability-related methods ----------
@@ -436,6 +446,9 @@ def normal(mu=0., sigmasq=1., size=None):
 
 # TODO: concatenate functions actually do force conversion
 
+def diagonal(x, offset=0, axis1=0, axis2=1):
+    return x.diagonal(offset=offset, axis1=axis1, axis2=axis2)
+
 def sum(x, axis=None, dtype=None, keepdims=False):
     return x.sum(axis=axis, dtype=dtype, keepdims=keepdims)
 
@@ -460,6 +473,10 @@ def reshape(x, newshape, order="C"):
 
 def transpose(x, axes=None):
     return x.transpose(axes=axes)
+
+
+def trace(x, offset=0, axis1=0, axis2=1, dtype=None):
+    return x.trace(offset=offset, axis1=axis1, axis2=axis2, dtype=dtype)
 
 
 def concatenate(arrays, axis=0, dtype=None):
