@@ -148,14 +148,12 @@ class Normal:
         em = self.emap * (np.log(np.where(other, other, 1.)) * b)
         return Normal(em, b)
 
-    def __matmul__(self, other):  # TODO: add tests for this operation
+    def __matmul__(self, other):
         if isinstance(other, Normal):
-            raise NotImplementedError
+            return self @ other.b + self.b @ other
         return Normal(self.emap @ other, self.b @ other)
 
     def __rmatmul__(self, other):
-        if isinstance(other, Normal):
-            raise NotImplementedError
         return Normal(other @ self.emap, other @ self.b)
 
     def __getitem__(self, key):
