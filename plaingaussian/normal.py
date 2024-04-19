@@ -163,6 +163,10 @@ class Normal:
     
     def __setitem__(self, key, value):
         value = asnormal(value)
+
+        if not self.b.flags.writeable:
+            self.b = self.b.copy()
+            
         self.b[key] = value.b
         self.emap[key] = value.emap
 
@@ -411,11 +415,11 @@ def normal(mu=0., sigmasq=1., size=None):
             if not size:
                 return Normal(sigma[None], mu)  # expanding sigma to 1d
             elif isinstance(size, int):
-                b = np.broadcast_to(mu, (size,)).copy()
+                b = np.broadcast_to(mu, (size,))
                 a = sigma * np.eye(size, size)
                 return Normal(a, b)
             else:
-                b = np.broadcast_to(mu, size).copy()
+                b = np.broadcast_to(mu, size)
                 a = sigma * np.eye(b.size, b.size).reshape((b.size, *b.shape))
                 return Normal(a, b)
         else:
@@ -425,7 +429,7 @@ def normal(mu=0., sigmasq=1., size=None):
     if sigmasq.ndim != 2:
         raise ValueError("Only 0 and 2 dimensional covariance matrices are presently supported.")
 
-    mu = np.broadcast_to(mu, (sigmasq.shape[0],)).copy()
+    mu = np.broadcast_to(mu, (sigmasq.shape[0],))
         
     try:
         atr = np.linalg.cholesky(sigmasq)

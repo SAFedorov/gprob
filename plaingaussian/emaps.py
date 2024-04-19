@@ -5,6 +5,9 @@ from . import elementary
 from .external import einsubs
 
 
+# TODO: add optimizations using issubset
+
+
 class ElementaryMap:
     """Array of zero-mean normal random variables, represented as
     
@@ -41,8 +44,10 @@ class ElementaryMap:
     def __add__(self, other):
         """Adds two maps."""
 
-        # TODO: This was missing broadcasting, probably better to remove----------------
         if self.elem is other.elem:
+            # This optimization is mostly to speed up in-place 
+            # manipulations with array elements.
+
             new_a = (self.unsqueezed_a(other.vndim) 
                      + other.unsqueezed_a(self.vndim))
             return ElementaryMap(new_a, self.elem)
