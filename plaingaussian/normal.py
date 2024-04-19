@@ -166,7 +166,7 @@ class Normal:
 
         if not self.b.flags.writeable:
             self.b = self.b.copy()
-            
+
         self.b[key] = value.b
         self.emap[key] = value.emap
 
@@ -511,16 +511,16 @@ def dstack(arrays, dtype=None):
 
 
 def _concatfunc(name, arrays, *args, **kwargs):
+    if not any(isinstance(a, Normal) for a in arrays):
+        return getattr(np, name)(arrays, *args, **kwargs)
+
     arrays = [asnormal(ar) for ar in arrays]
     
-    if len(arrays) == 0:
-        raise ValueError("Need at least one array.")
-    elif len(arrays) == 1:
+    if len(arrays) == 1:
         return arrays[0]
     
     b = getattr(np, name)([x.b for x in arrays], *args, **kwargs)
     em = getattr(emaps, name)([x.emap for x in arrays], *args, **kwargs)
-
     return Normal(em, b)
 
 
@@ -528,8 +528,7 @@ def _concatfunc(name, arrays, *args, **kwargs):
 
 def einsum(subs, op1, op2):
     if isinstance(op2, Normal) and isinstance(op1, Normal):
-        raise NotImplementedError("Einsums between two normal variables "
-                                  "are not implemented.")
+        return einsum(subs, op1.b, op2) + einsum(subs, op1, op2.b)
 
     if isinstance(op1, Normal) and not isinstance(op2, Normal):
         b = np.einsum(subs, op1.b, op2)
@@ -570,8 +569,9 @@ def tensordot(op1, op2, axes=2):
 
 def _bilinearfunc(name, op1, op2, *args, **kwargs):
     if isinstance(op2, Normal) and isinstance(op1, Normal):
-        raise NotImplementedError(f"{name} is not implemented for inputs "
-                                  "containing more than one normal variable.")
+        t1 = _bilinearfunc(name, op1.b, op2, *args, **kwargs)
+        t2 = _bilinearfunc(name, op1, op2.b, *args, **kwargs)
+        return t1 + t2
 
     if isinstance(op1, Normal) and not isinstance(op2, Normal):
         b = getattr(np, name)(op1.b, op2, *args, **kwargs)
@@ -586,3 +586,67 @@ def _bilinearfunc(name, op1, op2, *args, **kwargs):
         return Normal(em, b)
 
     return getattr(np, name)(op1, op2, *args, **kwargs)
+
+
+# ---------- linear and linearized array ufuncs ----------
+
+def linearized_unary(jmpf):
+    if not jmpf.__name__.endswith("_jmp"):
+        raise ValueError()
+    
+    f = getattr(np, jmpf.__name__[:-4])
+
+    def flin(x):
+        if not isinstance(x, Normal):
+            return f(x)
+        
+        new_b = f(x.b)
+        em = jmpf(x.b, new_b, x.emap)
+        return Normal(em, new_b)
+    
+    return flin
+
+
+def exp_jmp(x, ans, a):     return a * ans
+def exp2_jmp(x, ans, a):    return a * (ans * np.log(2.))
+def log_jmp(x, ans, a):     return a / x
+def log2_jmp(x, ans, a):    return a / (x * np.log(2.))
+def log10_jmp(x, ans, a):   return a / (x * np.log(10.))
+def sqrt_jmp(x, ans, a):    return a / (2. * ans)
+def cbrt_jmp(x, ans, a):    return a / (3. * ans**2)
+def sin_jmp(x, ans, a):     return a * np.cos(x)
+def cos_jmp(x, ans, a):     return a * (-np.sin(x))
+def tan_jmp(x, ans, a):     return a / np.cos(x)**2
+def arcsin_jmp(x, ans, a):  return a / np.sqrt(1 - x**2)
+def arccos_jmp(x, ans, a):  return a / (-np.sqrt(1 - x**2))
+def arctan_jmp(x, ans, a):  return a / (1 + x**2)
+def sinh_jmp(x, ans, a):    return a * np.cosh(x)
+def cosh_jmp(x, ans, a):    return a * np.sinh(x)
+def tanh_jmp(x, ans, a):    return a / np.cosh(x)**2
+def arcsinh_jmp(x, ans, a): return a / np.sqrt(x**2 + 1)
+def arccosh_jmp(x, ans, a): return a / np.sqrt(x**2 - 1)
+def arctanh_jmp(x, ans, a): return a / (1 - x**2)
+def conjugate_jmp(x, ans, a): return a.conj()
+
+
+exp = linearized_unary(exp_jmp)
+exp2 = linearized_unary(exp2_jmp)
+log = linearized_unary(log_jmp)
+log2 = linearized_unary(log2_jmp)
+log10 = linearized_unary(log10_jmp)
+sqrt = linearized_unary(sqrt_jmp)
+cbrt = linearized_unary(cbrt_jmp)
+sin = linearized_unary(sin_jmp)
+cos = linearized_unary(cos_jmp)
+tan = linearized_unary(tan_jmp)
+arcsin = linearized_unary(arcsin_jmp)
+arccos = linearized_unary(arccos_jmp)
+arctan = linearized_unary(arctan_jmp)
+sinh = linearized_unary(sinh_jmp)
+cosh = linearized_unary(cosh_jmp)
+tanh = linearized_unary(tanh_jmp)
+arcsinh = linearized_unary(arcsinh_jmp)
+arccosh = linearized_unary(arccosh_jmp)
+arctanh = linearized_unary(arctanh_jmp)
+conjugate = conj = linearized_unary(conjugate_jmp)
+# In numpy, only conjugate (and not conj) is a ufunc
