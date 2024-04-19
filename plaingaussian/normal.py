@@ -451,11 +451,8 @@ def normal(mu=0., sigmasq=1., size=None):
 
 # ---------- linear array functions ----------
 
-# These functions apply to numpy arrays without forcing their convertion 
-# to Normal. At the same time, they omit some arguments supported by 
-# the corresponding numpy functions.
+# The functions below apply to numpy arrays without forcing their convertion.
 
-# TODO: concatenate functions actually do force conversion
 
 def diagonal(x, offset=0, axis1=0, axis2=1):
     return x.diagonal(offset=offset, axis1=axis1, axis2=axis2)
@@ -524,7 +521,34 @@ def _concatfunc(name, arrays, *args, **kwargs):
     return Normal(em, b)
 
 
-# TODO: split family: split, hsplit, vsplit, dsplit
+def split(x, indices_or_sections, axis=0):   
+    if not isinstance(x, Normal):
+        return np.split(x, indices_or_sections, axis=axis)
+    
+    bs = np.split(x.b, indices_or_sections, axis=axis)
+    ems = x.emap.split(indices_or_sections, vaxis=axis)
+    return [Normal(em, b) for em, b in zip(ems, bs)]
+
+
+def hsplit(x, indices_or_sections):
+    if x.ndim < 1:
+        raise ValueError("hsplit only works on arrays of 1 or more dimensions")
+    if x.ndim == 1:
+        return split(x, indices_or_sections, axis=0)
+    return split(x, indices_or_sections, axis=1)
+
+
+def vsplit(x, indices_or_sections):
+    if x.ndim < 2:
+        raise ValueError("vsplit only works on arrays of 2 or more dimensions")
+    return split(x, indices_or_sections, axis=0)
+
+
+def dsplit(x, indices_or_sections):
+    if x.ndim < 3:
+        raise ValueError("dsplit only works on arrays of 3 or more dimensions")
+    return split(x, indices_or_sections, axis=2)
+    
 
 def einsum(subs, op1, op2):
     if isinstance(op2, Normal) and isinstance(op1, Normal):
