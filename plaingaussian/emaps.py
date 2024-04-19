@@ -41,9 +41,11 @@ class ElementaryMap:
     def __add__(self, other):
         """Adds two maps."""
 
-        # TODO: This is missing broadcasting, probably better to remove
-        #if self.elem is other.elem:
-        #    return ElementaryMap(self.a + other.a, self.elem)
+        # TODO: This was missing broadcasting, probably better to remove----------------
+        if self.elem is other.elem:
+            new_a = (self.unsqueezed_a(other.vndim) 
+                     + other.unsqueezed_a(self.vndim))
+            return ElementaryMap(new_a, self.elem)
     
         op1, op2 = self, other
         union_elem, swapped = elementary.ounion(op1.elem, op2.elem)
@@ -97,6 +99,18 @@ class ElementaryMap:
         
         key = (slice(None),) + key
         return ElementaryMap(self.a[key], self.elem)
+    
+    def __setitem__(self, key, value):
+        if not isinstance(key, tuple):
+            key = (key,)
+        
+        key = (slice(None),) + key
+
+        if self.elem is not value.elem:
+            self_, value = complete([self, value])
+            self.a = self_.a
+        
+        self.a[key] = value.a
 
     def extend_to(self, new_elem):
         

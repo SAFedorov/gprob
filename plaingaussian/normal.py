@@ -42,30 +42,25 @@ class Normal:
         return Normal(self.emap.transpose(), self.b.T)
 
     def __repr__(self):
-        def rpad(sl):
-            max_len = max(len(l) for l in sl)
-            return [l.ljust(max_len, " ") for l in sl] # TODO: fix for the case when one array starts wrapping and the other does not
-        
         csn = self.__class__.__name__
 
         meanstr = str(self.mean())
         varstr = str(self.var())
 
-        if "\n" not in meanstr:
-            return (f"{csn}(mean={meanstr}, var={varstr})")
-        
-        meanln = rpad(meanstr.splitlines())
-        varln = rpad(varstr.splitlines())
+        if "\n" not in meanstr and "\n" not in varstr:
+            return (f"{csn}(mean={meanstr}, variance={varstr})")
 
-        start = f"{csn}(mean="
-        mid = ", var="
-        end = ")"
-        
-        ln = [start + meanln[0] + mid + varln[0] + end]
-        ln.extend((" " * len(start)) + ml + (" " * len(mid)) + vl
-                  for ml, vl in zip(meanln[1:], varln[1:]))
+        meanln = meanstr.splitlines()
+        h = "  mean="
+        meanln_ = [h + meanln[0]]
+        meanln_.extend(" " * len(h) + ln for ln in meanln[1:])
 
-        return "\n".join(ln)
+        varln = varstr.splitlines()
+        h = "   var="
+        varln_ = [h + varln[0]]
+        varln_.extend(" " * len(h) + ln for ln in varln[1:])
+
+        return "\n".join([f"{csn}(", *meanln_, *varln_, ")"])
 
     def __len__(self):
         if self.ndim == 0:
@@ -165,6 +160,11 @@ class Normal:
 
     def __getitem__(self, key):
         return Normal(self.emap[key], self.b[key])
+    
+    def __setitem__(self, key, value):
+        value = asnormal(value)
+        self.b[key] = value.b
+        self.emap[key] = value.emap
 
     def __or__(self, observations: dict):
         """Conditioning operation."""
@@ -326,6 +326,9 @@ class Normal:
         
         return np.einsum("i..., i... -> ...", a, a)
     
+    def variance(self):
+        return self.var() # TODO: decide which form is better-----------------------------------
+    
     def cov(self):
         """Covariance"""
         a = self.emap.a2d
@@ -334,6 +337,9 @@ class Normal:
             return a.T.conj() @ a
 
         return a.T @ a
+    
+    def covariance(self):
+        return self.cov() # TODO: decide which form is better-----------------------------------
     
     def sample(self, n=None):
         """Samples the random variable `n` times."""
@@ -405,10 +411,11 @@ def normal(mu=0., sigmasq=1., size=None):
             if not size:
                 return Normal(sigma[None], mu)  # expanding sigma to 1d
             elif isinstance(size, int):
+                b = np.broadcast_to(mu, (size,)).copy()
                 a = sigma * np.eye(size, size)
-                return Normal(a, np.broadcast_to(mu, (size,)))
+                return Normal(a, b)
             else:
-                b = np.broadcast_to(mu, size)
+                b = np.broadcast_to(mu, size).copy()
                 a = sigma * np.eye(b.size, b.size).reshape((b.size, *b.shape))
                 return Normal(a, b)
         else:
@@ -418,7 +425,7 @@ def normal(mu=0., sigmasq=1., size=None):
     if sigmasq.ndim != 2:
         raise ValueError("Only 0 and 2 dimensional covariance matrices are presently supported.")
 
-    mu = np.broadcast_to(mu, (sigmasq.shape[0],))
+    mu = np.broadcast_to(mu, (sigmasq.shape[0],)).copy()
         
     try:
         atr = np.linalg.cholesky(sigmasq)
