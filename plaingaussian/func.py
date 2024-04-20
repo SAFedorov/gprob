@@ -224,14 +224,10 @@ def condition(m, a, mc, ac, mask=None):
     the mean vectors and `a` and `ac` are the map matrices.  
     
     Args:
-        m: The mean vector of the variable to be conditioned, a scalar 
-            or an (n,) array.
-        a: The map matrix of the variable to be conditioned, a scalar 
-            or a (ne, n) 2d array.
-        mc: The mean vector of the variable conditioned on, a scalar 
-            or an (nc,) array.
-        ac: The map matrix of the variable conditioned on, a scalar 
-            or a (ne, nc) 2d array.
+        m: The mean vector of the variable to be conditioned, an (n,) array.
+        a: The map matrix of the variable to be conditioned, a (ne, n) 2d array.
+        mc: The mean vector of the variable conditioned on, an (nc,) array.
+        ac: The map matrix of the variable conditioned on, a (ne, nc) 2d array.
         mask (bool array, optional): A 2d mask with the shape (nc, n), where
             mask[i, j] == False means than the i-th condition does not affect 
             the j-th variable.
@@ -239,8 +235,6 @@ def condition(m, a, mc, ac, mask=None):
     Returns:
         Tuple (conditional mean, conditional map matrix)
     """
-
-    # TODO: check that it actually works for scalars, and non-array data types.
 
     try:
         cond_m, cond_a = condition_qr(m, a, mc, ac, mask)
@@ -265,8 +259,11 @@ def condition_qr(m, a, mc, ac, mask=None):
         q, r = sp.linalg.qr(a, mode="economic", check_finite=False)
         return q, r
 
-    qtri = qu
+    if ac.shape[0] < ac.shape[1]:
+        raise ConditionError("Conditioning via QR decomposition does not work "
+                             "with degenerate constraints. Use SVD instead.")
 
+    qtri = qu
     if mask is not None and not mask[0, -1]:
         # For lower-triangular masks need to use ql decomposition.
         qtri = ql

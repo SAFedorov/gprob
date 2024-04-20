@@ -135,9 +135,9 @@ class Normal:
             em2 = other.emap * (np.log(np.where(self.b, self.b, 1.)) * b)
             return Normal(em1 + em2, b)
         
-        other = np.asanyarray(other)  # a number will be subtracted from it
-        b = self.b ** other 
-        em = self.emap * (self.b ** np.where(other, other-1, 1.))
+        other = np.asanyarray(other)
+        b = self.b ** other
+        em = self.emap * (other * (self.b ** np.where(other, other-1, 1.)))
         return Normal(em, b)
 
     def __rpow__(self, other):
@@ -174,27 +174,11 @@ class Normal:
     
     def __and__(self, other):
         """Combines two random variables into one vector."""
-
-        other = asnormal(other)
-
-        if self.ndim > 1 or other.ndim > 1:
-            raise ValueError("& is only applicable to 0- and 1-d arrays.")
-        
-        b = np.concatenate([self.b.ravel(), other.b.ravel()], axis=0)
-        em = emaps.join([self.emap, other.emap])
-        return Normal(em, b)  
+        return hstack([self, other])  
     
     def __rand__(self, other):
-        """Combines two random variables into one vector.""" # TODO: add test cases for this
-
-        other = asnormal(other)  # other is always a constant
-
-        if self.ndim > 1 or other.ndim > 1:
-            raise ValueError("& is only applicable to 0- and 1-d arrays.")
-        
-        b = np.concatenate([other.b.ravel(), self.b.ravel()], axis=0)
-        em = emaps.join([other.emap, self.emap])
-        return Normal(em, b)
+        """Combines two random variables into one vector."""
+        return hstack([other, self])
 
     # ---------- array methods ----------
 
@@ -383,7 +367,7 @@ def asnormal(v):
 
     # v is a number or array
     b = np.asanyarray(v)
-    em = ElementaryMap(np.zeros((0, *b.shape)))
+    em = ElementaryMap(np.zeros((0, *b.shape), dtype=b.dtype))
     return Normal(em, b)
 
 
@@ -489,7 +473,7 @@ def concatenate(arrays, axis=0, dtype=None):
     return _concatfunc("concatenate", arrays, axis, dtype=dtype)
 
 
-def stack(arrays, axis=0, dtype=None):
+def hstack(arrays, axis=0, dtype=None):
     return _concatfunc("stack", arrays, axis, dtype=dtype)
 
 

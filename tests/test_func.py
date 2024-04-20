@@ -3,7 +3,7 @@ sys.path.append('..')  # Until there is a package structure.
 
 import pytest
 import numpy as np
-from plaingaussian.normal import normal, join
+from plaingaussian.normal import normal, hstack
 from plaingaussian.func import logp, dlogp, d2logp, fisher
 
 from benchmarks.reffunc import logp as logp_
@@ -253,7 +253,7 @@ def test_logp_batch():
     # Degenerate cases.
 
     # Deterministic variables.
-    xi = join([normal(), 1])
+    xi = hstack([normal(), 1])
     m, cov = xi.mean(), xi.cov()
     assert logp([0, 1.1], m, cov) == float("-inf")
     assert (logp([[0, 1.1]], m, cov) == np.array([float("-inf")])).all()

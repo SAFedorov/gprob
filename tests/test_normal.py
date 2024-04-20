@@ -3,27 +3,27 @@ sys.path.append('..')  # Until there is a package structure.
 
 import pytest
 import numpy as np
-from plaingaussian.normal import normal, join, Normal
+from plaingaussian.normal import normal, hstack, Normal
 
 
 def test_normal():
     xi = normal()
-    assert (xi.a == np.array([1.])).all()
+    assert (xi.emap.a == np.array([1.])).all()
     assert (xi.b == np.array(0.)).all()
 
     xi = normal(1.3, 4)
-    assert (xi.a == np.array([2.])).all()
+    assert (xi.emap.a == np.array([2.])).all()
     assert (xi.b == np.array(1.3)).all()
 
     xi = normal(0, 4, size=3)
-    assert (xi.a == 2 * np.eye(3)).all()
+    assert (xi.emap.a == 2 * np.eye(3)).all()
     assert (xi.b == np.zeros(3)).all()
 
     with pytest.raises(ValueError):
         normal(0, -4)
     
     xi = normal(0, 0)
-    assert (xi.a == np.array([0.])).all()
+    assert (xi.emap.a == np.array([0.])).all()
     assert (xi.b == np.array(0.)).all()
 
     mu = [1.3, 2.5]
@@ -84,7 +84,7 @@ def test_logp():
     assert (0 * normal()).logp(0.1) == float("-inf")
 
     # Deterministic variables.
-    xi = join([normal(), 1])
+    xi = hstack([normal(), 1])
     assert xi.logp([0, 1.1]) == float("-inf")
     assert xi.logp([0, 1.]) == nc
     assert xi.logp([10.2, 1.]) == -(10.2)**2/(2) + nc
@@ -130,35 +130,29 @@ def test_sample():
     assert s.shape == (3, 5)
 
 
-def test_join():
+def test_stack():
 
     v1 = normal()
     v2 = normal()
     v3 = normal()
 
-    vm = join(v1)  # single argument input
-    assert vm == v1
-
     # single argument sequence
-    vm = join([v1])
-    assert vm.a == v1.a and vm.b == v1.b and vm.iids == v1.iids
+    vm = hstack([v1])
+    assert vm is v1
 
-    vm = join([v1, v2, v3])  # list input
+    vm = hstack([v1, v2, v3])  # list input
     assert isinstance(vm, Normal) and len(vm) == 3
 
-    vm = join((v1, v2, v3))  # tuple input
+    vm = hstack((v1, v2, v3))  # tuple input
     assert isinstance(vm, Normal) and len(vm) == 3
-
-    v4 = normal(0, 2, size=2)
-    vm = join([v1, v2, v4])
-    assert isinstance(vm, Normal) and len(vm) == 4 and len(vm.iids) == 4
 
 
 def test_elementary_ordering():
     # Requires python >= 3.6
 
-    def isordered(v):
-        return all([v.iids[k] == i for i, k in enumerate(v.iids)])
+    def isordered(v: Normal):
+        ed = v.emap.elem
+        return all(ed[k] == i for i, k in enumerate(ed))
     
     # Scalars
 
@@ -181,22 +175,22 @@ def test_elementary_ordering():
     nrv = 20
 
     vl1 = [normal() for _ in range(nrv)]
-    assert isordered(join(vl1))
+    assert isordered(hstack(vl1))
 
     vl2 = [normal() for _ in range(nrv)]
-    assert isordered(join(vl2))
+    assert isordered(hstack(vl2))
 
     vl3 = [normal() for _ in range(nrv // 2)]  # A shorter list.
-    assert isordered(join(vl3))
+    assert isordered(hstack(vl3))
 
-    assert isordered(join(vl1 + vl2))
-    assert isordered(join(vl3 + vl2))
-    assert isordered(join(vl2 + vl3))
-    assert isordered(join(vl2 + vl3 + vl2))
-    assert isordered(join(vl2 + vl3 + vl2 + vl2 + vl1 + vl2))
+    assert isordered(hstack(vl1 + vl2))
+    assert isordered(hstack(vl3 + vl2))
+    assert isordered(hstack(vl2 + vl3))
+    assert isordered(hstack(vl2 + vl3 + vl2))
+    assert isordered(hstack(vl2 + vl3 + vl2 + vl2 + vl1 + vl2))
 
-    assert isordered(join(vl2) + join(vl1))
-    assert isordered(join(vl2) - 1)
+    assert isordered(hstack(vl2) + hstack(vl1))
+    assert isordered(hstack(vl2) - 1)
 
     # Shuffled lists of scalars
 
@@ -207,10 +201,10 @@ def test_elementary_ordering():
     vl12_s = [vl1[i] for i in idx12]
     vl2_s = [vl2[i] for i in idx2]
     
-    assert isordered(join(vl1_s + vl1_s))
-    assert isordered(join(vl12_s + vl1_s))
-    assert isordered(join(vl2_s + vl1_s))
-    assert isordered(join(vl1_s + vl2_s))
+    assert isordered(hstack(vl1_s + vl1_s))
+    assert isordered(hstack(vl12_s + vl1_s))
+    assert isordered(hstack(vl2_s + vl1_s))
+    assert isordered(hstack(vl1_s + vl2_s))
 
     totvl1 = 0.
     for v in vl1_s:
@@ -233,22 +227,22 @@ def test_elementary_ordering():
     # Vectors
 
     vl1 = [normal(0.3, 12., size=3) for _ in range(nrv)]
-    assert isordered(join(vl1))
+    assert isordered(hstack(vl1))
 
     vl2 = [normal(size=3) for _ in range(nrv)]
-    assert isordered(join(vl2))
+    assert isordered(hstack(vl2))
 
     vl3 = [normal(-3, 2., size=3) for _ in range(nrv // 2)]  # A shorter list.
-    assert isordered(join(vl3))
+    assert isordered(hstack(vl3))
 
-    assert isordered(join(vl1 + vl2))
-    assert isordered(join(vl3 + vl2))
-    assert isordered(join(vl2 + vl3))
-    assert isordered(join(vl2 + vl3 + vl2))
-    assert isordered(join(vl2 + vl3 + vl2 + vl2 + vl1 + vl2))
+    assert isordered(hstack(vl1 + vl2))
+    assert isordered(hstack(vl3 + vl2))
+    assert isordered(hstack(vl2 + vl3))
+    assert isordered(hstack(vl2 + vl3 + vl2))
+    assert isordered(hstack(vl2 + vl3 + vl2 + vl2 + vl1 + vl2))
 
-    assert isordered(join(vl2) + join(vl1))
-    assert isordered(join(vl2) - 1)
+    assert isordered(hstack(vl2) + hstack(vl1))
+    assert isordered(hstack(vl2) - 1)
 
     # Shuffled lists of vectors
 
@@ -259,10 +253,10 @@ def test_elementary_ordering():
     vl12_s = [vl1[i] for i in idx12]
     vl2_s = [vl2[i] for i in idx2]
     
-    assert isordered(join(vl1_s + vl1_s))
-    assert isordered(join(vl12_s + vl1_s))
-    assert isordered(join(vl2_s + vl1_s))
-    assert isordered(join(vl1_s + vl2_s))
+    assert isordered(hstack(vl1_s + vl1_s))
+    assert isordered(hstack(vl12_s + vl1_s))
+    assert isordered(hstack(vl2_s + vl1_s))
+    assert isordered(hstack(vl1_s + vl2_s))
 
     totvl1 = 0.
     for v in vl1_s:
@@ -287,7 +281,7 @@ def test_operations():
     # arithmetic operations between normal variables and other types
 
     def isclose(v1, v2, tol=1e-14):
-        return ((np.abs(v1.a - v2.a) < tol).all() 
+        return ((np.abs(v1.emap.a - v2.emap.a) < tol).all() 
                 and (np.abs(v1.b - v2.b) < tol).all())
     
     # 0d-1d
@@ -380,29 +374,29 @@ def test_broadcasting():
     xi2 = xi1 * (-3, -4)
     assert xi2.shape == (2,)
     assert np.abs(xi2.b - (-0.3, -0.4)).max() < tol
-    assert np.abs(xi2.a[0] - (-3, -4)).max() < tol
+    assert np.abs(xi2.emap.a[0] - (-3, -4)).max() < tol
 
     xi = normal(1, 1)**[2, 0]
     assert xi.shape == (2,)
-    assert np.abs(xi.a - np.array([[2., 0.]])).max() < tol
+    assert np.abs(xi.emap.a - np.array([[2., 0.]])).max() < tol
 
     m = np.array([[1, 0], [0, 1], [2, 2]])
-    xi1 = Normal(a=np.array([[1, 0.5], [0, -1]]), b=np.array([0.3, -0.3]))
+    xi1 = Normal(np.array([[1, 0.5], [0, -1]]), np.array([0.3, -0.3]))
     xi2 = xi1 * m
     assert xi2.shape == (3, 2)
     assert np.abs(xi2.b - [[0.3, 0], [0, -0.3], [0.6, -0.6]]).max() < tol
-    for r1, r2 in zip(xi1.a, xi2.a):
+    for r1, r2 in zip(xi1.emap.a, xi2.emap.a):
         assert np.abs(r2 - r1 * m).max() < tol
 
     xi2 = m * xi1
     assert xi2.shape == (3, 2)
     assert np.abs(xi2.b - [[0.3, 0], [0, -0.3], [0.6, -0.6]]).max() < tol
-    for r1, r2 in zip(xi1.a, xi2.a):
+    for r1, r2 in zip(xi1.emap.a, xi2.emap.a):
         assert np.abs(r2 - r1 * m).max() < tol
 
     # random nd shapes
-    xi1 = Normal(a=np.array([[1, 0.5], [0, -1], [8., 9.]]), 
-                 b=np.array([0.3, -0.3]))
+    xi1 = Normal(np.array([[1, 0.5], [0, -1], [8., 9.]]), 
+                 np.array([0.3, -0.3]))
     
     # addition
     sh = tuple(np.random.randint(1, 4, 8))
@@ -410,11 +404,11 @@ def test_broadcasting():
 
     xi2 = m + xi1
     assert xi2.shape == sh + (2,)
-    assert xi2.a.shape == (3,) + sh + (2,)
+    assert xi2.emap.a.shape == (3,) + sh + (2,)
     rng = int(np.prod(sh))
-    a2_fl = np.reshape(xi2.a, (3, rng, 2))
+    a2_fl = np.reshape(xi2.emap.a, (3, rng, 2))
     for i in range(rng):
-        assert np.abs(a2_fl[:, i, :] - xi1.a).max() < tol
+        assert np.abs(a2_fl[:, i, :] - xi1.emap.a).max() < tol
 
     # multiplication
     sh = tuple(np.random.randint(1, 4, 9))
@@ -422,12 +416,12 @@ def test_broadcasting():
 
     xi2 = m * xi1
     assert xi2.shape == sh + (2,)
-    assert xi2.a.shape == (3,) + sh + (2,)
+    assert xi2.emap.a.shape == (3,) + sh + (2,)
     rng = int(np.prod(sh))
     m_fl = np.reshape(m, (rng, 2))
-    a2_fl = np.reshape(xi2.a, (3, rng, 2))
+    a2_fl = np.reshape(xi2.emap.a, (3, rng, 2))
     for i in range(rng):
-        assert np.abs(a2_fl[:, i, :] - m_fl[i] * xi1.a).max() < tol
+        assert np.abs(a2_fl[:, i, :] - m_fl[i] * xi1.emap.a).max() < tol
 
     # division
     sh = tuple(np.random.randint(1, 4, 7))
@@ -435,12 +429,12 @@ def test_broadcasting():
 
     xi2 =  xi1 / m
     assert xi2.shape == sh + (2,)
-    assert xi2.a.shape == (3,) + sh + (2,)
+    assert xi2.emap.a.shape == (3,) + sh + (2,)
     rng = int(np.prod(sh))
     m_fl = np.reshape(m, (rng, 2))
-    a2_fl = np.reshape(xi2.a, (3, rng, 2))
+    a2_fl = np.reshape(xi2.emap.a, (3, rng, 2))
     for i in range(rng):
-        assert np.abs(a2_fl[:, i, :] -  xi1.a / m_fl[i]).max() < tol
+        assert np.abs(a2_fl[:, i, :] -  xi1.emap.a / m_fl[i]).max() < tol
 
     # normal-normal operations
 

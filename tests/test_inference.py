@@ -4,7 +4,8 @@ sys.path.append('..')  # Until there is a package structure.
 import pytest
 import numpy as np
 from external.Infer import Infer
-from plaingaussian.normal import normal, join, ConditionError
+from plaingaussian.normal import normal, hstack
+from plaingaussian.func import ConditionError
 
 
 def test_conditioning():
@@ -18,7 +19,7 @@ def test_conditioning():
     v2 = normal(0, 1)
     v3 = normal(0, 1)
 
-    vm = join([v1, v2, v3])
+    vm = hstack([v1, v2, v3])
     vc = vm | {v1 + 0.2*v2 + 0.4*v3: 1.4}
 
 
@@ -48,7 +49,7 @@ def test_conditioning():
 
     # Incompatible conditions
     with pytest.raises(ConditionError):
-        join([v1, v2, v3]) | {v2: 0, v3: 1, v1:0, v1+v2:1}
+        hstack([v1, v2, v3]) | {v2: 0, v3: 1, v1:0, v1+v2:1}
 
 
 def test_linear_regression():
@@ -85,7 +86,7 @@ def test_linear_regression():
     cond = {f(x): y + n for (x, y, n) in zip(xs, ys, mn)}
 
     ab = (a & b) | cond
-    jointd = join([a, b, *mn]) | cond
+    jointd = hstack([a, b, *mn]) | cond
 
     assert (np.abs(mfull.Sigma - jointd.cov()) < tol).all()
     assert (np.abs(mfull.b[:, 0] - jointd.mean()) < tol).all()
@@ -98,7 +99,7 @@ def test_linear_regression():
     mnv = normal(0, 0.1, size=len(xs))
 
     ab2 = (a & b) | {fv: ys + mnv}
-    jointd2 = join([a, b, mnv]) | {fv: ys + mnv}
+    jointd2 = hstack([a, b, mnv]) | {fv: ys + mnv}
 
     assert (np.abs(mfull.Sigma - jointd2.cov()) < tol).all()
     assert (np.abs(mfull.b[:, 0] - jointd2.mean()) < tol).all()

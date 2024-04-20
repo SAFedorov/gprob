@@ -1,4 +1,7 @@
 from itertools import zip_longest
+from functools import reduce
+from operator import mul
+
 import numpy as np
 
 from . import elementary
@@ -36,7 +39,8 @@ class ElementaryMap:
 
     @property
     def a2d(self):
-        return np.ascontiguousarray(self.a.reshape((self.a.shape[0], -1)))
+        vsz = reduce(mul, self.vshape, 1)
+        return np.ascontiguousarray(self.a.reshape((self.a.shape[0], vsz)))
 
     def __neg__(self):
         return ElementaryMap(-self.a, self.elem)  # TODO: test how this performs
@@ -154,13 +158,13 @@ class ElementaryMap:
         if dn > 0:
             new_a = self.unsqueezed_a(vndim)
             new_a = np.broadcast_to(new_a, (new_a.shape[0], *vshape))
-            ElementaryMap(new_a, self.elem)
+            return ElementaryMap(new_a, self.elem)
             
         return self
     
     # ---------- array methods ----------
     
-    def conj(self):  # TODO: change to "conjugate" as numpy uses this name for the dispatch
+    def conj(self):  # TODO: change to "conjugate" as numpy uses this name as the main one
         return ElementaryMap(self.a.conj(), self.elem)
     
     @property
@@ -465,9 +469,9 @@ def stack(emaps, vaxis=0, dtype=None):
 
 
 def hstack(emaps, dtype=None):
-    if emaps[0].vndim == 0:
-        return stack(emaps, vaxis=0, dtype=dtype)
-    elif emaps[0].vndim == 1:
+    emaps = [em.ravel() if em.vndim == 0 else em for em in emaps]
+
+    if emaps[0].vndim == 1:
         return concatenate(emaps, vaxis=0, dtype=dtype)
     
     return concatenate(emaps, vaxis=1, dtype=dtype)
