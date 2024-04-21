@@ -48,7 +48,7 @@ class Normal:
         varstr = str(self.var())
 
         if "\n" not in meanstr and "\n" not in varstr:
-            return (f"{csn}(mean={meanstr}, variance={varstr})")
+            return (f"{csn}(mean={meanstr}, var={varstr})")
 
         meanln = meanstr.splitlines()
         h = "  mean="
@@ -195,9 +195,9 @@ class Normal:
         em = self.emap.diagonal(offset=offset, vaxis1=axis1, vaxis2=axis2)
         return Normal(em, b)
 
-    def flatten(self, order="C"):
-        b = self.b.flatten(order=order)
-        em = self.emap.flatten(order=order)
+    def flatten(self):
+        b = self.b.flatten()
+        em = self.emap.flatten()
         return Normal(em, b)
     
     def moveaxis(self, source, destination):
@@ -439,6 +439,7 @@ def normal(mu=0., sigmasq=1., size=None):
 def diagonal(x, offset=0, axis1=0, axis2=1):
     return x.diagonal(offset=offset, axis1=axis1, axis2=axis2)
 
+
 def sum(x, axis=None, dtype=None, keepdims=False):
     return x.sum(axis=axis, dtype=dtype, keepdims=keepdims)
 
@@ -473,7 +474,7 @@ def concatenate(arrays, axis=0, dtype=None):
     return _concatfunc("concatenate", arrays, axis, dtype=dtype)
 
 
-def hstack(arrays, axis=0, dtype=None):
+def stack(arrays, axis=0, dtype=None):
     return _concatfunc("stack", arrays, axis, dtype=dtype)
 
 
@@ -494,9 +495,6 @@ def _concatfunc(name, arrays, *args, **kwargs):
         return getattr(np, name)(arrays, *args, **kwargs)
 
     arrays = [asnormal(ar) for ar in arrays]
-    
-    if len(arrays) == 1:
-        return arrays[0]
     
     b = getattr(np, name)([x.b for x in arrays], *args, **kwargs)
     em = getattr(emaps, name)([x.emap for x in arrays], *args, **kwargs)

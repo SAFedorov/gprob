@@ -43,7 +43,7 @@ class ElementaryMap:
         return np.ascontiguousarray(self.a.reshape((self.a.shape[0], vsz)))
 
     def __neg__(self):
-        return ElementaryMap(-self.a, self.elem)  # TODO: test how this performs
+        return ElementaryMap(-self.a, self.elem)  # TODO: test how this performs-----
 
     def __add__(self, other):
         """Adds two maps."""
@@ -180,7 +180,7 @@ class ElementaryMap:
             a = self.a.reshape((self.a.shape[0], -1))
             axis = 1
         else:
-            a = self.a
+            a = np.atleast_2d(self.a)
             if vaxis >= 0:
                 axis = vaxis + 1
             else:
@@ -203,9 +203,8 @@ class ElementaryMap:
         new_a = self.a.diagonal(offset=offset, axis1=axis1, axis2=axis2)
         return ElementaryMap(new_a, self.elem)
     
-    def flatten(self, **kwargs):
-        # Flattens to 1d first to create a copy.
-        new_a = self.a.flatten(**kwargs).reshape((len(self.elem), -1))
+    def flatten(self):
+        new_a = self.a2d.copy()
         return ElementaryMap(new_a, self.elem)
     
     def moveaxis(self, vsource, vdestination):
@@ -233,7 +232,7 @@ class ElementaryMap:
         return ElementaryMap(new_a, self.elem)
     
     def sum(self, vaxis=None, **kwargs):
-        if vaxis is None:
+        if self.vndim == 0 or vaxis is None:
             vaxis = tuple(range(self.vndim))
         elif not isinstance(vaxis, tuple):
             vaxis = (vaxis,)
@@ -245,8 +244,10 @@ class ElementaryMap:
     
     def transpose(self, vaxes=None):
         if vaxes is None:
-            vaxes = tuple(range(1, self.vndim + 1))[::-1]
-        new_a = self.a.transpose((0, *vaxes))
+            vaxes = tuple(range(self.vndim))[::-1]
+
+        axes = tuple(ax + 1 if ax >= 0 else ax for ax in vaxes)
+        new_a = self.a.transpose((0, *axes))
         return ElementaryMap(new_a, self.elem)
     
     def trace(self, offset=0, vaxis1=0, vaxis2=1, **kwargs): # Probably need to introduce a helper to do ax1, ax2 = from_vaxes(vax1, vax2)
@@ -358,6 +359,9 @@ class ElementaryMap:
 def complete(ops):
     """Completes the maps."""
 
+    if len(ops) == 1:
+        return ops
+    
     if len(ops) > 2:
         union_elem = elementary.uunion(*[x.elem for x in ops])
         return tuple(op.extend_to(union_elem) for op in ops)
@@ -382,6 +386,9 @@ def _broadcast_shapes(shape1, shape2):
 
 
 def concatenate(emaps, vaxis=0, dtype=None):
+    if len(emaps) == 1:
+        return emaps[0]
+    
     if not dtype:
         dtype = emaps[0].a.dtype
 
@@ -429,21 +436,26 @@ def concatenate(emaps, vaxis=0, dtype=None):
 
 
 def stack(emaps, vaxis=0, dtype=None):
-
     # Essentially a copy of `concatenate`, with slightly less overhead.
 
-    if not dtype:
-        dtype = emaps[0].a.dtype
-
     if vaxis < 0:
-        vaxis = emaps[0].vndim - 1 + vaxis
+        vaxis = emaps[0].vndim + vaxis + 1
 
     base_jidx = (slice(None),) * vaxis
+
+    if len(emaps) == 1:
+        return emaps[0][*base_jidx, None]
+    
+    if dtype is None:
+        dtype = emaps[0].a.dtype
+    
+    new_vshape = list(emaps[0].vshape)
+    new_vshape.insert(vaxis, len(emaps)) 
 
     if len(emaps) > 2:
         union_elem = elementary.uunion(*[em.elem for em in emaps])
 
-        cat_a = np.zeros((len(union_elem), len(emaps), *emaps[0].vshape), dtype)
+        cat_a = np.zeros((len(union_elem), *new_vshape), dtype)
         for i, em in enumerate(emaps):
             idx = [union_elem[k] for k in em.elem]
             cat_a[idx, *base_jidx, i] = em.a
@@ -460,7 +472,7 @@ def stack(emaps, vaxis=0, dtype=None):
         op1, op2 = op2, op1
         j1, j2 = j2, j1
     
-    cat_a = np.zeros((len(union_elem), len(emaps), *emaps[0].vshape), dtype)
+    cat_a = np.zeros((len(union_elem), *new_vshape), dtype)
     cat_a[:len(op1.elem), *base_jidx, j1] = op1.a
     idx = [union_elem[k] for k in op2.elem]
     cat_a[idx, *base_jidx, j2] = op2.a

@@ -136,10 +136,6 @@ def test_stack():
     v2 = normal()
     v3 = normal()
 
-    # single argument sequence
-    vm = hstack([v1])
-    assert vm is v1
-
     vm = hstack([v1, v2, v3])  # list input
     assert isinstance(vm, Normal) and len(vm) == 3
 
