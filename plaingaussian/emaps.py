@@ -264,6 +264,15 @@ class ElementaryMap:
         new_a = self.a.trace(offset=offset, axis1=axis1, axis2=axis2, **kwargs)
         return ElementaryMap(new_a, self.elem)
     
+    def split(self, ios, vaxis=0):
+        if vaxis >= 0:
+            axis = vaxis + 1
+        else:
+            axis = vaxis
+        
+        new_as = np.split(self.a, ios, axis=axis)
+        return [ElementaryMap(a, self.elem) for a in new_as]
+    
     # ---------- bilinear functions with numeric arrays ----------
     
     def einsum(self, vsubs, other, otherfirst=False):
@@ -389,11 +398,11 @@ def concatenate(emaps, vaxis=0, dtype=None):
     if len(emaps) == 1:
         return emaps[0]
     
-    if not dtype:
+    if dtype is None:
         dtype = emaps[0].a.dtype
 
     if vaxis < 0:
-        vaxis = emaps[0].vndim - 1 + vaxis
+        vaxis = emaps[0].vndim + vaxis
 
     dims = [em.a.shape[vaxis + 1] for em in emaps]
 
@@ -444,7 +453,12 @@ def stack(emaps, vaxis=0, dtype=None):
     base_jidx = (slice(None),) * vaxis
 
     if len(emaps) == 1:
-        return emaps[0][*base_jidx, None]
+        if dtype is None:
+            return emaps[0][*base_jidx, None]
+        
+        em = emaps[0][*base_jidx, None]# hacky----------------------------------------------
+        em.a = em.a.astype(dtype)
+        return em
     
     if dtype is None:
         dtype = emaps[0].a.dtype
@@ -496,10 +510,10 @@ def vstack(emaps, dtype=None):
     return concatenate(emaps, vaxis=0, dtype=dtype)
 
 
-def dstack(emaps, dtype):
+def dstack(emaps):
     if emaps[0].vndim <= 1:
         emaps = [em.reshape((1, -1, 1)) for em in emaps]
     elif emaps[0].vndim == 2:
         emaps = [em.reshape((*em.vshape, 1)) for em in emaps]
     
-    return concatenate(emaps, vaxis=2, dtype=dtype)
+    return concatenate(emaps, vaxis=2)

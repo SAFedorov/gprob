@@ -486,8 +486,8 @@ def vstack(arrays, dtype=None):
     return _concatfunc("vstack", arrays, dtype=dtype)
 
 
-def dstack(arrays, dtype=None):
-    return _concatfunc("dstack", arrays, dtype=dtype)
+def dstack(arrays):
+    return _concatfunc("dstack", arrays)
 
 
 def _concatfunc(name, arrays, *args, **kwargs):
