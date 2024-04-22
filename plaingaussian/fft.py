@@ -78,7 +78,10 @@ def irfftn(x, s=None, axes=None, norm=None):
 def _fftfunc_n(name, x, s, axes, norm):
     x = asnormal(x)
 
-    axes_a = tuple(ax + 1 if ax >= 0 else ax for ax in axes)
+    if axes is None:
+        axes_a = list(range(1, x.ndim + 1))
+    else:
+        axes_a = [ax + 1 if ax >= 0 else ax for ax in axes]
 
     func = getattr(np.fft, name)
     b = func(x.b, s, axes, norm)

@@ -44,11 +44,18 @@ def _gts(ndim = None):
     raise ValueError("ndim must be None, an integer or a string")
 
 
-def _random_normal(shape):
+def _random_normal(shape, iscomplex=False):
     sz = reduce(lambda x, y: x * y, shape, 1)
     mu = 2. * np.random.rand(sz) - 1.
     a = 2 * np.random.rand(sz, sz) - 1.
-    cov = a.T @ a
+
+    if iscomplex:
+        mu = mu + 1j * (2. * np.random.rand(sz) - 1.)
+        a = a + 1j * (2 * np.random.rand(sz, sz) - 1.)
+        cov = a.T.conj() @ a
+    else:
+        cov = a.T @ a
+
     return normal(mu, cov).reshape(shape)
 
 
@@ -65,16 +72,22 @@ def _random_correlate(vs):
     return vs
 
 
-def _test_array_func(f, *args, test_shapes=None, **kwargs):
+def _test_array_func(f, *args, test_shapes=None, iscomplex=False, 
+                     module_name="", **kwargs):
     
     # single input and single output functions
-    npf = getattr(np, f.__name__)
+
+    if module_name != "":
+        mod = getattr(np, module_name)
+        npf = getattr(mod, f.__name__)
+    else:
+        npf = getattr(np, f.__name__)
 
     if test_shapes is None or isinstance(test_shapes, (str, int)):
         test_shapes = _gts(test_shapes)
         
     for sh in test_shapes:
-        vin = _random_normal(sh)
+        vin = _random_normal(sh, iscomplex=iscomplex)
         vout = f(vin, *args, **kwargs)
 
         assert vin.emap.a.shape[1:] == vin.b.shape
@@ -200,8 +213,117 @@ def test_reshape():
             _test_array_func(reshape, new_sh, test_shapes=[sh])
 
 
+def test_fft():
+    cfft_funcs = [fft, ifft, hfft]
+    rfft_funcs = [rfft, irfft, ihfft]
+
+    ts = [(2,), (4,), (16,), (128,), (3, 32), (3, 2, 7)]
+
+    for f in cfft_funcs + rfft_funcs:
+        _test_array_func(f, test_shapes=ts, module_name="fft")
+        _test_array_func(f, axis=-2, 
+                         test_shapes=[s + (2,) for s in ts], module_name="fft")
+        _test_array_func(f, axis=1, 
+                         test_shapes=[(1, 10) + s for s in ts], module_name="fft")
+        _test_array_func(f, axis=1, n=20,
+                         test_shapes=[(2, 63, 2)], module_name="fft")
+        _test_array_func(f, axis=0, n=129,
+                         test_shapes=[(128, 2)], module_name="fft")
+        
+    for f in cfft_funcs:
+        _test_array_func(f, test_shapes=ts, iscomplex=True, module_name="fft")
+        _test_array_func(f, axis=1, n=90, iscomplex=True,
+                         test_shapes=[(2, 63, 2)], module_name="fft")
+        
+    ts = [(128, 2), (89, 1)]
+
+    for f in cfft_funcs + rfft_funcs:
+        _test_array_func(f, axis=0, n=129, norm="ortho",
+                         test_shapes=ts, module_name="fft")
+        _test_array_func(f, axis=0, norm="backward",
+                         test_shapes=ts, module_name="fft")
+        _test_array_func(f, axis=0, n=64, norm="forward",
+                         test_shapes=ts, module_name="fft")
+    
+    for f in cfft_funcs:
+        _test_array_func(f, axis=0, n=129, norm="ortho",
+                         iscomplex=True, test_shapes=ts, module_name="fft")
+        _test_array_func(f, axis=0, norm="backward",
+                         iscomplex=True, test_shapes=ts, module_name="fft")
+        _test_array_func(f, axis=0, n=64, norm="forward",
+                         iscomplex=True, test_shapes=ts, module_name="fft")
+
+
+def test_fft2():
+    cfft_funcs = [fft2, ifft2]
+    rfft_funcs = [rfft2, irfft2]
+
+    ts = [(2, 2), (4, 2), (5, 3), (3, 17), (2, 8, 4)]
+
+    for f in cfft_funcs + rfft_funcs:
+        _test_array_func(f, test_shapes=ts, module_name="fft")
+        _test_array_func(f, axes=[0, 1], 
+                         test_shapes=[s + (2,) for s in ts], module_name="fft")
+        _test_array_func(f, axes=[-3, 1], 
+                         test_shapes=[(1, 10) + s for s in ts], module_name="fft")
+        _test_array_func(f, axes=(0, 1), s=(5, 20),
+                         test_shapes=[(2, 63, 2)], module_name="fft")
+        _test_array_func(f, s=(64, 3),
+                         test_shapes=[(128, 2)], module_name="fft")
+        
+    for f in cfft_funcs:
+        _test_array_func(f, test_shapes=ts, iscomplex=True, module_name="fft")
+        _test_array_func(f, axes=(0, 1), s=(5, 20), iscomplex=True,
+                         test_shapes=[(2, 63, 2)], module_name="fft")
+  
+    ts = [(33, 3, 2), (8, 7, 2)]
+
+    for f in cfft_funcs + rfft_funcs:
+        _test_array_func(f, axes=(0, 1), norm="ortho",
+                         test_shapes=ts, module_name="fft")
+        _test_array_func(f, axes=(0, 1), norm="backward",
+                         test_shapes=ts, module_name="fft")
+        _test_array_func(f, axes=(0, 1), s=(32, 5), norm="forward",
+                         test_shapes=ts, module_name="fft")
+    
+    for f in cfft_funcs:
+        _test_array_func(f, axes=(0, 1), s=(29, 5), norm="ortho",
+                         iscomplex=True, test_shapes=ts, module_name="fft")
+        _test_array_func(f, axes=(0, 1), norm="backward",
+                         iscomplex=True, test_shapes=ts, module_name="fft")
+        _test_array_func(f, axes=(0, 1), s=(32, 5), norm="forward",
+                         iscomplex=True, test_shapes=ts, module_name="fft")
+        
+
+def test_fftn():
+    # tests for 3 fft dimensions max
+
+    cfft_funcs = [fftn, ifftn]
+    rfft_funcs = [rfftn, irfftn]
+
+    ts = [(16, 3, 2), (2, 4, 7, 2)]
+
+    for f in cfft_funcs + rfft_funcs:
+        _test_array_func(f, test_shapes=ts, module_name="fft")
+        _test_array_func(f, axes=[-2, -3, -1], test_shapes=ts, module_name="fft")
+        _test_array_func(f, axes=[-2, -3, -1], s=[3, 5, 7], test_shapes=ts, module_name="fft")
+        _test_array_func(f, axes=[0, 2, 1], test_shapes=ts, module_name="fft")
+        _test_array_func(f, axes=[0, 2, 1], norm="ortho", test_shapes=ts, module_name="fft")
+        _test_array_func(f, axes=[0, 2, 1], norm="forward", test_shapes=ts, module_name="fft")
+        _test_array_func(f, axes=[2, 1, 0], norm="backward", test_shapes=ts, module_name="fft")
+
+    for f in cfft_funcs:
+        _test_array_func(f, axes=[0, 2, 1], norm="ortho", s=[3, 5, 7],
+                         iscomplex=True, test_shapes=ts, module_name="fft")
+        _test_array_func(f, axes=[0, 2, 1], norm="forward", 
+                         iscomplex=True, test_shapes=ts, module_name="fft")
+        _test_array_func(f, axes=[2, 1, 0], 
+                         iscomplex=True, test_shapes=ts, module_name="fft")
+
+
 def _test_array_func2(f, op1_shape=None, op2_shape=None, *args, **kwargs):
-    # *args so far are only used for einsum, and they go before the operands.
+    # *args so far are only used for the subscripts of einsum, 
+    # which is why they go into the functions before the operands.
 
     if op1_shape is None:
         shapes = [[tuple(), tuple()], [tuple(), (8,)], [tuple(), (2, 5)], 
@@ -242,7 +364,7 @@ def _test_array_func2(f, op1_shape=None, op2_shape=None, *args, **kwargs):
 
     # Random variable second
     
-    op1 = np.random.uniform(-1., 1., size=op1_shape)
+    op1 = (2. * np.random.rand(*op1_shape) - 1)
     vin = _random_normal(op2_shape)
 
     vout = f(*args, op1, vin, **kwargs)
