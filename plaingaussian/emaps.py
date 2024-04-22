@@ -402,12 +402,11 @@ def _broadcast_shapes(shape1, shape2):
     return tuple(max(*d) for d in shapesit)[::-1]
 
 
-def concatenate(emaps, vaxis=0, dtype=None):
+def concatenate(emaps, vaxis=0):
     if len(emaps) == 1:
         return emaps[0]
     
-    if dtype is None:
-        dtype = emaps[0].a.dtype
+    dtype = emaps[0].a.dtype
 
     if vaxis < 0:
         vaxis = emaps[0].vndim + vaxis
@@ -452,7 +451,7 @@ def concatenate(emaps, vaxis=0, dtype=None):
     return ElementaryMap(cat_a, union_elem)
 
 
-def stack(emaps, vaxis=0, dtype=None):
+def stack(emaps, vaxis=0):
     # Essentially a copy of `concatenate`, with slightly less overhead.
 
     if vaxis < 0:
@@ -461,15 +460,9 @@ def stack(emaps, vaxis=0, dtype=None):
     base_jidx = (slice(None),) * vaxis
 
     if len(emaps) == 1:
-        if dtype is None:
-            return emaps[0][*base_jidx, None]
-        
-        em = emaps[0][*base_jidx, None]# hacky----------------------------------------------
-        em.a = em.a.astype(dtype)
-        return em
-    
-    if dtype is None:
-        dtype = emaps[0].a.dtype
+        return emaps[0][*base_jidx, None]
+
+    dtype = emaps[0].a.dtype
     
     new_vshape = list(emaps[0].vshape)
     new_vshape.insert(vaxis, len(emaps)) 
@@ -502,20 +495,20 @@ def stack(emaps, vaxis=0, dtype=None):
     return ElementaryMap(cat_a, union_elem)
 
 
-def hstack(emaps, dtype=None):
+def hstack(emaps):
     emaps = [em.ravel() if em.vndim == 0 else em for em in emaps]
 
     if emaps[0].vndim == 1:
-        return concatenate(emaps, vaxis=0, dtype=dtype)
+        return concatenate(emaps, vaxis=0)
     
-    return concatenate(emaps, vaxis=1, dtype=dtype)
+    return concatenate(emaps, vaxis=1)
     
 
-def vstack(emaps, dtype=None):
+def vstack(emaps):
     if emaps[0].vndim <= 1:
         emaps = [em.reshape((1, -1)) for em in emaps]
     
-    return concatenate(emaps, vaxis=0, dtype=dtype)
+    return concatenate(emaps, vaxis=0)
 
 
 def dstack(emaps):

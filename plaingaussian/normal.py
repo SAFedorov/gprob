@@ -185,9 +185,9 @@ class Normal:
     def conj(self):
         return Normal(self.emap.conj(), self.b.conj())
     
-    def cumsum(self, axis=None, dtype=None):    
-        b = self.b.cumsum(axis, dtype=dtype)
-        em = self.emap.cumsum(axis, dtype=dtype)
+    def cumsum(self, axis=None):    
+        b = self.b.cumsum(axis)
+        em = self.emap.cumsum(axis)
         return Normal(em, b)
     
     def diagonal(self, offset=0, axis1=0, axis2=1):
@@ -216,11 +216,11 @@ class Normal:
         em = self.emap.reshape(newshape, order=order)
         return Normal(em, b)
     
-    def sum(self, axis=None, dtype=None, keepdims=False):
+    def sum(self, axis=None, keepdims=False):
         # "where" is absent because its broadcasting is not implemented.
         # "initial" is also not implemented.
-        b = self.b.sum(axis, dtype=dtype, keepdims=keepdims)
-        em = self.emap.sum(axis, dtype=dtype, keepdims=keepdims)
+        b = self.b.sum(axis, keepdims=keepdims)
+        em = self.emap.sum(axis, keepdims=keepdims)
         return Normal(em, b)
 
     def transpose(self, axes=None):
@@ -228,9 +228,9 @@ class Normal:
         em = self.emap.transpose(axes)
         return Normal(em, b)
     
-    def trace(self, offset=0, axis1=0, axis2=1, dtype=None):
-        b = self.b.trace(offset=offset, axis1=axis1, axis2=axis2, dtype=dtype)
-        em = self.emap.trace(offset, axis1, axis2, dtype=dtype)
+    def trace(self, offset=0, axis1=0, axis2=1):
+        b = self.b.trace(offset=offset, axis1=axis1, axis2=axis2)
+        em = self.emap.trace(offset, axis1, axis2)
         return Normal(em, b)
 
     # ---------- probability-related methods ----------
@@ -307,7 +307,7 @@ class Normal:
         a = self.emap.a
 
         if np.iscomplexobj(a):
-            cvar = np.einsum("i..., i... -> ...", a.conj(), a)
+            cvar = np.einsum("i..., i... -> ...", a, a.conj())
             return np.real(cvar)
         
         return np.einsum("i..., i... -> ...", a, a)
@@ -320,7 +320,7 @@ class Normal:
         a = self.emap.a2d
 
         if np.iscomplexobj(a):
-            return a.T.conj() @ a
+            return a.T @ a.conj()
 
         return a.T @ a
     
@@ -377,7 +377,7 @@ def normal(mu=0., sigmasq=1., size=None):
     Args:
         mu: Mean value, a scalar or an array.
         sigmasq: Scalar variance or matrix covariance.
-        size: Optional integer or tuple specifying the size and shape of 
+        size: Optional integer or sequence of integers specifying the shape of 
             the variable. Only has an effect with scalar mean and variance. 
 
     Returns:
@@ -398,14 +398,16 @@ def normal(mu=0., sigmasq=1., size=None):
                 return Normal(sigma[None], mu)  # expanding sigma to 1d
             elif isinstance(size, int):
                 b = np.broadcast_to(mu, (size,))
-                a = sigma * np.eye(size, size)
+                a = sigma * np.eye(size, size, dtype=sigma.dtype)
                 return Normal(a, b)
             else:
                 b = np.broadcast_to(mu, size)
-                a = sigma * np.eye(b.size, b.size).reshape((b.size, *b.shape))
+                a = sigma * np.eye(b.size, b.size, dtype=sigma.dtype)
+                a = a.reshape((b.size, *b.shape))
                 return Normal(a, b)
         else:
-            a = sigma * np.eye(mu.size, mu.size).reshape(mu.size, *mu.shape)
+            a = sigma * np.eye(mu.size, mu.size, dtype=sigma.dtype)
+            a = a.reshape((mu.size, *mu.shape))
             return Normal(a, mu)
         
     if sigmasq.ndim != 2:
@@ -414,38 +416,50 @@ def normal(mu=0., sigmasq=1., size=None):
     mu = np.broadcast_to(mu, (sigmasq.shape[0],))
         
     try:
-        atr = np.linalg.cholesky(sigmasq)
+        atr = _safer_cholesky(sigmasq)
         return Normal(atr.T, mu)
     except LinAlgError:
         # The covariance matrix is not strictly positive-definite.
         pass
 
-    # Handles the positive-semidefinite case using orthogonal decomposition. 
-    eigvals, eigvects = np.linalg.eigh(sigmasq)  # sigmasq = V D V.T
+    # Handles the positive-semidefinite case using unitary decomposition. 
+    eigvals, eigvects = np.linalg.eigh(sigmasq)  # sigmasq = V D V.H
 
-    if (eigvals < 0).any():
-        raise ValueError("Negative eigenvalue(s) in the covariance matrix.")
+    atol = len(sigmasq) * np.max(np.abs(eigvals)) * np.finfo(eigvals.dtype).eps
+    if (eigvals < -atol).any():
+        raise ValueError("Not all eigenvalues of the covariance matrix are "
+                         f"non-negative: {eigvals}.")
     
-    atr = eigvects @ np.diag(np.sqrt(eigvals))
-
+    eigvals[eigvals < 0] = 0.
+    atr = eigvects * np.sqrt(eigvals)
     return Normal(atr.T, mu)
 
 
-# ---------- linear array functions ----------
+def _safer_cholesky(x):
+    ltri = np.linalg.cholesky(x)
 
-# The functions below apply to numpy arrays without forcing their convertion.
+    d = np.diagonal(ltri)
+    atol = 100 * len(d) * np.finfo(d.dtype).eps * np.max(d**2)
+    if (d**2 < atol).any():
+        raise LinAlgError("The input matrix seems to be degenerate.")
+    
+    return ltri
+
+
+# ---------- linear array functions ----------
+# These functions apply to numpy arrays without converting them to Normal.
 
 
 def diagonal(x, offset=0, axis1=0, axis2=1):
     return x.diagonal(offset=offset, axis1=axis1, axis2=axis2)
 
 
-def sum(x, axis=None, dtype=None, keepdims=False):
-    return x.sum(axis=axis, dtype=dtype, keepdims=keepdims)
+def sum(x, axis=None, keepdims=False):
+    return x.sum(axis=axis, keepdims=keepdims)
 
 
-def cumsum(x, axis=None, dtype=None):
-    return x.cumsum(axis=axis, dtype=dtype)
+def cumsum(x, axis=None):
+    return x.cumsum(axis=axis)
 
 
 def moveaxis(x, source, destination):
@@ -466,24 +480,24 @@ def transpose(x, axes=None):
     return x.transpose(axes=axes)
 
 
-def trace(x, offset=0, axis1=0, axis2=1, dtype=None):
-    return x.trace(offset=offset, axis1=axis1, axis2=axis2, dtype=dtype)
+def trace(x, offset=0, axis1=0, axis2=1):
+    return x.trace(offset=offset, axis1=axis1, axis2=axis2)
 
 
-def concatenate(arrays, axis=0, dtype=None):
-    return _concatfunc("concatenate", arrays, axis, dtype=dtype)
+def concatenate(arrays, axis=0):
+    return _concatfunc("concatenate", arrays, axis)
 
 
-def stack(arrays, axis=0, dtype=None):
-    return _concatfunc("stack", arrays, axis, dtype=dtype)
+def stack(arrays, axis=0):
+    return _concatfunc("stack", arrays, axis)
 
 
-def hstack(arrays, dtype=None):
-    return _concatfunc("hstack", arrays, dtype=dtype)
+def hstack(arrays):
+    return _concatfunc("hstack", arrays)
 
 
-def vstack(arrays, dtype=None):
-    return _concatfunc("vstack", arrays, dtype=dtype)
+def vstack(arrays):
+    return _concatfunc("vstack", arrays)
 
 
 def dstack(arrays):

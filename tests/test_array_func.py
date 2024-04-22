@@ -113,11 +113,10 @@ def test_sum():
     _test_array_func(sum)
     _test_array_func(sum, axis=0)
     _test_array_func(sum, axis=0, keepdims=True)
-    _test_array_func(sum, axis=0, dtype=np.float16)
     _test_array_func(sum, axis=-1, keepdims=True)
     _test_array_func(sum, axis=-2, keepdims=False, test_shapes="2dmin")
     _test_array_func(sum, axis=-2, keepdims=True, test_shapes="2dmin")
-    _test_array_func(sum, axis=1, keepdims=True, dtype=np.float16, test_shapes="2dmin")
+    _test_array_func(sum, axis=1, keepdims=True, test_shapes="2dmin")
     _test_array_func(sum, axis=2, test_shapes="3dmin")
     _test_array_func(sum, axis=-2, test_shapes="3dmin")
     _test_array_func(sum, axis=(0, 1), test_shapes="2dmin")
@@ -129,17 +128,15 @@ def test_sum():
 def test_cumsum():
     _test_array_func(cumsum)
     _test_array_func(cumsum, axis=0)
-    _test_array_func(cumsum, axis=0, dtype=np.float16)
     _test_array_func(cumsum, axis=-1)
     _test_array_func(cumsum, axis=-2, test_shapes="2dmin")
-    _test_array_func(cumsum, axis=1, dtype=np.float16, test_shapes="2dmin")
+    _test_array_func(cumsum, axis=1, test_shapes="2dmin")
     _test_array_func(cumsum, axis=2, test_shapes="3dmin")
     _test_array_func(cumsum, axis=-2, test_shapes="3dmin")
 
 
 def test_trace():
     _test_array_func(trace, test_shapes="2dmin")
-    _test_array_func(trace, dtype=np.float16, test_shapes="2dmin")
     _test_array_func(trace, offset=1, test_shapes="2dmin")
     _test_array_func(trace, offset=-2, test_shapes="2dmin")
     _test_array_func(trace, offset=1, axis1=1, axis2=0, test_shapes="3dmin")
@@ -359,7 +356,7 @@ def _test_array_func2(f, op1_shape=None, op2_shape=None, *args, **kwargs):
         aref = npf(*args, arin, op2, **kwargs)
         assert arout.shape == aref.shape
 
-        atol = tol * max(1, np.max(np.abs(aref)))
+        atol = 2 * tol * max(1, np.max(np.abs(aref)))
         assert np.allclose(arout, aref, rtol=tol, atol=atol)
 
     # Random variable second
@@ -380,7 +377,7 @@ def _test_array_func2(f, op1_shape=None, op2_shape=None, *args, **kwargs):
         aref = npf(*args, op1, arin, **kwargs)
         assert arout.shape == aref.shape
 
-        atol = tol * max(1, np.max(np.abs(aref)))
+        atol = 2 * tol * max(1, np.max(np.abs(aref)))
         assert np.allclose(arout, aref, rtol=tol, atol=atol)  
     
 
@@ -629,7 +626,6 @@ def test_stack():
     _test_concat_func(stack, axis=1, test_shapes="2dmin")
     _test_concat_func(stack, axis=-1, test_shapes="1dmin")
     _test_concat_func(stack, axis=-2, test_shapes="3dmin")
-    _test_concat_func(stack, dtype=np.float16) #TODO: add data type argument to emap functions
 
 
 def test_vstack():

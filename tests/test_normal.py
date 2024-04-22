@@ -3,10 +3,11 @@ sys.path.append('..')  # Until there is a package structure.
 
 import pytest
 import numpy as np
-from plaingaussian.normal import normal, hstack, Normal
+from numpy.linalg import LinAlgError
+from plaingaussian.normal import normal, hstack, Normal, _safer_cholesky
 
 
-def test_normal():
+def test_creation():
     xi = normal()
     assert (xi.emap.a == np.array([1.])).all()
     assert (xi.b == np.array(0.)).all()
@@ -26,12 +27,7 @@ def test_normal():
     assert (xi.emap.a == np.array([0.])).all()
     assert (xi.b == np.array(0.)).all()
 
-    mu = [1.3, 2.5]
-    cov = [[1., 0.], [0., 0.]]
-    xi = normal(mu, cov)
-    assert (xi.cov() == np.array(cov)).all()
-    assert (xi.b == mu).all()
-
+    # Creation from a full-rank real covariance matrix.
     cov = [[2.1, 0.5], [0.5, 1.3]]
     xi = normal(0, cov)
     tol = 1e-14
@@ -46,6 +42,141 @@ def test_normal():
     cov = [[1., 0.], [0., 0.]]
     xi = normal(0, cov)
     assert (xi.cov() == np.array(cov)).all()
+
+    mu = [1.3, 2.5]
+    cov = [[1., 0.], [0., 0.]]
+    xi = normal(mu, cov)
+    assert (xi.cov() == np.array(cov)).all()
+    assert (xi.b == mu).all()
+
+
+def test_creation_dtype():
+    # The propagation of data types in various creation branches.
+
+    real_dtypes = [np.float16, np.float32, np.float64]
+    for dt in real_dtypes:
+        tol = 100 * np.finfo(dt).eps
+
+        mu = np.array(0.1, dtype=dt)
+        sigmasq = np.array(1, dtype=dt)
+
+        xi = normal(mu, sigmasq)
+        assert xi.mean().dtype == dt
+        assert xi.mean() == mu
+        assert xi.var().dtype == dt
+        assert np.allclose(xi.var(), sigmasq, rtol=tol, atol=tol)
+
+        xi = normal(mu, sigmasq, size=7)
+        assert xi.mean().dtype == dt
+        assert (xi.mean() == mu).all()
+        assert xi.var().dtype == dt
+        assert np.allclose(xi.var(), sigmasq, rtol=tol, atol=tol)
+
+        xi = normal(mu, sigmasq, size=(2, 3))
+        assert xi.mean().dtype == dt
+        assert (xi.mean() == mu).all()
+        assert xi.var().dtype == dt
+        assert np.allclose(xi.var(), sigmasq, rtol=tol, atol=tol)
+
+        mu = np.array([0.1, 0.2], dtype=dt)
+        xi = normal(mu, sigmasq)
+        assert xi.mean().dtype == dt
+        assert (xi.mean() == mu).all()
+        assert xi.var().dtype == dt
+        assert np.allclose(xi.var(), sigmasq, rtol=tol, atol=tol)
+
+        if dt is np.float16:
+            continue # numpy linalg does not support float16
+
+        # Non-degenerate covariance matrix.
+        sz = 11
+        esz = 17
+        a = 2. * np.random.rand(esz, sz) - 1.
+        cov = (a.T @ a).astype(dt)
+        mu = np.random.rand(sz).astype(dt)
+        xi = normal(mu, cov)
+        assert xi.mean().dtype == dt
+        assert (xi.mean() == mu).all()
+        assert xi.cov().dtype == dt
+        assert np.allclose(xi.cov(), cov, rtol=tol, atol=tol)
+
+        # Singly degenerate covariance matrix.
+        a = (2. * np.random.rand(esz, sz) - 1.)
+        cov_ = (a.T @ a).astype(dt)
+        evals, evects = np.linalg.eigh(cov_)
+        evals[1] = 0.
+
+        cov = (evects * evals) @ evects.T
+        with pytest.raises(LinAlgError):  # confirms the degeneracy
+            _safer_cholesky(cov)
+
+        mu = np.random.rand(sz).astype(dt)
+        xi = normal(mu, cov)
+        assert xi.mean().dtype == dt
+        assert (xi.mean() == mu).all()
+        assert xi.cov().dtype == dt
+        assert np.allclose(xi.cov(), cov, rtol=tol, atol=tol)
+
+        # Doubly degenerate covariance matrix.
+        evals[2] = 0.
+        cov = (evects * evals) @ evects.T
+        with pytest.raises(LinAlgError):
+            _safer_cholesky(cov)
+
+        mu = np.random.rand(sz).astype(dt)
+        xi = normal(mu, cov)
+        assert xi.mean().dtype == dt
+        assert (xi.mean() == mu).all()
+        assert xi.cov().dtype == dt
+        assert np.allclose(xi.cov(), cov, rtol=tol, atol=tol)
+
+    complex_dtypes = [np.complex64, np.complex128]
+    for dt in complex_dtypes:
+        tol = 100 * np.finfo(dt).eps
+
+        # Non-degenerate covariance matrix.
+        sz = 11
+        esz = 17
+        a = ((2. * np.random.rand(esz, sz) - 1.) 
+             + 1j * (2. * np.random.rand(esz, sz) - 1.))
+        cov = (a.T @ a.conj()).astype(dt)
+        mu = (np.random.rand(sz) + 1j * np.random.rand(sz)).astype(dt)
+        xi = normal(mu, cov)
+        assert xi.mean().dtype == dt
+        assert (xi.mean() == mu).all()
+        assert xi.cov().dtype == dt
+        assert np.allclose(xi.cov(), cov, rtol=tol, atol=tol)
+
+        # Singly degenerate covariance matrix.
+        a = ((2. * np.random.rand(esz, sz) - 1.) 
+             + 1j * (2. * np.random.rand(esz, sz) - 1.))
+        cov_ = (a.T @ a.conj()).astype(dt)
+        evals, evects = np.linalg.eigh(cov_)
+        evals[1] = 0.
+
+        cov = (evects * evals) @ evects.T.conj()
+        with pytest.raises(LinAlgError):  # confirms the degeneracy
+            _safer_cholesky(cov)
+
+        mu = (np.random.rand(sz) + 1j * np.random.rand(sz)).astype(dt)
+        xi = normal(mu, cov)
+        assert xi.mean().dtype == dt
+        assert (xi.mean() == mu).all()
+        assert xi.cov().dtype == dt
+        assert np.allclose(xi.cov(), cov, rtol=tol, atol=tol)
+
+        # Doubly degenerate covariance matrix.
+        evals[2] = 0.
+        cov = (evects * evals) @ evects.T.conj()
+        with pytest.raises(LinAlgError):
+            _safer_cholesky(cov)
+
+        mu = (np.random.rand(sz) + 1j * np.random.rand(sz)).astype(dt)
+        xi = normal(mu, cov)
+        assert xi.mean().dtype == dt
+        assert (xi.mean() == mu).all()
+        assert xi.cov().dtype == dt
+        assert np.allclose(xi.cov(), cov, rtol=tol, atol=tol)
 
 
 def test_logp():
@@ -102,6 +233,7 @@ def test_logp():
     assert np.abs(xi1.logp(np.ones((2, 2))) - xi2.logp(np.ones((4,)))) < tol
     assert np.abs(xi1.logp([np.ones((2, 2)), 0.5 * np.ones((2, 2))]) 
                   - xi2.logp([np.ones((4,)), 0.5 * np.ones((4,))])).max() < tol
+
 
 def test_len():
     xi = normal(0, 2, size=2)
