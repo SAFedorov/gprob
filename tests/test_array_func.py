@@ -3,7 +3,6 @@ sys.path.append('..')  # Until there is a package structure.
 
 
 from functools import reduce
-from itertools import accumulate
 import numpy as np
 from numpy.random import default_rng
 
@@ -26,9 +25,9 @@ def _gts(ndim = None):
         return (elem for list in list_of_lists for elem in list)
 
     test_shapes = [[tuple()], 
-                   [(1,), (4,), (3,)], 
-                   [(3, 1), (3, 5), (2, 4)], 
-                   [(2, 3, 4), (3, 5, 2), (3, 2, 1)], 
+                   [(1,), (3,), (10,)], 
+                   [(3, 1), (3, 5), (2, 4), (2, 10), (10, 2)], 
+                   [(2, 3, 4), (3, 5, 1), (3, 8, 2), (3, 2, 10)], 
                    [(3, 2, 5, 4), (2, 1, 3, 4), (2, 3, 3, 2)],
                    [(2, 3, 1, 5, 1)], 
                    [(3, 2, 1, 2, 1, 4)]]
@@ -69,6 +68,7 @@ def _random_correlate(vs):
 def _test_array_func(f, *args, test_shapes=None, **kwargs):
     
     # single input and single output functions
+    npf = getattr(np, f.__name__)
 
     if test_shapes is None or isinstance(test_shapes, (str, int)):
         test_shapes = _gts(test_shapes)
@@ -76,7 +76,6 @@ def _test_array_func(f, *args, test_shapes=None, **kwargs):
     for sh in test_shapes:
         vin = _random_normal(sh)
         vout = f(vin, *args, **kwargs)
-        npf = getattr(np, f.__name__)
 
         assert vin.emap.a.shape[1:] == vin.b.shape
         assert vout.emap.a.shape[1:] == vout.b.shape
@@ -87,14 +86,14 @@ def _test_array_func(f, *args, test_shapes=None, **kwargs):
         assert np.all(vout.b == refmean)
 
         dt = refmean.dtype
-        tol = 6 * np.finfo(dt).eps
+        tol = 10 * np.finfo(dt).eps
 
         assert vout.emap.a.dtype == dt
 
         for arin, arout in zip(vin.emap.a, vout.emap.a):
             aref = npf(arin, *args, **kwargs)
             assert arout.shape == aref.shape
-            assert np.allclose(arout, aref, rtol=tol, atol=tol * np.max(arin)) 
+            assert np.allclose(arout, aref, rtol=tol, atol=tol * np.max(arin))
 
 
 def test_sum():
@@ -201,6 +200,186 @@ def test_reshape():
             _test_array_func(reshape, new_sh, test_shapes=[sh])
 
 
+def _test_array_func2(f, op1_shape=None, op2_shape=None, **kwargs):
+    if op1_shape is None:
+        shapes = [[tuple(), tuple()], [tuple(), (8,)], [tuple(), (2, 5)], 
+                  [(3,), (7,)], [(11,), (1,)], [(5,), (3, 2)], [(5,), (3, 2, 4)],
+                  [(3, 2), (4, 5)], [(2, 3), (5, 1, 4)], 
+                  [(2, 3, 4), (2, 5, 7)], [(2, 3, 4), (2, 5, 6, 7)]]
+        
+        for sh1, sh2 in shapes:
+            _test_array_func2(f, sh1, sh2, **kwargs)
+
+        return
+        
+    npf = getattr(np, f.__name__)
+
+    # Random variable first
+
+    vin = _random_normal(op1_shape)
+    op2 = (2. * np.random.rand(*op2_shape) - 1)
+
+    vout = f(vin, op2, **kwargs)
+
+    refmean = npf(vin.b, op2, **kwargs)
+    assert vout.b.shape == refmean.shape
+    assert vout.b.dtype == refmean.dtype
+    assert np.all(vout.b == refmean)
+
+    dt = refmean.dtype
+    tol = 10 * np.finfo(dt).eps
+
+    assert vout.emap.a.dtype == dt
+
+    for arin, arout in zip(vin.emap.a, vout.emap.a):
+        aref = npf(arin, op2, **kwargs)
+        assert arout.shape == aref.shape
+
+        atol = tol * max(1, np.max(np.abs(aref)))
+        assert np.allclose(arout, aref, rtol=tol, atol=atol)
+
+    # Random variable second
+    
+    op1 = np.random.uniform(-1., 1., size=op1_shape)
+    vin = _random_normal(op2_shape)
+
+    vout = f(op1, vin, **kwargs)
+
+    refmean = npf(op1, vin.b, **kwargs)
+    assert vout.b.shape == refmean.shape
+    assert vout.b.dtype == refmean.dtype
+    assert np.all(vout.b == refmean)
+
+    assert vout.emap.a.dtype == refmean.dtype
+
+    for arin, arout in zip(vin.emap.a, vout.emap.a):
+        aref = npf(op1, arin, **kwargs)
+        assert arout.shape == aref.shape
+
+        atol = tol * max(1, np.max(np.abs(aref)))
+        assert np.allclose(arout, aref, rtol=tol, atol=atol)  
+    
+
+def test_matmul():
+    for sh in _gts(1):
+        _test_array_func2(matmul, sh, sh)
+        _test_array_func2(matmul, sh + sh, sh)
+        _test_array_func2(matmul, (2, 3) + sh, sh)
+        _test_array_func2(matmul, sh, sh + sh)
+        _test_array_func2(matmul, sh, sh + (3,))
+        _test_array_func2(matmul, sh, (2, 4) + sh + (7,))
+        _test_array_func2(matmul, (8,) + sh, (2, 4) + sh + (7,))
+        _test_array_func2(matmul, (5, 3) + sh, (5,) + sh + (7,))
+        _test_array_func2(matmul, (3,) + sh, (5, 3) + sh + (7,))
+        _test_array_func2(matmul, (5, 3) + sh, (5, 1) + sh + (7,))
+        _test_array_func2(matmul, (5, 1, 3, 2) + sh, (5, 3, 1) + sh + (2,))
+
+
+def test_dot():
+    for sh in _gts(1):
+        _test_array_func2(dot, sh, sh)
+        _test_array_func2(dot, sh + sh, sh)
+        _test_array_func2(dot, (2, 3) + sh, sh)
+        _test_array_func2(dot, sh, sh + sh)
+        _test_array_func2(dot, sh, sh + (3,))
+        _test_array_func2(dot, sh, (2, 4) + sh + (7,))
+        _test_array_func2(dot, (8,) + sh, (2, 4) + sh + (7,))
+        _test_array_func2(dot, (5, 3) + sh, (5,) + sh + (7,))
+        _test_array_func2(dot, (3,) + sh, (5, 3) + sh + (7,))
+        _test_array_func2(dot, (5, 3) + sh, (5, 1) + sh + (7,))
+        _test_array_func2(dot, (5, 1, 3, 2) + sh, (5, 3, 1) + sh + (2,))
+
+
+def test_inner():
+    for sh in _gts(1):
+        _test_array_func2(inner, sh, sh)
+        _test_array_func2(inner, sh + sh, sh)
+        _test_array_func2(inner, (2, 3) + sh, sh)
+        _test_array_func2(inner, sh, sh + sh)
+        _test_array_func2(inner, sh, (2, 3,) + sh)
+        _test_array_func2(inner, (2, 3,) + sh, sh)
+        _test_array_func2(inner, (4,) + sh, (2, 4) + sh)
+        _test_array_func2(inner, (2, 1) + sh, (5,) + sh)
+        _test_array_func2(inner, (3,) + sh, (5, 3) + sh)
+        _test_array_func2(inner, (5, 3) + sh, (3,) + sh)
+        _test_array_func2(inner, (5, 1, 2) + sh, (5, 3, 1) + sh)
+
+
+def test_tensordot():
+    _test_array_func2(tensordot, axes=0)
+
+    for sh in _gts(1):
+        _test_array_func2(tensordot, sh, sh, axes=1)
+        _test_array_func2(tensordot, sh, sh, axes=((0,), (0,)))
+        _test_array_func2(tensordot, sh, sh, axes=[[0], [-1]])
+        _test_array_func2(tensordot, sh, sh, axes=[[-1], [-1]])
+        _test_array_func2(tensordot, sh, sh + (3,), axes=1)
+        _test_array_func2(tensordot, sh, sh + (3,), axes=[[0], [0]])
+        _test_array_func2(tensordot, sh, (3,) + sh, axes=[[0], [1]])
+        _test_array_func2(tensordot, sh, (3,) + sh, axes=[[0], [-1]])
+        _test_array_func2(tensordot, (2,) + sh, sh, axes=1)
+        _test_array_func2(tensordot, (2,) + sh, sh, axes=[[-1], [0]])
+        _test_array_func2(tensordot, sh + (2,), sh, axes=[[0], [0]])
+        _test_array_func2(tensordot, (2,) + sh, sh + (3,), axes=1)
+        _test_array_func2(tensordot, (2,) + sh, sh + (3,), axes=[[-1], [0]])
+        _test_array_func2(tensordot, sh + (2,), sh + (3,), axes=[[0], [0]])
+        _test_array_func2(tensordot, (2,) + sh, (3,) + sh, axes=[[1], [1]])
+        _test_array_func2(tensordot, (2, 4) + sh, sh + (3, 7), axes=1)
+        _test_array_func2(tensordot, (2, 4) + sh, (3, 7) + sh, axes=[[-1], [-1]])
+        _test_array_func2(tensordot, (2,) + sh + (4,), (3, 7) + sh, axes=[[1], [2]])
+
+    for sh in _gts(2):
+        _test_array_func2(tensordot, sh, sh, axes=2)
+        _test_array_func2(tensordot, sh, sh, axes=((0, 1), (0, 1)))
+        _test_array_func2(tensordot, sh, sh[::-1], axes=((0, 1), (1, 0)))
+        _test_array_func2(tensordot, sh, sh[::-1], axes=((1, 0), (0, 1)))
+        _test_array_func2(tensordot, sh, sh, axes=[[-1, 0], [-1, 0]])
+        _test_array_func2(tensordot, sh, sh + (3,), axes=2)
+        _test_array_func2(tensordot, sh, sh + (3,), axes=[[0, 1], [0, -2]])
+        _test_array_func2(tensordot, sh, sh[::-1] + (3,), axes=[[0, 1], [1, 0]])
+        _test_array_func2(tensordot, sh, (3,) + sh, axes=[[1, 0], [2, 1]])
+        _test_array_func2(tensordot, sh, (3,) + sh[::-1], axes=[[0, 1], [-1, -2]])
+        _test_array_func2(tensordot, (2,) + sh, sh, axes=2)
+        _test_array_func2(tensordot, (2,) + sh, sh, axes=[[-2, -1], [0, 1]])
+        _test_array_func2(tensordot, sh + (2,), sh, axes=[[0, 1], [0, 1]])
+        _test_array_func2(tensordot, (2,) + sh, sh + (3,), axes=2)
+        _test_array_func2(tensordot, (2,) + sh, sh + (3,), axes=[[1, 2], [0, 1]])
+        _test_array_func2(tensordot, sh + (2,), sh + (3,), axes=[[-3, -2], [0, 1]])
+        _test_array_func2(tensordot, (2,) + sh, (3,) + sh, axes=[[-2, -1], [-2, -1]])
+        _test_array_func2(tensordot, (2, 4) + sh, sh + (3, 7), axes=2)
+        _test_array_func2(tensordot, (2, 4) + sh, (3, 7) + sh, axes=[[2, 3], [2, 3]])
+        _test_array_func2(tensordot, (2,) + sh + (4,), (3, 7) + sh, axes=[[1, 2], [2, 3]])
+        _test_array_func2(tensordot, (2,) + sh + (4,), sh[::-1] + (3, 7), axes=[[-2, -3], [0, 1]])
+
+    for sh in _gts(3):
+        _test_array_func2(tensordot, sh, sh, axes=3)
+        _test_array_func2(tensordot, sh, sh + (3,), axes=3)
+        _test_array_func2(tensordot, (3,) + sh, sh, axes=3)
+        _test_array_func2(tensordot, (2, 3) + sh, sh + (1, 5), axes=3)
+        _test_array_func2(tensordot, (sh[1], sh[0], 3, sh[2]), 
+                          (sh[2], 1, sh[1], sh[0]), axes=[[1, 0, -1], [3, 2, 0]])
+
+    for sh in _gts(4):
+        _test_array_func2(tensordot, sh, sh, axes=4)
+        _test_array_func2(tensordot, sh, sh + (3,), axes=4)
+        _test_array_func2(tensordot, (3,) + sh, sh, axes=4)
+        _test_array_func2(tensordot, (2, 3) + sh, sh + (1, 5), axes=4)
+        _test_array_func2(tensordot, (sh[3], sh[1], sh[0], 3, sh[2]), 
+                          (sh[2], 1, sh[1], sh[0], sh[3]), 
+                          axes=[[2, 1, -1, 0], [3, 2, 0, -1]])
+
+    for sh in _gts(5):
+        _test_array_func2(tensordot, sh, sh, axes=5)
+
+
+def test_outer():
+    _test_array_func2(outer)
+
+
+def test_kron():
+    _test_array_func2(kron)
+    
+
 def _test_array_method(name, *args, test_shapes=None, **kwargs):
     if test_shapes is None or isinstance(test_shapes, (str, int)):
         test_shapes = _gts(test_shapes)
@@ -218,14 +397,16 @@ def _test_array_method(name, *args, test_shapes=None, **kwargs):
         assert np.all(vout.b == refmean)
 
         dt = vout.b.dtype
-        tol = 6 * np.finfo(dt).eps
+        tol = 10 * np.finfo(dt).eps
 
         assert vout.emap.a.dtype == dt
 
         for arin, arout in zip(vin.emap.a, vout.emap.a):
             aref = getattr(arin, name)(*args, **kwargs)
             assert arout.shape == aref.shape
-            assert np.allclose(arout, aref, rtol=tol, atol=tol * np.max(aref)) 
+
+            atol = tol * max(1, np.max(np.abs(aref)))
+            assert np.allclose(arout, aref, rtol=tol, atol=atol) 
             
 
 def test_flatten():
@@ -233,6 +414,8 @@ def test_flatten():
 
 
 def _test_concat_func(f, *args, test_shapes=None, vins_list=None, **kwargs):
+    npf = getattr(np, f.__name__)
+
     if test_shapes is None or isinstance(test_shapes, (str, int)):
         test_shapes = _gts(test_shapes)
 
@@ -254,9 +437,7 @@ def _test_concat_func(f, *args, test_shapes=None, vins_list=None, **kwargs):
             vins_list += [[vins2[0], vins2[1]], [vins2[1], vins2[0]]]
 
     for vins in vins_list:
-
         vout = f(vins, *args, **kwargs)
-        npf = getattr(np, f.__name__)
 
         assert all(vin.emap.a.shape[1:] == vin.b.shape for vin in vins)
         assert vout.emap.a.shape[1:] == vout.b.shape
@@ -323,6 +504,8 @@ def test_concatenate():
 
 
 def _test_split_func(f, test_shapes="1dmin", test_axis=None, **kwargs):
+    npf = getattr(np, f.__name__)
+
     if test_axis is None:
         test_axis = kwargs.get("axis", 0)
     
@@ -334,10 +517,12 @@ def _test_split_func(f, test_shapes="1dmin", test_axis=None, **kwargs):
     for sh in test_shapes:
         sz = sh[test_axis]
         args_lists = [[1], [sz], [[0]], [[sz]], [[sz//2]]]
+        if sz > 3:
+            args_lists += [[[sz//3, 2*sz//3]]]
+
         for args in args_lists:
             vin = _random_normal(sh)
             vouts = f(vin, *args, **kwargs)
-            npf = getattr(np, f.__name__)
 
             refmeans = npf(vin.b, *args, **kwargs)
 

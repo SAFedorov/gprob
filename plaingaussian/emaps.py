@@ -22,6 +22,7 @@ class ElementaryMap:
     """
 
     __slots__ = ("a", "elem", "vshape", "vndim")
+    __array_ufunc__ = None
 
     def __init__(self, a, elem=None):
 
@@ -86,7 +87,15 @@ class ElementaryMap:
     def __matmul__(self, other):
         """Matrix-multiplies the map by a constant array."""
         other = np.asanyarray(other)
-        new_a = self.unsqueezed_a(other.ndim - 1) @ other
+
+        if self.vndim >= other.ndim:
+            new_a = self.a @ other
+        else:
+            new_a = self.unsqueezed_a(other.ndim) @ other
+
+            if self.vndim == 1:
+                new_a = new_a.reshape(new_a.shape[:-2] + new_a.shape[-1:])
+
         return ElementaryMap(new_a, self.elem)
 
     def __rmatmul__(self, other):
@@ -94,7 +103,7 @@ class ElementaryMap:
         other = np.asanyarray(other)
 
         if self.vndim == 1:
-            new_a = np.moveaxis(other @ self.a.T, -1, 0)  # TODO: test this implementation for broadcasting
+            new_a = np.moveaxis(other @ self.a.T, -1, 0)
         elif self.vndim >= 2:
             new_a = other @ self.unsqueezed_a(other.ndim)
         else:
@@ -344,8 +353,6 @@ class ElementaryMap:
         return ElementaryMap(new_a, self.elem)
     
     def tensordot(self, other, otherfirst=False, axes=2):
-
-        # This is the same how numpy.tensordot handles the axes.
         try:
             iter(axes)
         except Exception:
@@ -353,6 +360,7 @@ class ElementaryMap:
             axes2 = list(range(0, axes))
         else:
             axes1, axes2 = axes
+        # This is the same how numpy.tensordot handles the axes.
 
         if not otherfirst:
             axes1 = [a + 1 if a >= 0 else a for a in axes1]
@@ -360,7 +368,7 @@ class ElementaryMap:
         else:
             axes2 = [a + 1 if a >= 0 else a for a in axes2]
             new_a = np.tensordot(other, self.a, axes=(axes1, axes2))
-            new_a = np.moveaxis(new_a, -self.vndim + len(axes2), 0)
+            new_a = np.moveaxis(new_a, -self.vndim - 1 + len(axes2), 0)
 
         return ElementaryMap(new_a, self.elem)
 
