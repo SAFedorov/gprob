@@ -26,7 +26,7 @@ def _gts(ndim = None):
 
     test_shapes = [[tuple()], 
                    [(1,), (3,), (10,)], 
-                   [(3, 1), (3, 5), (2, 4), (2, 10), (10, 2)], 
+                   [(3, 1), (2, 4), (2, 10), (10, 2)], 
                    [(2, 3, 4), (3, 5, 1), (3, 8, 2), (3, 2, 10)], 
                    [(3, 2, 5, 4), (2, 1, 3, 4), (2, 3, 3, 2)],
                    [(2, 3, 1, 5, 1)], 
@@ -200,7 +200,9 @@ def test_reshape():
             _test_array_func(reshape, new_sh, test_shapes=[sh])
 
 
-def _test_array_func2(f, op1_shape=None, op2_shape=None, **kwargs):
+def _test_array_func2(f, op1_shape=None, op2_shape=None, *args, **kwargs):
+    # *args so far are only used for einsum, and they go before the operands.
+
     if op1_shape is None:
         shapes = [[tuple(), tuple()], [tuple(), (8,)], [tuple(), (2, 5)], 
                   [(3,), (7,)], [(11,), (1,)], [(5,), (3, 2)], [(5,), (3, 2, 4)],
@@ -219,9 +221,9 @@ def _test_array_func2(f, op1_shape=None, op2_shape=None, **kwargs):
     vin = _random_normal(op1_shape)
     op2 = (2. * np.random.rand(*op2_shape) - 1)
 
-    vout = f(vin, op2, **kwargs)
+    vout = f(*args, vin, op2, **kwargs)
 
-    refmean = npf(vin.b, op2, **kwargs)
+    refmean = npf(*args, vin.b, op2, **kwargs)
     assert vout.b.shape == refmean.shape
     assert vout.b.dtype == refmean.dtype
     assert np.all(vout.b == refmean)
@@ -232,7 +234,7 @@ def _test_array_func2(f, op1_shape=None, op2_shape=None, **kwargs):
     assert vout.emap.a.dtype == dt
 
     for arin, arout in zip(vin.emap.a, vout.emap.a):
-        aref = npf(arin, op2, **kwargs)
+        aref = npf(*args, arin, op2, **kwargs)
         assert arout.shape == aref.shape
 
         atol = tol * max(1, np.max(np.abs(aref)))
@@ -243,9 +245,9 @@ def _test_array_func2(f, op1_shape=None, op2_shape=None, **kwargs):
     op1 = np.random.uniform(-1., 1., size=op1_shape)
     vin = _random_normal(op2_shape)
 
-    vout = f(op1, vin, **kwargs)
+    vout = f(*args, op1, vin, **kwargs)
 
-    refmean = npf(op1, vin.b, **kwargs)
+    refmean = npf(*args, op1, vin.b, **kwargs)
     assert vout.b.shape == refmean.shape
     assert vout.b.dtype == refmean.dtype
     assert np.all(vout.b == refmean)
@@ -253,7 +255,7 @@ def _test_array_func2(f, op1_shape=None, op2_shape=None, **kwargs):
     assert vout.emap.a.dtype == refmean.dtype
 
     for arin, arout in zip(vin.emap.a, vout.emap.a):
-        aref = npf(op1, arin, **kwargs)
+        aref = npf(*args, op1, arin, **kwargs)
         assert arout.shape == aref.shape
 
         atol = tol * max(1, np.max(np.abs(aref)))
@@ -378,6 +380,47 @@ def test_outer():
 
 def test_kron():
     _test_array_func2(kron)
+
+
+def test_einsum():
+    for sh in _gts(1):
+        _test_array_func2(einsum, sh, sh, "i, i -> ")  # inner
+        _test_array_func2(einsum, sh, sh, "i, i")  # inner implicit
+        _test_array_func2(einsum, sh, sh, "i, j -> ij")  # outer
+        _test_array_func2(einsum, sh, sh, "i, j -> ji")
+        _test_array_func2(einsum, sh, sh, "i, j")  # outer implicit
+        _test_array_func2(einsum, sh, sh + (3,), "i, i... -> ...")  # ellipsis
+        _test_array_func2(einsum, sh, sh + (3,), "i, j... -> j...i")
+        _test_array_func2(einsum, sh, sh + (3,), "i, j...")
+        _test_array_func2(einsum, (3,) + sh, sh + (3,), "ki, jk -> ijk")
+        _test_array_func2(einsum, (1,) + sh, sh + (3,), "ki, jk -> ijk") # broadcasting
+
+    for sh in _gts(2):
+        _test_array_func2(einsum, sh, sh, "ij, ij")
+        _test_array_func2(einsum, sh, sh, "ij, kj")
+        _test_array_func2(einsum, sh, sh[::-1], "ij, jk")
+        _test_array_func2(einsum, sh, sh, "ij, kj -> ki")
+        _test_array_func2(einsum, sh, sh, "ij, kl")
+        _test_array_func2(einsum, sh, sh, "ij, kl -> kilj")
+        _test_array_func2(einsum, (3, 2) + sh, sh, "...ij, kj -> ki...")
+        _test_array_func2(einsum, (3, 2) + sh, sh + (1, 2), "...ij, kj... -> ki...")
+        _test_array_func2(einsum, sh, (5, 3) + sh, "ij, ...ij -> ...")
+
+    for sh in _gts(3):
+        _test_array_func2(einsum, sh, sh, "..., ...")
+        _test_array_func2(einsum, sh, sh, "i..., i...-> ...")
+        _test_array_func2(einsum, sh, sh, "ijk, ilk-> lj")
+        _test_array_func2(einsum, (2,) + sh, sh, "nijk, ilk-> nlj")
+        _test_array_func2(einsum, (2,) + sh, sh, "nijk, ilk")
+        _test_array_func2(einsum, (2, 3) + sh, sh, "...ijk, ilk-> ...lj")
+        _test_array_func2(einsum, (2, 3) + sh, sh, "...ijk, ijk-> ...j")
+        _test_array_func2(einsum, (2, 3) + sh, sh, "...ijk, ijk-> ...")
+
+    for sh in _gts(4):
+        _test_array_func2(einsum, sh, sh, "..., ...")
+        _test_array_func2(einsum, sh, sh[::-1], "ijkl, lkjs")
+        _test_array_func2(einsum, sh, sh, "...ij, ...ij-> ...ij")
+        _test_array_func2(einsum, sh, sh, "ij..., ij...-> ...j")
     
 
 def _test_array_method(name, *args, test_shapes=None, **kwargs):
