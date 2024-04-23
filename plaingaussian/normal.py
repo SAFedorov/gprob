@@ -565,8 +565,20 @@ def add(op1, op2):
     return op1 + op2
 
 
+def subtract(op1, op2):
+    return op1 - op2
+
+
 def multiply(op1, op2):
     return op1 * op2
+
+
+def divide(op1, op2):
+    return op1 / op2
+
+
+def power(op1, op2):
+    return op1 ** op2
 
 
 def matmul(op1, op2):

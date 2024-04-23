@@ -11,7 +11,8 @@ from plaingaussian.normal import (normal,
                                   stack, hstack, vstack, dstack, concatenate,
                                   split, hsplit, vsplit, dsplit,
                                   sum, cumsum, trace, diagonal, reshape, moveaxis, ravel, transpose,
-                                  einsum, add, multiply, dot, matmul, inner, outer, kron, tensordot)
+                                  add, subtract, multiply, divide, power, 
+                                  einsum, dot, matmul, inner, outer, kron, tensordot)
 
 from plaingaussian.fft import (fft, fft2, fftn, 
                                ifft, ifft2, ifftn,
@@ -350,10 +351,9 @@ def _test_array_func2(f, op1_shape=None, op2_shape=None, *args, **kwargs):
 
     vin = _random_normal(op1_shape)
     op2 = (2. * np.random.rand(*op2_shape) - 1)
-
     vout = f(*args, vin, op2, **kwargs)
-
     refmean = npf(*args, vin.b, op2, **kwargs)
+
     assert vout.b.shape == refmean.shape
     assert vout.b.dtype == refmean.dtype
     assert np.all(vout.b == refmean)
@@ -374,10 +374,9 @@ def _test_array_func2(f, op1_shape=None, op2_shape=None, *args, **kwargs):
     
     op1 = (2. * np.random.rand(*op1_shape) - 1)
     vin = _random_normal(op2_shape)
-
     vout = f(*args, op1, vin, **kwargs)
-
     refmean = npf(*args, op1, vin.b, **kwargs)
+
     assert vout.b.shape == refmean.shape
     assert vout.b.dtype == refmean.dtype
     assert np.all(vout.b == refmean)
@@ -401,7 +400,6 @@ def test_multiply():
         _test_array_func2(multiply, (2, 3) + sh, sh)
         _test_array_func2(multiply, sh, sh + sh)
         _test_array_func2(multiply, sh, (2, 3,) + sh)
-        _test_array_func2(multiply, (2, 3,) + sh, sh)
         _test_array_func2(multiply, (4,) + sh, (2, 4) + sh)
         _test_array_func2(multiply, (2, 1) + sh, (5,) + sh)
         _test_array_func2(multiply, (3,) + sh, (5, 3) + sh)
@@ -446,7 +444,6 @@ def test_inner():
         _test_array_func2(inner, (2, 3) + sh, sh)
         _test_array_func2(inner, sh, sh + sh)
         _test_array_func2(inner, sh, (2, 3,) + sh)
-        _test_array_func2(inner, (2, 3,) + sh, sh)
         _test_array_func2(inner, (4,) + sh, (2, 4) + sh)
         _test_array_func2(inner, (2, 1) + sh, (5,) + sh)
         _test_array_func2(inner, (3,) + sh, (5, 3) + sh)
@@ -770,7 +767,9 @@ def test_dtype_promotion():
     v6 = _random_normal(sh, dtype=np.complex128)
 
     funcs = [stack, concatenate, 
-             lambda a: add(a[0], a[1]), lambda a: add(a[1], a[0])]
+             lambda a: add(a[0], a[1]), lambda a: add(a[1], a[0]),
+             lambda a: subtract(a[0], a[1]), lambda a: subtract(a[1], a[0])]
+    
     for f in funcs:
         v12 = f([v1, v2])
         assert v12.emap.a.dtype == np.float32
@@ -824,3 +823,34 @@ def test_dtype_promotion():
         eml_ = emaps.complete(eml)
         for em_, em in zip(eml_, eml):
             assert em_.a.dtype == em.a.dtype
+
+
+def _assert_normals_close(v1, v2):
+    assert v1.shape == v2.shape
+    assert v1.b.shape == v2.b.shape
+    assert v1.b.dtype == v2.b.dtype
+    assert v1.emap.a.shape == v2.emap.a.shape
+    assert v1.emap.a.dtype == v2.emap.a.dtype
+
+    rtolb = 100 * np.finfo(v1.b.dtype).eps
+    assert np.allclose(v1.b, v2.b, 
+                       rtol=rtolb, atol=rtolb * np.max(np.abs(v1.b)))
+
+    rtola = 100 * np.finfo(v1.emap.a.dtype).eps
+    assert np.allclose(v1.emap.a, v2.emap.a, 
+                       rtol=rtola, atol=rtola * np.max(np.abs(v1.emap.a)))
+    
+
+def test_divide():
+    for bsh in _gts(1):
+        test_shapes = [[tuple(), bsh], [bsh, tuple()], [bsh, bsh], [bsh + bsh, bsh], 
+                       [(2, 3) + bsh, bsh], [bsh, bsh + bsh], [bsh, (2, 3,) + bsh], 
+                       [(4,) + bsh, (2, 4) + bsh], [(2, 1) + bsh, (5,) + bsh],
+                       [(3,) + bsh, (5, 3) + bsh], [(5, 3) + bsh, (3,) + bsh],
+                       [(5, 1, 2) + bsh, (5, 3, 1) + bsh]]
+        
+        for sh1, sh2 in test_shapes:
+            v = _random_normal(sh1)
+            ar = np.random.rand(*sh2)
+
+            _assert_normals_close(divide(v, ar), multiply(v, 1/ar))
