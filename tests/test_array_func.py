@@ -11,7 +11,7 @@ from plaingaussian.normal import (normal,
                                   stack, hstack, vstack, dstack, concatenate,
                                   split, hsplit, vsplit, dsplit,
                                   sum, cumsum, trace, diagonal, reshape, moveaxis, ravel, transpose,
-                                  einsum, dot, matmul, inner, outer, kron, tensordot)
+                                  einsum, add, multiply, dot, matmul, inner, outer, kron, tensordot)
 
 from plaingaussian.fft import (fft, fft2, fftn, 
                                ifft, ifft2, ifftn,
@@ -44,17 +44,27 @@ def _gts(ndim = None):
     raise ValueError("ndim must be None, an integer or a string")
 
 
-def _random_normal(shape, iscomplex=False):
+def _random_normal(shape, dtype=np.float64):
     sz = reduce(lambda x, y: x * y, shape, 1)
-    mu = 2. * np.random.rand(sz) - 1.
-    a = 2 * np.random.rand(sz, sz) - 1.
 
-    if iscomplex:
-        mu = mu + 1j * (2. * np.random.rand(sz) - 1.)
-        a = a + 1j * (2 * np.random.rand(sz, sz) - 1.)
-        cov = a.T.conj() @ a
+    if np.issubdtype(dtype, np.complexfloating):
+        rdtype = dtype(0).real.dtype
+
+        rmu = (2. * np.random.rand(sz) - 1.).astype(rdtype)
+        ra = (2 * np.random.rand(sz, sz) - 1.).astype(rdtype)
+        imu = (2. * np.random.rand(sz) - 1.).astype(rdtype)
+        ia = (2 * np.random.rand(sz, sz) - 1.).astype(rdtype)
+
+        mu = rmu + 1j * imu
+        a = ra + 1j * ia
+        cov = a.T @ a.conj()
     else:
+        mu = (2. * np.random.rand(sz) - 1.).astype(dtype)
+        a = (2 * np.random.rand(sz, sz) - 1.).astype(dtype)
         cov = a.T @ a
+
+    assert mu.dtype == dtype
+    assert cov.dtype == dtype
 
     return normal(mu, cov).reshape(shape)
 
@@ -72,7 +82,7 @@ def _random_correlate(vs):
     return vs
 
 
-def _test_array_func(f, *args, test_shapes=None, iscomplex=False, 
+def _test_array_func(f, *args, test_shapes=None, test_dtype=np.float64, 
                      module_name="", **kwargs):
     
     # single input and single output functions
@@ -87,7 +97,7 @@ def _test_array_func(f, *args, test_shapes=None, iscomplex=False,
         test_shapes = _gts(test_shapes)
         
     for sh in test_shapes:
-        vin = _random_normal(sh, iscomplex=iscomplex)
+        vin = _random_normal(sh, test_dtype)
         vout = f(vin, *args, **kwargs)
 
         assert vin.emap.a.shape[1:] == vin.b.shape
@@ -228,9 +238,10 @@ def test_fft():
                          test_shapes=[(128, 2)], module_name="fft")
         
     for f in cfft_funcs:
-        _test_array_func(f, test_shapes=ts, iscomplex=True, module_name="fft")
-        _test_array_func(f, axis=1, n=90, iscomplex=True,
-                         test_shapes=[(2, 63, 2)], module_name="fft")
+        _test_array_func(f, test_shapes=ts, 
+                         test_dtype=np.complex128, module_name="fft")
+        _test_array_func(f, axis=1, n=90, test_shapes=[(2, 63, 2)],
+                         test_dtype=np.complex128, module_name="fft")
         
     ts = [(128, 2), (89, 1)]
 
@@ -244,11 +255,11 @@ def test_fft():
     
     for f in cfft_funcs:
         _test_array_func(f, axis=0, n=129, norm="ortho",
-                         iscomplex=True, test_shapes=ts, module_name="fft")
+                         test_dtype=np.complex128, test_shapes=ts, module_name="fft")
         _test_array_func(f, axis=0, norm="backward",
-                         iscomplex=True, test_shapes=ts, module_name="fft")
+                         test_dtype=np.complex128, test_shapes=ts, module_name="fft")
         _test_array_func(f, axis=0, n=64, norm="forward",
-                         iscomplex=True, test_shapes=ts, module_name="fft")
+                         test_dtype=np.complex128, test_shapes=ts, module_name="fft")
 
 
 def test_fft2():
@@ -269,8 +280,8 @@ def test_fft2():
                          test_shapes=[(128, 2)], module_name="fft")
         
     for f in cfft_funcs:
-        _test_array_func(f, test_shapes=ts, iscomplex=True, module_name="fft")
-        _test_array_func(f, axes=(0, 1), s=(5, 20), iscomplex=True,
+        _test_array_func(f, test_shapes=ts, test_dtype=np.complex128, module_name="fft")
+        _test_array_func(f, axes=(0, 1), s=(5, 20), test_dtype=np.complex128,
                          test_shapes=[(2, 63, 2)], module_name="fft")
   
     ts = [(33, 3, 2), (8, 7, 2)]
@@ -285,11 +296,11 @@ def test_fft2():
     
     for f in cfft_funcs:
         _test_array_func(f, axes=(0, 1), s=(29, 5), norm="ortho",
-                         iscomplex=True, test_shapes=ts, module_name="fft")
+                         test_dtype=np.complex128, test_shapes=ts, module_name="fft")
         _test_array_func(f, axes=(0, 1), norm="backward",
-                         iscomplex=True, test_shapes=ts, module_name="fft")
+                         test_dtype=np.complex128, test_shapes=ts, module_name="fft")
         _test_array_func(f, axes=(0, 1), s=(32, 5), norm="forward",
-                         iscomplex=True, test_shapes=ts, module_name="fft")
+                         test_dtype=np.complex128, test_shapes=ts, module_name="fft")
         
 
 def test_fftn():
@@ -311,11 +322,11 @@ def test_fftn():
 
     for f in cfft_funcs:
         _test_array_func(f, axes=[0, 2, 1], norm="ortho", s=[3, 5, 7],
-                         iscomplex=True, test_shapes=ts, module_name="fft")
+                         test_dtype=np.complex128, test_shapes=ts, module_name="fft")
         _test_array_func(f, axes=[0, 2, 1], norm="forward", 
-                         iscomplex=True, test_shapes=ts, module_name="fft")
+                         test_dtype=np.complex128, test_shapes=ts, module_name="fft")
         _test_array_func(f, axes=[2, 1, 0], 
-                         iscomplex=True, test_shapes=ts, module_name="fft")
+                         test_dtype=np.complex128, test_shapes=ts, module_name="fft")
 
 
 def _test_array_func2(f, op1_shape=None, op2_shape=None, *args, **kwargs):
@@ -379,7 +390,24 @@ def _test_array_func2(f, op1_shape=None, op2_shape=None, *args, **kwargs):
 
         atol = 2 * tol * max(1, np.max(np.abs(aref)))
         assert np.allclose(arout, aref, rtol=tol, atol=atol)  
-    
+
+
+def test_multiply():
+    # Only tests the multiplication of normals by constants.
+    for sh in _gts(1):
+        _test_array_func2(multiply, sh, tuple())
+        _test_array_func2(multiply, sh, sh)
+        _test_array_func2(multiply, sh + sh, sh)
+        _test_array_func2(multiply, (2, 3) + sh, sh)
+        _test_array_func2(multiply, sh, sh + sh)
+        _test_array_func2(multiply, sh, (2, 3,) + sh)
+        _test_array_func2(multiply, (2, 3,) + sh, sh)
+        _test_array_func2(multiply, (4,) + sh, (2, 4) + sh)
+        _test_array_func2(multiply, (2, 1) + sh, (5,) + sh)
+        _test_array_func2(multiply, (3,) + sh, (5, 3) + sh)
+        _test_array_func2(multiply, (5, 3) + sh, (3,) + sh)
+        _test_array_func2(multiply, (5, 1, 2) + sh, (5, 3, 1) + sh)
+
 
 def test_matmul():
     for sh in _gts(1):
@@ -722,3 +750,77 @@ def test_vsplit():
 
 def test_dsplit():
     _test_split_func(dsplit, test_axis=2, test_shapes="3dmin")
+
+
+def test_dtype_promotion():
+    # concatenate, stack, sum, complete
+
+    sh = (2, 3)
+
+    # Real types
+    v1 = _random_normal(sh)
+    v1.emap.a = v1.emap.a.astype(np.float16)
+    v1.b = v1.b.astype(np.float16)
+
+    v2 = _random_normal(sh, dtype=np.float32)
+    v3 = _random_normal(sh, dtype=np.float64)
+
+    # Complex types
+    v5 = _random_normal(sh, dtype=np.complex64)
+    v6 = _random_normal(sh, dtype=np.complex128)
+
+    funcs = [stack, concatenate, 
+             lambda a: add(a[0], a[1]), lambda a: add(a[1], a[0])]
+    for f in funcs:
+        v12 = f([v1, v2])
+        assert v12.emap.a.dtype == np.float32
+        assert v12.b.dtype == np.float32
+
+        v21 = f([v2, v1])
+        assert v21.emap.a.dtype == np.float32
+        assert v21.b.dtype == np.float32
+
+        v12 = f([v1, v2])
+        assert v12.emap.a.dtype == np.float32
+        assert v12.b.dtype == np.float32
+
+        v55 = f([v5, v5])
+        assert v55.emap.a.dtype == np.complex64
+        assert v55.b.dtype == np.complex64
+
+        v56 = f([v5, v6])
+        assert v56.emap.a.dtype == np.complex128
+        assert v56.b.dtype == np.complex128
+
+        v15 = f([v1, v5])
+        assert v15.emap.a.dtype == np.complex64
+        assert v15.b.dtype == np.complex64
+
+        v53 = f([v5, v3])
+        assert v53.emap.a.dtype == np.complex128
+        assert v53.b.dtype == np.complex128
+
+    for f in [stack, concatenate]:
+        v1_ = f([v1])
+        assert v1_.emap.a.dtype == np.float16
+        assert v1_.b.dtype == np.float16
+
+        v123 = f([v1, v2, v3])
+        assert v123.emap.a.dtype == np.float64
+        assert v123.b.dtype == np.float64
+
+        v5_ = f([v5])
+        assert v5_.emap.a.dtype == np.complex64
+        assert v5_.b.dtype == np.complex64
+
+        v564 = f([v5, v6, v3])
+        assert v564.emap.a.dtype == np.complex128
+        assert v564.b.dtype == np.complex128
+
+    emap_lists = [[v1.emap, v5.emap], [v5.emap, v1.emap], 
+                  [v1.emap, v5.emap, v3.emap]]
+    
+    for eml in emap_lists:
+        eml_ = emaps.complete(eml)
+        for em_, em in zip(eml_, eml):
+            assert em_.a.dtype == em.a.dtype

@@ -561,12 +561,20 @@ def einsum(subs, op1, op2):
     return np.einsum(subs, op1, op2)
 
 
-def dot(op1, op2):
-    return _bilinearfunc("dot", op1, op2)
+def add(op1, op2):
+    return op1 + op2
+
+
+def multiply(op1, op2):
+    return op1 * op2
 
 
 def matmul(op1, op2):
     return op1 @ op2
+
+
+def dot(op1, op2):
+    return _bilinearfunc("dot", op1, op2)
 
 
 def inner(op1, op2):
@@ -606,7 +614,7 @@ def _bilinearfunc(name, op1, op2, *args, **kwargs):
     return getattr(np, name)(op1, op2, *args, **kwargs)
 
 
-# ---------- linear and linearized array ufuncs ----------
+# ---------- linear and linearized unary array ufuncs ----------
 
 def linearized_unary(jmpf):
     if not jmpf.__name__.endswith("_jmp"):

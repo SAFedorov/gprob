@@ -62,9 +62,10 @@ class ElementaryMap:
         
         if swapped:
             op1, op2 = op2, op1
-            
+
+        dtype = np.result_type(self.a.dtype, other.a.dtype)    
         vsh = _broadcast_shapes(self.vshape, other.vshape)
-        sum_a = np.zeros((len(union_elem), *vsh))
+        sum_a = np.zeros((len(union_elem), *vsh), dtype)
         sum_a[:len(op1.elem)] = op1.unsqueezed_a(len(vsh))
         idx = [union_elem[k] for k in op2.elem]
         sum_a[idx] += op2.unsqueezed_a(len(vsh))
@@ -133,7 +134,7 @@ class ElementaryMap:
     def extend_to(self, new_elem):
         
         new_shape = (len(new_elem), *self.a.shape[1:])
-        new_a = np.zeros(new_shape)
+        new_a = np.zeros(new_shape, dtype=self.a.dtype)
         idx = [new_elem[k] for k in self.elem]
         new_a[idx] = self.a
 
@@ -143,7 +144,7 @@ class ElementaryMap:
         """Extends the map assuming that `new_elem` contain `self.elem` as
         their beginning."""
 
-        new_a = np.zeros((len(new_elem), *self.a.shape[1:]))
+        new_a = np.zeros((len(new_elem), *self.a.shape[1:]), dtype=self.a.dtype)
         new_a[:len(self.elem)] = self.a        
         return ElementaryMap(new_a, new_elem)
     
@@ -374,7 +375,7 @@ class ElementaryMap:
 
 
 def complete(ops):
-    """Completes the maps."""
+    """Extends the maps to the union of their elementary variables."""
 
     if len(ops) == 1:
         return ops
@@ -405,14 +406,13 @@ def _broadcast_shapes(shape1, shape2):
 def concatenate(emaps, vaxis=0):
     if len(emaps) == 1:
         return emaps[0]
-    
-    dtype = emaps[0].a.dtype
 
     if vaxis < 0:
         vaxis = emaps[0].vndim + vaxis
 
     dims = [em.a.shape[vaxis + 1] for em in emaps]
 
+    dtype = np.result_type(*[em.a.dtype for em in emaps])
     new_vshape = list(emaps[0].vshape)
     new_vshape[vaxis] = sum(dims)
 
@@ -462,8 +462,7 @@ def stack(emaps, vaxis=0):
     if len(emaps) == 1:
         return emaps[0][*base_jidx, None]
 
-    dtype = emaps[0].a.dtype
-    
+    dtype = np.result_type(*[em.a.dtype for em in emaps])
     new_vshape = list(emaps[0].vshape)
     new_vshape.insert(vaxis, len(emaps)) 
 
