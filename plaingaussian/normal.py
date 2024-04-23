@@ -315,14 +315,16 @@ class Normal:
     def variance(self):
         return self.var() # TODO: decide which form is better-----------------------------------
     
-    def cov(self):
-        """Covariance"""
+    def _cov2d(self):
         a = self.emap.a2d
 
         if np.iscomplexobj(a):
             return a.T @ a.conj()
-
         return a.T @ a
+
+    def cov(self):
+        """Covariance"""
+        return self._cov2d().reshape(self.shape * 2)
     
     def covariance(self):
         return self.cov() # TODO: decide which form is better-----------------------------------
@@ -358,7 +360,7 @@ class Normal:
                 x = x.reshape((x.size,))
             else:
                 x = x.reshape((x.shape[0], -1)) 
-        return logp(x, self.b.ravel(), self.cov())
+        return logp(x, self.b.ravel(), self._cov2d())
 
 
 def asnormal(v):
@@ -410,29 +412,41 @@ def normal(mu=0., sigmasq=1., size=None):
             a = a.reshape((mu.size, *mu.shape))
             return Normal(a, mu)
         
-    if sigmasq.ndim != 2:
-        raise ValueError("Only 0 and 2 dimensional covariance matrices are presently supported.")
-
-    mu = np.broadcast_to(mu, (sigmasq.shape[0],))
+    if sigmasq.ndim % 2 != 0:
+        raise ValueError("The number of the dimensions of the covariance "
+                         f"matrix must be even, while it is {sigmasq.ndim}.")
+    
+    vnd = sigmasq.ndim // 2
+    if sigmasq.shape[:vnd] != sigmasq.shape[vnd:]:
+        raise ValueError("The first and the second halves of the covaraince "
+                         "matrix shape must be identical, while they are "
+                         f"{sigmasq.shape[:vnd]} and {sigmasq.shape[vnd:]}.")
+    
+    vshape = sigmasq.shape[:vnd]
+    mu = np.broadcast_to(mu, vshape)
+    sigmasq2d = sigmasq.reshape((mu.size, mu.size))
         
     try:
-        atr = _safer_cholesky(sigmasq)
-        return Normal(atr.T, mu)
+        a2dtr = _safer_cholesky(sigmasq2d)
+        a = np.reshape(a2dtr.T, (mu.size,) + vshape)
+        return Normal(a, mu)
     except LinAlgError:
         # The covariance matrix is not strictly positive-definite.
         pass
 
     # Handles the positive-semidefinite case using unitary decomposition. 
-    eigvals, eigvects = np.linalg.eigh(sigmasq)  # sigmasq = V D V.H
+    eigvals, eigvects = np.linalg.eigh(sigmasq2d)  # sigmasq = V D V.H
 
-    atol = len(sigmasq) * np.max(np.abs(eigvals)) * np.finfo(eigvals.dtype).eps
+    atol = len(eigvals) * np.max(np.abs(eigvals)) * np.finfo(eigvals.dtype).eps
     if (eigvals < -atol).any():
         raise ValueError("Not all eigenvalues of the covariance matrix are "
                          f"non-negative: {eigvals}.")
     
     eigvals[eigvals < 0] = 0.
-    atr = eigvects * np.sqrt(eigvals)
-    return Normal(atr.T, mu)
+    a2dtr = eigvects * np.sqrt(eigvals)
+    a = np.reshape(a2dtr.T, (mu.size,) + vshape)
+
+    return Normal(a, mu)
 
 
 def _safer_cholesky(x):
@@ -645,6 +659,7 @@ def linearized_unary(jmpf):
     return flin
 
 
+# Elementwise Jacobian-matrix products.
 def exp_jmp(x, ans, a):     return a * ans
 def exp2_jmp(x, ans, a):    return a * (ans * np.log(2.))
 def log_jmp(x, ans, a):     return a / x

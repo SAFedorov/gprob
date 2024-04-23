@@ -49,6 +49,52 @@ def test_creation():
     assert (xi.cov() == np.array(cov)).all()
     assert (xi.b == mu).all()
 
+    # High-dimensional covaraince arrays.
+
+    mu = 0.1 
+    sh = (3, 7, 2)
+    vsz = int(np.prod(sh))
+
+    a = np.random.rand(vsz * 2, *sh)
+    cov = np.einsum("ijkl, imno -> jklmno", a, a)
+
+    tol = 10 * vsz * np.finfo(cov.dtype).eps
+
+    xi = normal(mu, cov)
+    assert xi.shape == sh
+    assert (xi.mean() == mu).all()
+    assert np.allclose(xi.covariance(), cov, rtol=tol, atol=tol)
+
+    # Complex
+    a = np.random.rand(vsz * 2, *sh) + 1j * np.random.rand(vsz * 2, *sh)
+    cov = np.einsum("ijkl, imno -> jklmno", a, a.conj())
+    xi = normal(mu, cov)
+    assert xi.shape == sh
+    assert (xi.mean() == mu).all()
+    assert np.allclose(xi.covariance(), cov, rtol=tol, atol=tol)
+
+    # Degenerate complex
+    a = np.random.rand(vsz // 2, *sh) + 1j * np.random.rand(vsz // 2, *sh)
+    cov = np.einsum("ijkl, imno -> jklmno", a, a.conj())
+
+    with pytest.raises(LinAlgError):  # confirms the degeneracy
+        _safer_cholesky(cov.reshape((vsz, vsz)))
+
+    xi = normal(mu, cov)
+    assert xi.shape == sh
+    assert (xi.mean() == mu).all()
+    assert np.allclose(xi.covariance(), cov, rtol=tol, atol=tol)
+
+    # Inputs for the covaraince array with inappropriate shapes.
+    with pytest.raises(ValueError):
+        normal(0, np.zeros((3,)))
+
+    with pytest.raises(ValueError):
+        normal(0, np.zeros((1, 2, 3)))
+
+    with pytest.raises(ValueError):
+        normal(0, np.zeros((2, 3, 2, 4)))
+
 
 def test_creation_dtype():
     # The propagation of data types in various creation branches.
