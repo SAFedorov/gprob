@@ -1,6 +1,6 @@
 import numpy as np
 from .normal import Normal, asnormal
-from .emaps import ElementaryMap
+from .emaps import ElementaryMap, vax_to_ax
 
 
 def fft(x, n=None, axis=-1, norm=None):
@@ -30,11 +30,7 @@ def ihfft(x, n=None, axis=-1, norm=None):
 def _fftfunc(name, x, n, axis, norm):  # maybe make fft a sub-package to hide this from importing
     x = asnormal(x)
 
-    if axis >= 0:
-        axis_a = axis + 1
-    else:
-        axis_a = axis
-
+    axis_a, = vax_to_ax([axis])
     func = getattr(np.fft, name)
     b = func(x.b, n, axis, norm)
     a = func(x.emap.a, n, axis_a, norm)
@@ -79,10 +75,9 @@ def _fftfunc_n(name, x, s, axes, norm):
     x = asnormal(x)
 
     if axes is None:
-        axes_a = list(range(1, x.ndim + 1))
-    else:
-        axes_a = [ax + 1 if ax >= 0 else ax for ax in axes]
+        axes = list(range(x.ndim))
 
+    axes_a = vax_to_ax(axes)
     func = getattr(np.fft, name)
     b = func(x.b, s, axes, norm)
     a = func(x.emap.a, s, axes_a, norm)

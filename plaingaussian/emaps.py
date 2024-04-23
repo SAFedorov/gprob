@@ -191,25 +191,13 @@ class ElementaryMap:
             axis = 1
         else:
             a = np.atleast_2d(self.a)
-            if vaxis >= 0:
-                axis = vaxis + 1
-            else:
-                axis = vaxis
+            axis, = vax_to_ax([vaxis])
 
         new_a = np.cumsum(a, axis=axis, **kwargs)
         return ElementaryMap(new_a, self.elem)
     
     def diagonal(self, offset=0, vaxis1=0, vaxis2=1):
-        if vaxis1 >= 0:
-            axis1 = vaxis1 + 1
-        else:
-            axis1 = vaxis1
-
-        if vaxis2 >= 0:
-            axis2 = vaxis2 + 1
-        else:
-            axis2 = vaxis2
-
+        axis1, axis2 = vax_to_ax([vaxis1, vaxis2])
         new_a = self.a.diagonal(offset=offset, axis1=axis1, axis2=axis2)
         return ElementaryMap(new_a, self.elem)
     
@@ -223,16 +211,7 @@ class ElementaryMap:
         return ElementaryMap(new_a, self.elem)
     
     def moveaxis(self, vsource, vdestination):
-        if vsource >= 0:
-            source = vsource + 1
-        else:
-            source = vsource
-
-        if vdestination >= 0:
-            destination = vdestination + 1
-        else:
-            destination = vdestination
-
+        source, destination = vax_to_ax([vsource, vdestination])
         new_a = np.moveaxis(self.a, source, destination)
         return ElementaryMap(new_a, self.elem)
     
@@ -263,39 +242,25 @@ class ElementaryMap:
         elif not isinstance(vaxis, tuple):
             vaxis = (vaxis,)
 
-        axis = tuple(ax + 1 if ax >= 0 else ax for ax in vaxis)
+        axis = tuple(vax_to_ax(vaxis))  # sum needs axis to be a tuple not list
         new_a = self.a.sum(axis, **kwargs)
-
         return ElementaryMap(new_a, self.elem)
     
     def transpose(self, vaxes=None):
         if vaxes is None:
             vaxes = tuple(range(self.vndim))[::-1]
 
-        axes = tuple(ax + 1 if ax >= 0 else ax for ax in vaxes)
+        axes = vax_to_ax(vaxes)
         new_a = self.a.transpose((0, *axes))
         return ElementaryMap(new_a, self.elem)
     
-    def trace(self, offset=0, vaxis1=0, vaxis2=1, **kwargs): # Probably need to introduce a helper to do ax1, ax2 = from_vaxes(vax1, vax2)
-        if vaxis1 >= 0:
-            axis1 = vaxis1 + 1
-        else:
-            axis1 = vaxis1
-
-        if vaxis2 >= 0:
-            axis2 = vaxis2 + 1
-        else:
-            axis2 = vaxis2
-
+    def trace(self, offset=0, vaxis1=0, vaxis2=1, **kwargs):
+        axis1, axis2 = vax_to_ax([vaxis1, vaxis2])
         new_a = self.a.trace(offset=offset, axis1=axis1, axis2=axis2, **kwargs)
         return ElementaryMap(new_a, self.elem)
     
     def split(self, ios, vaxis=0):
-        if vaxis >= 0:
-            axis = vaxis + 1
-        else:
-            axis = vaxis
-        
+        axis, = vax_to_ax([vaxis])
         new_as = np.split(self.a, ios, axis=axis)
         return [ElementaryMap(a, self.elem) for a in new_as]
     
@@ -380,14 +345,18 @@ class ElementaryMap:
         # This is the same how numpy.tensordot handles the axes.
 
         if not otherfirst:
-            axes1 = [a + 1 if a >= 0 else a for a in axes1]
+            axes1 = vax_to_ax(axes1)
             new_a = np.tensordot(self.a, other, axes=(axes1, axes2))
         else:
-            axes2 = [a + 1 if a >= 0 else a for a in axes2]
+            axes2 = vax_to_ax(axes2)
             new_a = np.tensordot(other, self.a, axes=(axes1, axes2))
             new_a = np.moveaxis(new_a, -self.vndim - 1 + len(axes2), 0)
 
         return ElementaryMap(new_a, self.elem)
+
+
+def vax_to_ax(vax):
+    return [a + 1 if a >= 0 else a for a in vax]
 
 
 def complete(ops):
