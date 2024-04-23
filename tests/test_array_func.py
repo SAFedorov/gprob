@@ -167,6 +167,7 @@ def test_diagonal():
 
 def test_ravel():
     _test_array_func(ravel)
+    _test_array_func(ravel, order="F")
 
 
 def test_transpose():
@@ -205,11 +206,11 @@ def test_reshape():
 
     for sh in shapes:
         if len(sh) == 0:
-            new_shapes = [tuple(), (1,), (1, 1, 1)]
+            new_shapes = [1, tuple(), (1,), (1, 1, 1)]
         elif len(sh) == 1:
-            new_shapes = [(1, sh[0]), (1, sh[0], 1)]
+            new_shapes = [sh[0], np.array(sh[0]), (1, sh[0]), (1, sh[0], 1)]
         elif len(sh) == 2:
-            new_shapes = [(sh[0] * sh[1],), (sh[1], 1, sh[0])]
+            new_shapes = [sh[0] * sh[1], (sh[0] * sh[1],), (sh[1], 1, sh[0])]
         elif len(sh) == 3:
             new_shapes = [(sh[0] * sh[1] * sh[2],), (sh[1], sh[0] * sh[2]),
                           (sh[0] * sh[1], sh[2])]
@@ -219,6 +220,8 @@ def test_reshape():
 
         for new_sh in new_shapes:
             _test_array_func(reshape, new_sh, test_shapes=[sh])
+            _test_array_func(reshape, new_sh, test_shapes=[sh], order="F")
+            _test_array_func(reshape, new_sh, test_shapes=[sh], order="A")
 
 
 def test_fft():
@@ -598,6 +601,7 @@ def _test_array_method(name, *args, test_shapes=None, **kwargs):
 
 def test_flatten():
     _test_array_method("flatten")
+    _test_array_method("flatten", order="F")
 
 
 def _test_concat_func(f, *args, test_shapes=None, vins_list=None, **kwargs):

@@ -195,9 +195,9 @@ class Normal:
         em = self.emap.diagonal(offset=offset, vaxis1=axis1, vaxis2=axis2)
         return Normal(em, b)
 
-    def flatten(self):
-        b = self.b.flatten()
-        em = self.emap.flatten()
+    def flatten(self, order="C"):
+        b = self.b.flatten(order=order)
+        em = self.emap.flatten(order=order)
         return Normal(em, b)
     
     def moveaxis(self, source, destination):
@@ -205,10 +205,9 @@ class Normal:
         em = self.emap.moveaxis(source, destination)
         return Normal(em, b)
     
-    def ravel(self):
-        # Order is always "C"
-        b = self.b.ravel()
-        em = self.emap.ravel()
+    def ravel(self, order="C"):
+        b = self.b.ravel(order=order)
+        em = self.emap.ravel(order=order)
         return Normal(em, b)
     
     def reshape(self, newshape, order="C"):
@@ -482,8 +481,8 @@ def moveaxis(x, source, destination):
     return x.moveaxis(source, destination)
 
 
-def ravel(x):
-    return x.ravel()
+def ravel(x, order="C"):
+    return x.ravel(order=order)
 
 
 def reshape(x, newshape, order="C"):

@@ -213,8 +213,13 @@ class ElementaryMap:
         new_a = self.a.diagonal(offset=offset, axis1=axis1, axis2=axis2)
         return ElementaryMap(new_a, self.elem)
     
-    def flatten(self):
-        new_a = self.a2d.copy()
+    def flatten(self, order="C"):
+        valid_orders = ["C", "F"]
+        if order not in valid_orders:
+            raise ValueError(f"Only {valid_orders} orders are supported.")
+         
+        vsz = reduce(mul, self.vshape, 1)
+        new_a = self.a.reshape((self.a.shape[0], vsz), order=order).copy()
         return ElementaryMap(new_a, self.elem)
     
     def moveaxis(self, vsource, vdestination):
@@ -231,14 +236,25 @@ class ElementaryMap:
         new_a = np.moveaxis(self.a, source, destination)
         return ElementaryMap(new_a, self.elem)
     
-    def ravel(self):
+    def ravel(self, order="C"):
         """Flattens the map's `a` to a 2D contiguous array, for which the 
         variable dimension is 1."""
-        return ElementaryMap(self.a2d, self.elem)
+        if order == "C":
+            return ElementaryMap(self.a2d, self.elem)
+        elif order == "F":
+            vsz = reduce(mul, self.vshape, 1)
+            new_a = self.a.reshape((self.a.shape[0], vsz), order="F")
+            return ElementaryMap(np.asfortranarray(new_a), self.elem)
+
+        raise ValueError("Only C and F orders are supported.")
     
     def reshape(self, newvshape, **kwargs):
-        newvshape = np.array(newvshape, ndmin=1)
-        new_a = self.a.reshape((self.a.shape[0], *newvshape), **kwargs)
+        try:
+            new_shape = (self.a.shape[0], *newvshape)
+        except TypeError:
+            new_shape = (self.a.shape[0], newvshape)
+
+        new_a = self.a.reshape(new_shape, **kwargs)
         return ElementaryMap(new_a, self.elem)
     
     def sum(self, vaxis=None, **kwargs):
