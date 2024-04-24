@@ -238,7 +238,7 @@ def condition(m, a, mc, ac, mask=None):
 
     try:
         cond_m, cond_a = condition_qr(m, a, mc, ac, mask)
-    except ConditionError:
+    except LinAlgError:
         if mask is not None:
             raise ConditionError("Masks can only be used with non-degenerate "
                                  "conditions.")
@@ -275,8 +275,8 @@ def condition_qr(m, a, mc, ac, mask=None):
     diatri = np.abs(np.diag(tri))
     tol = np.finfo(tri.dtype).eps
     if (diatri < (tol * np.max(diatri))).any():
-        raise ConditionError("Conditioning via QR decomposition does not work "
-                             "with degenerate constraints. Use SVD instead.")
+        raise LinAlgError("Conditioning via QR decomposition does not work "
+                          "with degenerate constraints. Use SVD instead.")
 
     es = sp.linalg.solve_triangular(tri.T, -mc, lower=(qtri is qu),
                                     check_finite=False) # TODO: check the mean for the case with masking

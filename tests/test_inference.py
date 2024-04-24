@@ -51,6 +51,12 @@ def test_conditioning():
     with pytest.raises(ConditionError):
         hstack([v1, v2, v3]) | {v2: 0, v3: 1, v1:0, v1+v2:1}
 
+    with pytest.raises(ConditionError):
+        normal() | {0:1e-8}
+
+    # But compatible degenerate conditions should work.
+    assert (normal() | {1:1.}).mean() == 0
+
 
 def test_linear_regression():
     # Using the linear regression example from GaussianInfer
