@@ -4,7 +4,7 @@ import jax
 from jax import numpy as jnp
 
 from .normal import Normal
-from .elementary import u_complete_maps
+from .emaps import complete, ElementaryMap
 from .func import logp, dlogp, fisher
 
 
@@ -25,7 +25,8 @@ def jmp(fun, primals, tangents):
     """
 
     # The function operates on transposed input matrices and calculates
-    # m_out = J @ m.T, because vmap works the fastest along the inner-most axis.
+    # m_out = J @ m.T, because vmap works the fastest along the inner-most axis
+    # for C-ordered arrays.
     #
     # The function can handle multiple arguments, but otherwise the same as in
     # https://jax.readthedocs.io/en/latest/notebooks/autodiff_cookbook.html
@@ -49,17 +50,21 @@ def pnormal(f, input_vs, jit=True):
         A parametric normal variable representing the random function 
         `lambda p: f(p, input_vs)`.
     """
-    # `p` is limited to 1D with the scipy minimize signature in mind
+    # `p` is limited to 1D with the scipy.minimize signature in mind
 
     if isinstance(input_vs, (list, tuple)):
         inbs = tuple(force_float(v.b) for v in input_vs)
-        inas, iids = u_complete_maps([(v.a, v.iids) for v in input_vs])
+        
+        ems = complete([v.emap for v in input_vs])
+        inas = tuple(em.a for em in ems)
+        elem = ems[0].elem
+
         afun = lambda p: jmp(lambda *v: f(p, v), inbs, inas)
         bfun = lambda p: f(p, inbs)
     elif isinstance(input_vs, Normal):
-        iids = input_vs.iids
+        elem = input_vs.emap.elem
         afun = lambda p: jmp(lambda v: f(p, v), (force_float(input_vs.b),),
-                             (input_vs.a,))
+                             (input_vs.emap.a,))
         bfun = lambda p: f(p, input_vs.b)
     else:
         raise ValueError("vs must be a normal variable or a sequence of normal "
@@ -79,7 +84,7 @@ def pnormal(f, input_vs, jit=True):
         bfun = jax.jit(bfun)
         dbfun = jax.jit(dbfun)
 
-    return ParametricNormal(afun, bfun, dafun, dbfun, iids)
+    return ParametricNormal(afun, bfun, dafun, dbfun, elem)
     
 
 class ParametricNormal:
@@ -87,32 +92,36 @@ class ParametricNormal:
 
     # TODO: annotate the matrix shapes
 
-    __slots__ = ("_afun", "_bfun", "_dafun", "_dbfun", "iids")
+    __slots__ = ("_afun", "_bfun", "_dafun", "_dbfun", "elem")
 
-    def __init__(self, afun, bfun, dafun, dbfun, iids):
-        self._afun = afun  # TODO: signature.
-        self._bfun = bfun
-        self._dafun = dafun
-        self._dbfun = dbfun
-        self.iids = iids
+    def __init__(self, afun, bfun, dafun, dbfun, elem):
+        # ... is the array shape of the variable mean, nelem is the number 
+        # of the elementary variables, np is the number of the parameters.
+
+        self._afun = afun  # output shape: nelem x ... 
+        self._bfun = bfun  # output shape: ...
+        self._dafun = dafun  # output shape: np x nelem x ... 
+        self._dbfun = dbfun  # output shape: np x ...
+        self.elem = elem
 
     def __call__(self, p):
-        return Normal(self.a(p), self.mean(p), self.iids)
+        em = ElementaryMap(self.a(p), self.elem)
+        return Normal(em, self.mean(p))
 
-    # Note: the underscored functions produce jax arrays, which have to be 
-    # explicitly converted to regular numpy arrays.
+    # Note: the private functions produce jax arrays, which have to be 
+    # explicitly converted to regular numpy arrays for further calculations.
 
     def a(self, p):
-        return np.array(self._afun(p))  # nf x nrv
+        return np.array(self._afun(p))
 
     def da(self, p):  
-        return np.array(self._dafun(p))  # np x nf x niids
+        return np.array(self._dafun(p))
     
     def mean(self, p):
         return np.array(self._bfun(p))
     
     def dmean(self, p):
-        return np.array(self._dbfun(p))  # np x nf
+        return np.array(self._dbfun(p))
     
     def cov(self, p):
         a = self.a(p)

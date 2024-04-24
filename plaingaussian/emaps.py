@@ -8,9 +8,6 @@ from . import elementary
 from .external import einsubs
 
 
-# TODO: add optimizations using issubset
-
-
 class ElementaryMap:
     """Array of zero-mean normal random variables, represented as
     

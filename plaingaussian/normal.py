@@ -262,10 +262,10 @@ class Normal:
             ConditionError if the observations are mutually incompatible,
             or if a mask is given with degenerate observations.
         """
+        obs = [asnormal(k-v) for k, v in observations.items()]
 
         if mask is None:
-            cond = concatenate([(k-v).ravel() for k, v in observations.items()])
-        
+            cond = concatenate([c.ravel() for c in obs])
         else:
             # Concatenates preserving the order along the 0th axis.
 
@@ -273,7 +273,6 @@ class Normal:
                 raise ValueError("The variable must have at least one "
                                  "dimension to be conditioned with a mask.")
 
-            obs = [k-v for k, v in observations.items()]
             if any(c.ndim < 1 for c in obs):
                 raise ValueError("All conditions must have at least one "
                                  "dimension to be compatible with masking.")
