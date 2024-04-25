@@ -45,10 +45,13 @@ class Normal:
         csn = self.__class__.__name__
 
         if self.ndim == 0:
-            return (f"{csn}({self.mean():0.6g}, {self.var():0.6g})")
-
-        meanstr = str(self.mean())
-        varstr = str(self.var())
+            meanstr = f"{self.mean():0.8g}"
+            varstr = f"{self.var():0.8g}"
+            # To make the displays of scalars consistent with the display 
+            # of array elements.
+        else:
+            meanstr = str(self.mean())
+            varstr = str(self.var())
 
         if "\n" not in meanstr and "\n" not in varstr:
             return (f"{csn}(mean={meanstr}, var={varstr})")
