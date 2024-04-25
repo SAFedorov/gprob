@@ -1,18 +1,14 @@
-import sys
-sys.path.append('..')  # Until there is a package structure.
-
-
 from functools import reduce
 import numpy as np
 from numpy.random import default_rng
 
 import plaingaussian.emaps as emaps
-from plaingaussian.normal import (normal,
-                                  stack, hstack, vstack, dstack, concatenate,
-                                  split, hsplit, vsplit, dsplit,
-                                  sum, cumsum, trace, diagonal, reshape, moveaxis, ravel, transpose,
-                                  add, subtract, multiply, divide, power, 
-                                  einsum, dot, matmul, inner, outer, kron, tensordot)
+from plaingaussian import (normal,
+                           stack, hstack, vstack, dstack, concatenate,
+                           split, hsplit, vsplit, dsplit,
+                           sum, cumsum, trace, diagonal, reshape, moveaxis, ravel, transpose,
+                           add, subtract, multiply, divide, power, 
+                           einsum, dot, matmul, inner, outer, kron, tensordot)
 
 from plaingaussian.fft import (fft, fft2, fftn, 
                                ifft, ifft2, ifftn,

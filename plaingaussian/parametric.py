@@ -90,8 +90,6 @@ def pnormal(f, input_vs, jit=True):
 class ParametricNormal:
     """Parametric normal random variable produced by a linearized function."""
 
-    # TODO: annotate the matrix shapes
-
     __slots__ = ("_afun", "_bfun", "_dafun", "_dbfun", "elem")
 
     def __init__(self, afun, bfun, dafun, dbfun, elem):

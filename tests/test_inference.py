@@ -1,6 +1,3 @@
-import sys
-sys.path.append('..')  # Until there is a package structure.
-
 import pytest
 import numpy as np
 from external.Infer import Infer

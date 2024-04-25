@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "plaingaussian"
+version = "0.2"
+description = "Probabilistic programming with arrays of Gaussian variables."
+requires-python = ">=3.6"
+readme = "readme.md"
+license = {file = "LICENSE"}
+authors = [
+    {name = "Sergey Fedorov", email = "fedorov.s.a@outlook.com"},
+]
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+]
+keywords = [
+    "Gaussian distribution",
+    "Noise",
+    "Random variables",
+    "Stochastic processes",
+    "Probabilistic programming",
+    "Python",
+    "Numpy",
+    "Scipy",
+]
+dependencies = []

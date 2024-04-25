@@ -1,14 +1,12 @@
-import sys
-sys.path.append('..')  # Until there is a package structure.
-
 import pytest
 import numpy as np
+
 from plaingaussian.normal import normal, hstack
 from plaingaussian.func import logp, dlogp, d2logp, fisher
 
-from benchmarks.reffunc import logp as logp_
-from benchmarks.reffunc import dlogp_eigh as dlogp_
-from benchmarks.reffunc import d2logp as d2logp_
+from reffunc import logp as logp_
+from reffunc import dlogp_eigh as dlogp_
+from reffunc import d2logp as d2logp_
 
 
 def num_dlogp(x, m, cov, dm, dcov, delta=1e-7):
