@@ -309,22 +309,15 @@ class Normal:
     def var(self):
         """Variance"""
         a = self.emap.a
-
-        if np.iscomplexobj(a):
-            cvar = np.einsum("i..., i... -> ...", a, a.conj())
-            return np.real(cvar)
-        
-        return np.einsum("i..., i... -> ...", a, a)
+        cvar = np.einsum("i..., i... -> ...", a, a.conj())
+        return cvar.real
     
     def variance(self):
         return self.var() # TODO: decide which form is better-----------------------------------
     
     def _cov2d(self):
         a = self.emap.a2d
-
-        if np.iscomplexobj(a):
-            return a.T @ a.conj()
-        return a.T @ a
+        return a.T.conj() @ a
 
     def cov(self):
         """Covariance"""
@@ -431,8 +424,8 @@ def normal(mu=0., sigmasq=1., size=None):
     sigmasq2d = sigmasq.reshape((mu.size, mu.size))
         
     try:
-        a2dtr = _safer_cholesky(sigmasq2d)
-        a = np.reshape(a2dtr.T, (mu.size,) + vshape)
+        a2dH = _safer_cholesky(sigmasq2d)
+        a = np.reshape(a2dH.T.conj(), (mu.size,) + vshape)
         return Normal(a, mu)
     except LinAlgError:
         # The covariance matrix is not strictly positive-definite.
@@ -447,14 +440,14 @@ def normal(mu=0., sigmasq=1., size=None):
                          f"non-negative: {eigvals}.")
     
     eigvals[eigvals < 0] = 0.
-    a2dtr = eigvects * np.sqrt(eigvals)
-    a = np.reshape(a2dtr.T, (mu.size,) + vshape)
+    a2dH = eigvects * np.sqrt(eigvals)
+    a = np.reshape(a2dH.T.conj(), (mu.size,) + vshape)
 
     return Normal(a, mu)
 
 
 def _safer_cholesky(x):
-    ltri = np.linalg.cholesky(x)
+    ltri = np.linalg.cholesky(x) 
 
     d = np.diagonal(ltri)
     atol = 100 * len(d) * np.finfo(d.dtype).eps * np.max(d**2)
