@@ -15,7 +15,7 @@ class Normal:
     __slots__ = ("emap", "b", "size", "shape", "ndim")
     __array_ufunc__ = None
 
-    def __init__(self, emap, b): # TODO: Change to Normal(mu, emap)? -------------------
+    def __init__(self, emap, b):
         if not isinstance(emap, ElementaryMap):
             emap = ElementaryMap(emap)
 
@@ -43,6 +43,9 @@ class Normal:
 
     def __repr__(self):
         csn = self.__class__.__name__
+
+        if self.ndim == 0:
+            return (f"{csn}({self.mean():0.6g}, {self.var():0.6g})")
 
         meanstr = str(self.mean())
         varstr = str(self.var())
