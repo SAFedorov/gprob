@@ -4,6 +4,9 @@ from numpy.linalg import LinAlgError
 from plaingaussian.normal import normal, hstack, Normal, _safer_cholesky
 
 
+np.random.seed(0)
+
+
 def test_creation():
     xi = normal()
     assert (xi.emap.a == np.array([1.])).all()
@@ -93,7 +96,7 @@ def test_creation():
         normal(0, np.zeros((2, 3, 2, 4)))
 
 
-def test_creation_dtype():
+def test_creation_w_dtype():
     # The propagation of data types in various creation branches.
 
     real_dtypes = [np.float16, np.float32, np.float64]

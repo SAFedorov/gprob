@@ -308,23 +308,15 @@ class Normal:
 
     def var(self):
         """Variance"""
-        a = self.emap.a
-
-        if np.iscomplexobj(a):
-            cvar = np.einsum("i..., i... -> ...", a, a.conj())
-            return np.real(cvar)
-        
-        return np.einsum("i..., i... -> ...", a, a)
+        a = self.emap.a        
+        return np.real(np.einsum("i..., i... -> ...", a, a.conj()))
     
     def variance(self):
         return self.var() # TODO: decide which form is better-----------------------------------
     
     def _cov2d(self):
         a = self.emap.a2d
-
-        if np.iscomplexobj(a):
-            return a.T @ a.conj()
-        return a.T @ a
+        return a.T @ a.conj()
 
     def cov(self):
         """Covariance"""

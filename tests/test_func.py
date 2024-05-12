@@ -1,6 +1,8 @@
 import pytest
 import numpy as np
 
+np.random.seed(0)
+
 from plaingaussian.normal import normal, hstack
 from plaingaussian.func import logp, dlogp, d2logp, fisher
 
