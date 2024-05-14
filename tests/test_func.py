@@ -135,7 +135,7 @@ def test_logp_lstsq():
     tol = 1e-7
 
     v, v1, msq1 = random_d(41)
-    llk = logp(v, v1, msq1)
+    llk = logp_lstsq(v, v1, msq1)
     ref_llk = mvn.logpdf(v, v1, msq1)
 
     assert np.abs((llk - ref_llk)/ref_llk) < tol
@@ -143,7 +143,7 @@ def test_logp_lstsq():
 
     v_, v1, msq1 = random_d(41)
     vs = [v, v_]
-    llk = logp(vs, v1, msq1)
+    llk = logp_lstsq(vs, v1, msq1)
     ref_llk = mvn.logpdf(vs, v1, msq1)
     assert np.max(np.abs((llk - ref_llk)/ref_llk)) < tol
     assert llk.shape == (2,)
@@ -224,12 +224,19 @@ def test_d2logp():
 
 
 def test_fisher():
-    # Do the testing via random sampling based on the formulas
+    # Test via random sampling based on the formula
     # FI[i, j] = <dlogp/dtheta_i * dlogp/dtheta_j>
-    # and
-    # FI[i, j] = - <d2logp/dtheta_i dtheta_j>
 
-    pass
+    _, v1, msq1, v2, msq2 = random_d1(20, 5)
+    
+    xi = normal(v1, msq1)
+    ns = 10**3
+    samples = xi.sample(ns)
+
+    dllk = np.array([dlogp(s, v1, msq1, v2, msq2) for s in samples])
+    fi = fisher(msq1, v2, msq2)
+
+    assert np.abs((fi - dllk.T @ dllk / ns) / np.abs(fi)).max() < 0.1
 
 
 def test_logp_batch():
