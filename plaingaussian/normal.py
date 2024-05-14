@@ -313,14 +313,12 @@ class Normal:
     
     def variance(self):
         return self.var() # TODO: decide which form is better-----------------------------------
-    
-    def _cov2d(self):
-        a = self.emap.a2d
-        return a.T @ a.conj()
 
     def cov(self):
         """Covariance"""
-        return self._cov2d().reshape(self.shape * 2)
+        a = self.emap.a2d
+        cov2d = a.T @ a.conj()
+        return cov2d.reshape(self.shape * 2)
     
     def covariance(self):
         return self.cov() # TODO: decide which form is better-----------------------------------
@@ -352,11 +350,23 @@ class Normal:
         
         x = np.asanyarray(x)
         if self.ndim > 1:
+            # Flattens the sample values.
+
             if x.ndim == self.ndim:
                 x = x.reshape((x.size,))
             else:
-                x = x.reshape((x.shape[0], -1)) 
-        return logp(x, self.b.ravel(), self._cov2d())
+                x = x.reshape((x.shape[0], -1))
+
+        m = self.b.ravel()
+        a = self.emap.a2d
+        if np.iscomplexobj(a):
+            # Converts to real by doubling the space size.
+            x = np.hstack([x.real, x.imag])
+            m = np.hstack([m.real, m.imag])
+            a = np.hstack([a.real, a.imag])
+        
+        cov = a.T @ a 
+        return logp(x, m, cov)
 
 
 def asnormal(v):

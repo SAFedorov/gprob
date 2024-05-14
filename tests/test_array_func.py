@@ -1,6 +1,7 @@
 from functools import reduce
 import numpy as np
-from numpy.random import default_rng
+
+np.random.seed(0)
 
 import plaingaussian.emaps as emaps
 from plaingaussian import (normal,
@@ -15,6 +16,9 @@ from plaingaussian.fft import (fft, fft2, fftn,
                                rfft, rfft2, rfftn,
                                irfft, irfft2, irfftn,
                                hfft, ihfft)
+
+from utils import random_normal, random_correlate
+
 
 def _gts(ndim = None):
     """Get test shapes"""
@@ -41,44 +45,6 @@ def _gts(ndim = None):
     raise ValueError("ndim must be None, an integer or a string")
 
 
-def _random_normal(shape, dtype=np.float64):
-    sz = reduce(lambda x, y: x * y, shape, 1)
-
-    if np.issubdtype(dtype, np.complexfloating):
-        rdtype = dtype(0).real.dtype
-
-        rmu = (2. * np.random.rand(sz) - 1.).astype(rdtype)
-        ra = (2 * np.random.rand(sz, sz) - 1.).astype(rdtype)
-        imu = (2. * np.random.rand(sz) - 1.).astype(rdtype)
-        ia = (2 * np.random.rand(sz, sz) - 1.).astype(rdtype)
-
-        mu = rmu + 1j * imu
-        a = ra + 1j * ia
-        cov = a.T @ a.conj()
-    else:
-        mu = (2. * np.random.rand(sz) - 1.).astype(dtype)
-        a = (2 * np.random.rand(sz, sz) - 1.).astype(dtype)
-        cov = a.T @ a
-
-    assert mu.dtype == dtype
-    assert cov.dtype == dtype
-
-    return normal(mu, cov).reshape(shape)
-
-
-def _random_correlate(vs):
-    # Correlates the input variables by randomly mixing their elementary keys.
-    union_elems = set().union(*list(v.emap.elem.keys() for v in vs))
-
-    rng = default_rng()
-
-    for v in vs:
-        new_ind  = rng.choice(list(union_elems), size=len(v.emap.elem), 
-                              replace=False)
-        v.emap.elem = {i: v.emap.elem[k] for i, k in zip(new_ind, v.emap.elem)}
-    return vs
-
-
 def _test_array_func(f, *args, test_shapes=None, test_dtype=np.float64, 
                      module_name="", **kwargs):
     
@@ -94,7 +60,7 @@ def _test_array_func(f, *args, test_shapes=None, test_dtype=np.float64,
         test_shapes = _gts(test_shapes)
         
     for sh in test_shapes:
-        vin = _random_normal(sh, test_dtype)
+        vin = random_normal(sh, test_dtype)
         vout = f(vin, *args, **kwargs)
 
         assert vin.emap.a.shape[1:] == vin.b.shape
@@ -113,7 +79,7 @@ def _test_array_func(f, *args, test_shapes=None, test_dtype=np.float64,
         for arin, arout in zip(vin.emap.a, vout.emap.a):
             aref = npf(arin, *args, **kwargs)
             assert arout.shape == aref.shape
-            assert np.allclose(arout, aref, rtol=tol, atol=tol * np.max(arin))
+            assert np.allclose(arout, aref, rtol=tol, atol=tol * np.max(np.abs(arin)))
 
 
 def test_sum():
@@ -348,7 +314,7 @@ def _test_array_func2(f, op1_shape=None, op2_shape=None, *args, **kwargs):
 
     # Random variable first
 
-    vin = _random_normal(op1_shape)
+    vin = random_normal(op1_shape)
     op2 = (2. * np.random.rand(*op2_shape) - 1)
     vout = f(*args, vin, op2, **kwargs)
     refmean = npf(*args, vin.b, op2, **kwargs)
@@ -372,7 +338,7 @@ def _test_array_func2(f, op1_shape=None, op2_shape=None, *args, **kwargs):
     # Random variable second
     
     op1 = (2. * np.random.rand(*op1_shape) - 1)
-    vin = _random_normal(op2_shape)
+    vin = random_normal(op2_shape)
     vout = f(*args, op1, vin, **kwargs)
     refmean = npf(*args, op1, vin.b, **kwargs)
 
@@ -571,7 +537,7 @@ def _test_array_method(name, *args, test_shapes=None, **kwargs):
         test_shapes = _gts(test_shapes)
 
     for sh in test_shapes:
-        vin = _random_normal(sh)
+        vin = random_normal(sh)
         vout = getattr(vin, name)(*args, **kwargs)
 
         assert vin.emap.a.shape[1:] == vin.b.shape
@@ -611,14 +577,14 @@ def _test_concat_func(f, *args, test_shapes=None, vins_list=None, **kwargs):
     if vins_list is None:
         vins_list = []
         for sh in test_shapes:
-            vins_max = _random_correlate([_random_normal(sh) 
+            vins_max = random_correlate([random_normal(sh) 
                                           for _ in range(ns[-1])])
             vins_list += [vins_max[:n] for n in ns]
             
             # Adds special cases of two inputs with different numbers of 
             # the elementary variables, because there are separate evaluation
             # branches for the optimization of those.
-            vins2 = _random_correlate([_random_normal(sh) for _ in range(2)])
+            vins2 = random_correlate([random_normal(sh) for _ in range(2)])
             vins2[0] = vins2[0] + np.random.rand(*sh) * normal(0.1, 0.9)
 
             vins_list += [[vins2[0], vins2[1]], [vins2[1], vins2[0]]]
@@ -676,7 +642,7 @@ def test_concatenate():
     ts = _gts("2dmin")
     ax = 2
     for s in ts:
-        vins = _random_correlate([_random_normal((*s[:ax], i, *s[ax:]))
+        vins = random_correlate([random_normal((*s[:ax], i, *s[ax:]))
                                   for i in range(1, 4)])
         _test_concat_func(concatenate, axis=ax, vins_list=[vins])
 
@@ -684,7 +650,7 @@ def test_concatenate():
     ax = -2
     for s in ts:
         print(s)
-        vins = _random_correlate([_random_normal((*s[:ax+1], i, *s[ax+1:]))
+        vins = random_correlate([random_normal((*s[:ax+1], i, *s[ax+1:]))
                                   for i in range(1, 4)])
         _test_concat_func(concatenate, axis=ax, vins_list=[vins])
 
@@ -707,7 +673,7 @@ def _test_split_func(f, test_shapes="1dmin", test_axis=None, **kwargs):
             args_lists += [[[sz//3, 2*sz//3]]]
 
         for args in args_lists:
-            vin = _random_normal(sh)
+            vin = random_normal(sh)
             vouts = f(vin, *args, **kwargs)
 
             refmeans = npf(vin.b, *args, **kwargs)
@@ -755,16 +721,16 @@ def test_dtype_promotion():
     sh = (2, 3)
 
     # Real types
-    v1 = _random_normal(sh)
+    v1 = random_normal(sh)
     v1.emap.a = v1.emap.a.astype(np.float16)
     v1.b = v1.b.astype(np.float16)
 
-    v2 = _random_normal(sh, dtype=np.float32)
-    v3 = _random_normal(sh, dtype=np.float64)
+    v2 = random_normal(sh, dtype=np.float32)
+    v3 = random_normal(sh, dtype=np.float64)
 
     # Complex types
-    v5 = _random_normal(sh, dtype=np.complex64)
-    v6 = _random_normal(sh, dtype=np.complex128)
+    v5 = random_normal(sh, dtype=np.complex64)
+    v6 = random_normal(sh, dtype=np.complex128)
 
     funcs = [stack, concatenate, 
              lambda a: add(a[0], a[1]), lambda a: add(a[1], a[0]),
@@ -850,7 +816,7 @@ def test_divide():
                        [(5, 1, 2) + bsh, (5, 3, 1) + bsh]]
         
         for sh1, sh2 in test_shapes:
-            v = _random_normal(sh1)
+            v = random_normal(sh1)
             ar = np.random.rand(*sh2)
 
             _assert_normals_close(divide(v, ar), multiply(v, 1/ar))

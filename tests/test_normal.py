@@ -1,7 +1,9 @@
 import pytest
 import numpy as np
+from scipy.stats import multivariate_normal as mvn
 from numpy.linalg import LinAlgError
-from plaingaussian.normal import normal, hstack, Normal, _safer_cholesky
+from plaingaussian.normal import normal, hstack, vstack, Normal, _safer_cholesky
+from utils import random_normal
 
 
 np.random.seed(0)
@@ -226,7 +228,7 @@ def test_creation_w_dtype():
 
 
 def test_logp():
-    # The validation of the log likelihood calculation
+    # The validation of the log likelihood calculation for real normal arrays.
 
     tol = 1e-15
 
@@ -254,6 +256,22 @@ def test_logp():
     with pytest.raises(ValueError):
         xi.logp([[0], [0]])
 
+    # A higher-dimensional variable.
+    sh = (3, 4)
+    xi = random_normal(sh, dtype=np.float64)
+    xif = xi.ravel()
+
+    tol_ = 1e-10  # increased tolerance margin
+    x = np.random.rand(*sh)
+    logpref = mvn.logpdf(x.ravel(), xif.mean(), xif.covariance())
+    assert np.abs(xi.logp(x) - logpref) < tol_
+    assert xi.logp(x).shape == x.shape[:-xi.ndim]
+
+    x = np.random.rand(3, *sh)
+    logpref = mvn.logpdf(x.reshape(-1, xif.size), xif.mean(), xif.covariance())
+    assert np.max(np.abs(xi.logp(x) - logpref)) < tol_
+    assert xi.logp(x).shape == x.shape[:-xi.ndim]
+
     # Degenerate cases.
         
     # Zero scalar random variable.
@@ -273,12 +291,145 @@ def test_logp():
     assert xi12.logp([1.2, 0]) == -(1.2)**2/(2) + nc
     assert xi12.logp([1.2, 0.1]) == float("-inf")
 
-    # Higher-dimensional examples
+    # Higher-dimensional example.
     xi1 = normal([[0.1, 0.2], [0.3, 0.4]], 2)
     xi2 = normal([0.1, 0.2, 0.3, 0.4], 2)
     assert np.abs(xi1.logp(np.ones((2, 2))) - xi2.logp(np.ones((4,)))) < tol
     assert np.abs(xi1.logp([np.ones((2, 2)), 0.5 * np.ones((2, 2))]) 
                   - xi2.logp([np.ones((4,)), 0.5 * np.ones((4,))])).max() < tol
+    
+    # More degenerate cases.
+
+    tol_ = 1e-9
+
+    # Self-consistency: doubling the dimension does not change logp
+    sh = (2, 3, 1)
+    xi = random_normal(sh, dtype=np.float64)
+    xi_ = vstack([xi, xi]) / np.sqrt(2)
+    x = xi.sample()
+    x_ = np.vstack([x, x]) / np.sqrt(2)
+    assert np.abs(xi.logp(x) - xi_.logp(x_)) < tol_
+
+    for sh in [tuple(), (5,), (3, 3), (3, 20, 4)]:
+        xi = random_normal(sh, dtype=np.float64)
+        xi = vstack([xi, xi])
+        xif = xi.ravel()
+
+        with pytest.raises(LinAlgError):  # Asserts the degeneracy.
+            np.linalg.cholesky(xif.covariance())
+
+        # Single possible sample.
+        x = xi.sample()
+        xf = x.ravel()
+        logpref = mvn.logpdf(xf, xif.mean(), xif.covariance(), 
+                             allow_singular=True)
+        assert np.abs(xi.logp(x) - logpref) < tol_
+        assert xi.logp(x).shape == x.shape[:-xi.ndim]
+
+        # Single impossible sample.
+        x = np.random.rand(*xi.shape)
+        assert xi.logp(x) == float("-inf")
+
+        # Multiple possible samples.
+        x = xi.sample(3)
+        xf = x.reshape(-1, xi.size)
+        logpref = mvn.logpdf(xf, xif.mean(), xif.covariance(), 
+                             allow_singular=True)
+        assert np.max(np.abs(xi.logp(x) - logpref)) < tol_
+        assert xi.logp(x).shape == x.shape[:-xi.ndim]
+
+        # One impossible sample among possible.
+        x[0] = np.random.rand(*xi.shape)
+        xf = x.reshape(-1, xi.size)
+        logpref = mvn.logpdf(xf, xif.mean(), xif.covariance(), 
+                             allow_singular=True)
+        assert np.max(np.abs(xi.logp(x)[1:] - logpref[1:])) < tol_
+        assert xi.logp(x)[0] == float("-inf")
+        assert xi.logp(x).shape == x.shape[:-xi.ndim]
+
+
+def test_complex_logp():
+    # Logp for complex arrays.
+
+    def complex_pdf(x, m, cov, rel):
+        dx = x - m
+        rmat = rel.T.conj() @ np.linalg.inv(cov)
+        pmat = cov.conj() - rmat @ rel
+        pci = np.linalg.inv(pmat).conj()
+
+        _, ld1 = np.linalg.slogdet(cov)
+        _, ld2 = np.linalg.slogdet(pmat)
+
+        norm = len(x) * np.log(np.pi) + 0.5 * (ld1 + ld2)
+        return -dx.conj() @ pci @ dx + np.real(dx @ rmat.T @ pci @ dx) - norm
+
+    tol = 1e-9
+
+    sh = (5,)
+    xi = (random_normal(sh, dtype=np.complex128) 
+          + random_normal(sh, dtype=np.complex128))  
+    # Adds two because the number of latent variables created by random_normal 
+    # equals the array size, which makes the extended covariance matrix for 
+    # complex data types to be degenerate.
+
+    a = xi.emap.a
+    m = xi.mean()
+    cov = a.T @ a.conj()
+    rel = a.T @ a
+
+    x = np.random.rand(*sh) + 1j * np.random.rand(*sh)
+    logpref = complex_pdf(x, m, cov, rel)
+    assert np.abs(xi.logp(x) - logpref) < tol
+    assert xi.logp(x).shape == x.shape[:-xi.ndim]
+
+    x = np.random.rand(3, *sh)
+    logpref = np.array([complex_pdf(x_, m, cov, rel) for x_ in x])
+    assert np.max(np.abs(xi.logp(x) - logpref)) < tol
+    assert xi.logp(x).shape == x.shape[:-xi.ndim]
+
+    # A higher-dimensional array.
+    sh = (3, 2)
+    xi = (random_normal(sh, dtype=np.complex128) 
+          + random_normal(sh, dtype=np.complex128))
+    
+    xif = xi.flatten()
+    a = xif.emap.a
+    m = xif.mean()
+    cov = a.T @ a.conj()
+    rel = a.T @ a
+
+    x = np.random.rand(*sh) + 1j * np.random.rand(*sh)
+    xf = x.flatten()
+    logpref = complex_pdf(xf, m, cov, rel)
+    assert np.abs(xi.logp(x) - logpref) < tol
+    assert xi.logp(x).shape == x.shape[:-xi.ndim]
+
+    x = np.random.rand(3, *sh)
+    xf = x.reshape(3, -1)
+    logpref = np.array([complex_pdf(x_, m, cov, rel) for x_ in xf])
+    assert np.max(np.abs(xi.logp(x) - logpref)) < tol
+    assert xi.logp(x).shape == x.shape[:-xi.ndim]
+
+    # A degenerate case.
+    sh = (6,)
+    xi = random_normal(sh, dtype=np.complex128)
+    x = xi.sample()
+
+    m = xi.mean()
+    a = xi.emap.a
+    x2 = np.hstack([x.real, x.imag])
+    m2 = np.hstack([m.real, m.imag])
+    a2 = np.hstack([a.real, a.imag])
+
+    with pytest.raises(LinAlgError):  # Asserts the degeneracy.
+        np.linalg.cholesky(a2.T @ a2)
+
+    logpref = mvn.logpdf(x2, m2, a2.T @ a2, allow_singular=True)
+    assert np.abs(xi.logp(x) - logpref) < tol
+
+    # An impossible sample.
+    x = np.random.rand(*xi.shape) + 1j * np.random.rand(*xi.shape)
+    assert xi.logp(x) == float("-Inf")
 
 
 def test_len():

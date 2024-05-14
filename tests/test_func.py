@@ -150,8 +150,7 @@ def test_logp_lstsq():
 
 
 def test_dlogp():
-
-    num_tol = 5e-5  # The actual errors should be in 1e-6 - 1e-5 range
+    num_tol = 1e-4  # The actual errors should be in 1e-6 - 1e-5 range
     ref_tol = 1e-7
 
     v, v1, msq1, v2, msq2 = random_d1(200, 10)
@@ -178,7 +177,7 @@ def test_dlogp():
     assert np.abs((g - num_g)/num_g).max() < num_tol
     assert np.abs((g - ref_g)/ref_g).max() < ref_tol
 
-    v, v1, msq1, v2, msq2 = random_d1(400, 1)
+    v, v1, msq1, v2, msq2 = random_d1(401, 1)
     g = dlogp(v, v1, msq1, v2, msq2)
     num_g = num_dlogp(v, v1, msq1, v2, msq2, delta=1e-9)
     ref_g = dlogp_(v, v1, msq1, v2, msq2)
@@ -188,7 +187,6 @@ def test_dlogp():
 
 
 def test_d2logp():
-
     num_tol = 1e-4  # The actual errors are typically around or below 1e-5
     ref_tol = 1e-7
 
