@@ -1,10 +1,11 @@
 import pytest
 import numpy as np
+from scipy.stats import multivariate_normal as mvn
 
 np.random.seed(0)
 
 from plaingaussian.normal import normal, hstack
-from plaingaussian.func import logp, dlogp, d2logp, fisher
+from plaingaussian.func import logp, logp_lstsq, dlogp, d2logp, fisher
 
 from reffunc import logp as logp_
 from reffunc import dlogp_eigh as dlogp_
@@ -57,62 +58,95 @@ def num_d2logp(x, m, cov, dm, dcov, d2m, d2cov, delta=1e-10):
     return np.array(h)
 
 
-def random_d1(sz, npar):
-    """Prepares random matrices for testing formulas using 1st derivatives."""
-
-    mat1 = np.random.rand(sz, sz)
+def random_d(sz):
+    """Random covariance matrix, mean, and sample."""
+    mat1 = 2 * np.random.rand(sz, sz) - 1
     msq1 = mat1 @ mat1.T
+    
+    v = 2 * np.random.rand(sz) - 1
+    v1 = 2 * np.random.rand(sz) - 1
 
-    mat2 = np.random.rand(npar, sz, sz)
+    return v, v1, msq1  # x, m, cov
+
+
+def random_d1(sz, npar):
+    """Random matrices for testing formulas using 1st derivatives."""
+
+    mat2 = 2 * np.random.rand(npar, sz, sz) - 1
     msq2 = np.einsum('ijk, ilk -> ijl', mat2, mat2)
+    v2 = 2 * np.random.rand(npar, sz) - 1
 
-    v = np.random.rand(sz)
-    v1 = np.random.rand(sz)
-    v2 = np.random.rand(npar, sz)
-
-    return v, v1, msq1, v2, msq2  # x, m, cov, dm, dcov
+    return random_d(sz) + (v2, msq2)  # x, m, cov, dm, dcov
 
 
 def random_d2(sz, npar):
-    """Prepares random matrices for testing formulas using 2nd derivatives."""
+    """Random matrices for testing formulas using 2nd derivatives."""
 
-    mat3 = np.random.rand(npar, npar, sz, sz)
+    mat3 = 2 * np.random.rand(npar, npar, sz, sz) - 1
     msq3 = np.einsum('ijkl, ijrl -> ijkr', mat3, mat3)
     msq3 = msq3.transpose(1, 0, 2, 3) + msq3  # Symmetrizes the Hessian of m
 
-    v3 = np.random.rand(npar, npar, sz)
+    v3 = 2 * np.random.rand(npar, npar, sz) - 1
     v3 = v3.transpose(1, 0, 2) + v3  # Symmetrizes the Hessian of cov
 
     return random_d1(sz, npar) + (v3, msq3)  # x, m, cov, dm, dcov, d2m, d2cov
 
 
 def test_logp():
-
     tol = 1e-7  # The actual errors should be in 1e-8 range or below
 
-    v, v1, msq1, _, _ = random_d1(200, 10)
+    v, v1, msq1 = random_d(200)
     llk = logp(v, v1, msq1)
     ref_llk = logp_(v, v1, msq1)
+    ref_llk2 = mvn.logpdf(v, v1, msq1)
 
     assert np.abs((llk - ref_llk)/ref_llk) < tol
+    assert np.abs((llk - ref_llk2)/ref_llk2) < tol
 
-    v, v1, msq1, _, _ = random_d1(20, 3)
+    v, v1, msq1 = random_d(20)
     llk = logp(v, v1, msq1)
     ref_llk = logp_(v, v1, msq1)
+    ref_llk2 = mvn.logpdf(v, v1, msq1)
 
     assert np.abs((llk - ref_llk)/ref_llk) < tol
+    assert np.abs((llk - ref_llk2)/ref_llk2) < tol
 
-    v, v1, msq1, _, _ = random_d1(40, 100)
+    v, v1, msq1 = random_d(41)
     llk = logp(v, v1, msq1)
     ref_llk = logp_(v, v1, msq1)
+    ref_llk2 = mvn.logpdf(v, v1, msq1)
 
     assert np.abs((llk - ref_llk)/ref_llk) < tol
+    assert np.abs((llk - ref_llk2)/ref_llk2) < tol
 
-    v, v1, msq1, _, _ = random_d1(400, 1)
+    v, v1, msq1 = random_d(400)
     llk = logp(v, v1, msq1)
     ref_llk = logp_(v, v1, msq1)
+    ref_llk2 = mvn.logpdf(v, v1, msq1)
 
     assert np.abs((llk - ref_llk)/ref_llk) < tol
+    assert np.abs((llk - ref_llk2)/ref_llk2) < tol
+
+
+def test_logp_lstsq():
+    # Tests logp_lstsq with non-singular matrices. The singular case is covered 
+    # by test_normal.
+
+    tol = 1e-7
+
+    v, v1, msq1 = random_d(41)
+    llk = logp(v, v1, msq1)
+    ref_llk = mvn.logpdf(v, v1, msq1)
+
+    assert np.abs((llk - ref_llk)/ref_llk) < tol
+    assert llk.shape == tuple()
+
+    v_, v1, msq1 = random_d(41)
+    vs = [v, v_]
+    llk = logp(vs, v1, msq1)
+    ref_llk = mvn.logpdf(vs, v1, msq1)
+    assert np.max(np.abs((llk - ref_llk)/ref_llk)) < tol
+    assert llk.shape == (2,)
 
 
 def test_dlogp():
@@ -271,8 +305,6 @@ def test_logp_batch():
     assert (logp([[1, 0.1]], m, cov) == np.array([float("-inf")])).all()
     assert (logp([[1, 0.1], [1.2, 0]], m, cov) == 
             [float("-inf"), -(1.2)**2/(2) + nc]).all()
-
-    # TODO: add higher-dimensional examples
     
     # Integrals of the probability density
     xi = normal(0, 3.3)

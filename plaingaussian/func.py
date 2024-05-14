@@ -178,7 +178,7 @@ def logp_cho(x, m, cov):
     
     rank = cov.shape[0]  # Since the factorization suceeded, the rank is full.
     log_sqrt_det = np.sum(np.log(np.diagonal(ltr)))
-    norm = np.log(np.sqrt(2 * np.pi)) * rank + log_sqrt_det
+    norm = 0.5 * np.log(2 * np.pi) * rank + log_sqrt_det
 
     return -0.5 * np.einsum("i..., i... -> ...", z, z) - norm
 
@@ -188,20 +188,21 @@ def logp_lstsq(x, m, cov):
     covariance matrices.
     """
 
-    y, _, rank, sv = np.linalg.lstsq(cov, (x - m).T, rcond=None)
+    dx = (x - m)
+    y, _, rank, sv = np.linalg.lstsq(cov, dx.T, rcond=None)
     sv = sv[:rank]  # Selects only non-zero singular values.
 
-    norm = np.log(np.sqrt(2 * np.pi)) * rank + np.sum(np.log(sv))
-    llk = -0.5 * np.einsum("...i, i... -> ...", x, y) - norm  # log likelihoods
+    norm = 0.5 * np.log(2 * np.pi) * rank + 0.5 * np.sum(np.log(sv))
+    llk = -0.5 * np.einsum("...i, i... -> ...", dx, y) - norm  # log likelihoods
 
     if rank == cov.shape[0]:
         # The covariance matrix has full rank, all solutions must be good.
         return llk
     
     # Otherwise checks the residual errors.
-    delta = (y.T - (x - m)) 
+    delta = ((cov @ y).T - dx) 
     res = np.einsum("...i, ...i -> ...", delta, delta)
-    eps = np.finfo(y.dtype).eps * cov.shape[0] 
+    eps = np.finfo(y.dtype).eps * cov.shape[0] * (np.max(sv)**2) 
     valid_idx = np.abs(res) < eps
 
     return np.where(valid_idx, llk, float("-inf"))
