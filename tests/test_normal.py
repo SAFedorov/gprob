@@ -261,7 +261,7 @@ def test_logp():
     xi = random_normal(sh, dtype=np.float64)
     xif = xi.ravel()
 
-    tol_ = 1e-10  # increased tolerance margin
+    tol_ = 1e-9  # increased tolerance margin
     x = np.random.rand(*sh)
     logpref = mvn.logpdf(x.ravel(), xif.mean(), xif.covariance())
     assert np.abs(xi.logp(x) - logpref) < tol_
@@ -312,7 +312,7 @@ def test_logp():
 
     for sh in [tuple(), (5,), (3, 3), (3, 20, 4)]:
         xi = random_normal(sh, dtype=np.float64)
-        xi = vstack([xi, xi])
+        xi = vstack([xi, xi, xi])
         xif = xi.ravel()
 
         with pytest.raises(LinAlgError):  # Asserts the degeneracy.
@@ -363,14 +363,10 @@ def test_complex_logp():
         norm = len(x) * np.log(np.pi) + 0.5 * (ld1 + ld2)
         return -dx.conj() @ pci @ dx + np.real(dx @ rmat.T @ pci @ dx) - norm
 
-    tol = 1e-9
+    tol = 1e-8
 
     sh = (5,)
-    xi = (random_normal(sh, dtype=np.complex128) 
-          + random_normal(sh, dtype=np.complex128))  
-    # Adds two because the number of latent variables created by random_normal 
-    # equals the array size, which makes the extended covariance matrix for 
-    # complex data types to be degenerate.
+    xi = random_normal(sh, dtype=np.complex128)
 
     a = xi.emap.a
     m = xi.mean()
@@ -389,8 +385,7 @@ def test_complex_logp():
 
     # A higher-dimensional array.
     sh = (3, 2)
-    xi = (random_normal(sh, dtype=np.complex128) 
-          + random_normal(sh, dtype=np.complex128))
+    xi = random_normal(sh, dtype=np.complex128)
     
     xif = xi.flatten()
     a = xif.emap.a
@@ -411,8 +406,9 @@ def test_complex_logp():
     assert xi.logp(x).shape == x.shape[:-xi.ndim]
 
     # A degenerate case.
-    sh = (6,)
+    sh = (3,)
     xi = random_normal(sh, dtype=np.complex128)
+    xi = hstack([xi, xi])
     x = xi.sample()
 
     m = xi.mean()

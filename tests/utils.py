@@ -10,9 +10,9 @@ def random_normal(shape, dtype=np.float64):
         rdtype = dtype(0).real.dtype
 
         rmu = (2. * np.random.rand(sz) - 1.).astype(rdtype)
-        ra = (2 * np.random.rand(sz, sz) - 1.).astype(rdtype)
+        ra = (2 * np.random.rand(2 * sz, sz) - 1.).astype(rdtype)
         imu = (2. * np.random.rand(sz) - 1.).astype(rdtype)
-        ia = (2 * np.random.rand(sz, sz) - 1.).astype(rdtype)
+        ia = (2 * np.random.rand(2 * sz, sz) - 1.).astype(rdtype)
 
         mu = rmu + 1j * imu
         a = ra + 1j * ia
