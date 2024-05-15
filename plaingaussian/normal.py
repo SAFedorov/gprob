@@ -40,13 +40,17 @@ class Normal:
     @property
     def T(self):
         return Normal(self.emap.transpose(), self.b.T)
+    
+    @property
+    def a(self):
+        return self.emap.a
 
     def __repr__(self):
         csn = self.__class__.__name__
 
         if self.ndim == 0:
-            meanstr = f"{self.mean():0.8g}"
-            varstr = f"{self.var():0.8g}"
+            meanstr = f"{self.mean():.8g}"
+            varstr = f"{self.var():.8g}"
             # To make the displays of scalars consistent with the display 
             # of array elements.
         else:
@@ -191,6 +195,9 @@ class Normal:
     def conj(self):
         return Normal(self.emap.conj(), self.b.conj())
     
+    def conjugate(self):
+        return self.conj()
+    
     def cumsum(self, axis=None):    
         b = self.b.cumsum(axis)
         em = self.emap.cumsum(axis)
@@ -240,26 +247,30 @@ class Normal:
 
     # ---------- probability-related methods ----------
 
-    def condition(self, observations: dict, mask=None):
+    def condition(self, observations, mask=None):
         """Conditioning operation.
         
         Args:
-            observations: 
-                A dictionary of observations {`variable`: `value`, ...}, where 
-                `variable`s are normal variables, and `value`s can be constants 
-                or normal variables.
+            observations (Normal or dict):
+                A single random normal variable or a dictionary of observations
+                of the format 
+                {`variable`: `value`, ...}, where `variable`s are normal 
+                variables, and `value`s can be numerical constants or 
+                random variables. A single normal `variable` is equavalent to 
+                {`variable`: `0`}.
             mask (optional): 
-                A 2d bool array, in which `mask[i, j] == False` means that 
-                the `i`-th condition should not affect the `j`-th variable.
-                The 0th axis of `mask` spans over the conditions, and its 1st 
-                axis spans over the variable. To variables and conditions whose 
-                numbers of dimensions are greater than one the mask applies  
-                along their 0-th axes.
+                A 2d bool array, in which `mask[i, j] == True` means that 
+                the `i`-th condition applies to the `j`-th variable, and
+                `False` that it does not.
+                In the case when the variables have more than one dimension, 
+                the 0th axis of `mask` spans over the 0th axis of each of the 
+                conditions, and the 1st axis of `mask` spans over the 0th axis
+                of the conditioned variable.
                 The mask needs to be generalized upper- or lower- triangular, 
                 meaning that there needs to be a set of indices `i0[j]` such 
-                that either `mask[i, j] == True` for `i > i0[j]` and 
+                that either `mask[i, j] == True` for all `i > i0[j]` and 
                 `mask[i, j] == False` for `i < i0[j]`, or `mask[i, j] == True` 
-                for `i < i0[j]` and `mask[i, j] == False` for `i > i0[j]`.
+                for all `i < i0[j]` and `mask[i, j] == False` for `i > i0[j]`.
         
         Returns:
             Conditional normal variable.
@@ -268,7 +279,10 @@ class Normal:
             ConditionError if the observations are mutually incompatible,
             or if a mask is given with degenerate observations.
         """
-        obs = [asnormal(k-v) for k, v in observations.items()]
+        if isinstance(observations, dict):
+            obs = [asnormal(k-v) for k, v in observations.items()]
+        else:
+            obs = [asnormal(observations)]
 
         if mask is None:
             cond = concatenate([c.ravel() for c in obs])
@@ -294,9 +308,29 @@ class Normal:
             mask = mask.reshape((ms[0] * k, ms[1] * l))
 
         emv, emc = emaps.complete((self.emap, cond.emap))
-        new_b, new_a = condition(self.b.ravel(), emv.a2d, cond.b, emc.a, mask)
 
-        # Shaping back
+        a = emv.a2d
+        m = self.b.ravel()
+        iscv = (np.iscomplexobj(a) or np.iscomplexobj(m))
+        if iscv:
+            a = np.hstack([a.real, a.imag])
+            m = np.hstack([m.real, m.imag])
+
+        ac = emc.a
+        mc = cond.b
+        if np.iscomplexobj(ac) or np.iscomplexobj(mc):
+            ac = np.hstack([ac.real, ac.imag])
+            mc = np.hstack([mc.real, mc.imag])
+
+        new_b, new_a = condition(m, a, mc, ac, mask)
+
+        if iscv:
+            # Converting back to complex.
+            sz = len(new_b) // 2
+            new_a = new_a[:, :sz] + 1j * new_a[:, sz:]
+            new_b = new_b[:sz] + 1j * new_b[sz:]
+
+        # Shaping back.
         new_a = np.reshape(new_a, emv.a.shape)
         new_b = np.reshape(new_b, self.b.shape)
 
@@ -312,7 +346,7 @@ class Normal:
         return np.real(np.einsum("i..., i... -> ...", a, a.conj()))
     
     def variance(self):
-        return self.var() # TODO: decide which form is better-----------------------------------
+        return self.var()
 
     def cov(self):
         """Covariance"""
@@ -321,7 +355,7 @@ class Normal:
         return cov2d.reshape(self.shape * 2)
     
     def covariance(self):
-        return self.cov() # TODO: decide which form is better-----------------------------------
+        return self.cov()
     
     def sample(self, n=None):
         """Samples the random variable `n` times."""
@@ -359,7 +393,7 @@ class Normal:
 
         m = self.b.ravel()
         a = self.emap.a2d
-        if np.iscomplexobj(a):
+        if np.iscomplexobj(a) or np.iscomplexobj(m):
             # Converts to real by doubling the space size.
             x = np.hstack([x.real, x.imag])
             m = np.hstack([m.real, m.imag])
@@ -464,6 +498,28 @@ def _safer_cholesky(x):
         raise LinAlgError("The input matrix seems to be degenerate.")
     
     return ltri
+
+
+def cov(*args):
+    """Covariance, defined as <(x-<x>) (y-<y>)^*>, where * is 
+    conjugate transpose."""
+
+    if len(args) == 0 or len(args) > 2:
+        raise ValueError("The function only accepts one or two input "
+                         f"arguments, while {len(args)} areguments are given.")
+    
+    if len(args) == 1:
+        return args[0].cov()
+    
+    # len(args) == 2
+    x, y = args
+    ax, ay = [em.a2d for em in emaps.complete([x.emap, y.emap])]
+    cov2d = ax.T @ ay.conj()
+    return cov2d.reshape(x.shape + y.shape)
+
+
+def covariance(*args):
+    return cov(*args)
 
 
 # ---------- linear array functions ----------

@@ -1,5 +1,6 @@
 from plaingaussian.normal import (
-    normal, asnormal, stack, hstack, vstack, dstack, concatenate, 
+    normal, asnormal, covariance, cov, 
+    stack, hstack, vstack, dstack, concatenate, 
     split, hsplit, vsplit, dsplit, sum, cumsum, trace, diagonal, reshape, 
     moveaxis, ravel, transpose, add, subtract, multiply, divide, power, 
     einsum, dot, matmul, inner, outer, kron, tensordot, 

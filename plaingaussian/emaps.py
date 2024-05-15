@@ -171,7 +171,7 @@ class ElementaryMap:
     
     # ---------- array methods ----------
     
-    def conj(self):  # TODO: change to "conjugate" as numpy uses this name as the main one
+    def conj(self):
         return ElementaryMap(self.a.conj(), self.elem)
     
     @property

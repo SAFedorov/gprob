@@ -257,7 +257,7 @@ def test_logp():
         xi.logp([[0], [0]])
 
     # A higher-dimensional variable.
-    sh = (3, 4)
+    sh = (3, 5)
     xi = random_normal(sh, dtype=np.float64)
     xif = xi.ravel()
 
@@ -338,7 +338,7 @@ def test_logp():
         assert np.max(np.abs(xi.logp(x) - logpref)) < tol_
         assert xi.logp(x).shape == x.shape[:-xi.ndim]
 
-        # One impossible sample among possible.
+        # One impossible sample among several possible.
         x[0] = np.random.rand(*xi.shape)
         xf = x.reshape(-1, xi.size)
         logpref = mvn.logpdf(xf, xif.mean(), xif.covariance(), 
@@ -365,7 +365,7 @@ def test_complex_logp():
 
     tol = 1e-8
 
-    sh = (5,)
+    sh = (6,)
     xi = random_normal(sh, dtype=np.complex128)
 
     a = xi.emap.a
