@@ -271,3 +271,39 @@ def test_masked_conditioning():
                 xi2 = ma_cond[i]
                 assert np.max(np.abs(xi1.mean() - xi2.mean())) < tol
                 assert np.max(np.abs(xi1.variance() - xi2.variance())) < tol
+
+        # A test with more than one condition variable
+        sh = (5,)
+        shc1 = (4,)
+        shc2 = (4, 2)
+        idx = [1, 1, 3, 3, 4]
+
+        mask = np.array([range(shc1[0])] * sh[0]).T < idx
+
+        for dt in [np.float64, np.complex128]:
+            v = random_normal(sh, dtype=dt)
+            vc1 = random_normal(shc1, dtype=dt)
+            vc2 = -2.1 * vc1.reshape((4, 1)) + random_normal(shc2, dtype=dt)
+            v, vc2 = random_correlate([v, vc2])
+            
+            # Ensures correlation.
+            assert np.abs(covariance(v, vc1)).max() > 0.1
+            assert np.abs(covariance(v, vc2)).max() > 0.1
+
+            # Causal masking.
+            mc_cond = v.condition({vc1: 0, vc2: 0}, mask=mask)
+            
+            ref = stack([(v[i] | {vc1[:idx[i]]: 0, vc2[:idx[i]]: 0}) 
+                         for i in range(len(v))])
+            assert np.max(np.abs(ref.mean() - mc_cond.mean())) < tol
+            assert np.max(np.abs(ref.covariance() - mc_cond.covariance())) < tol
+
+            # Anti-causal masking.
+            ma_cond = v.condition({vc1: 0, vc2: 0}, mask=~mask)
+
+            ref = stack([(v[i] | {vc1[idx[i]:]:0, vc2[idx[i]:]:0})
+                         if len(vc1[idx[i]:]) > 0 else v[i]
+                         for i in range(len(v))])
+
+            assert np.max(np.abs(ref.mean() - ma_cond.mean())) < tol
+            assert np.max(np.abs(ref.covariance() - ma_cond.covariance())) < tol
