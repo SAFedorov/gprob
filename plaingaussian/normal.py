@@ -44,6 +44,10 @@ class Normal:
     @property
     def a(self):
         return self.emap.a
+    
+    @property
+    def iscomplex(self):
+        return (np.iscomplexobj(self.emap.a) or np.iscomplexobj(self.b))
 
     def __repr__(self):
         csn = self.__class__.__name__
@@ -287,7 +291,7 @@ class Normal:
         if mask is None:
             cond = concatenate([c.ravel() for c in obs])
         else:
-            # Concatenates preserving the order along the 0th axis.
+            # Concatenates preserving the element order along the 0th axis.
 
             if self.ndim < 1:
                 raise ValueError("The variable must have at least one "
@@ -311,24 +315,32 @@ class Normal:
 
         a = emv.a2d
         m = self.b.ravel()
-        iscv = (np.iscomplexobj(a) or np.iscomplexobj(m))
-        if iscv:
-            a = np.hstack([a.real, a.imag])
-            m = np.hstack([m.real, m.imag])
+        if self.iscomplex:
+            # Doubles the dimension preserving the triangular structure.
+            a = np.stack([a.real, a.imag], axis=-1).reshape(a.shape[0], -1)
+            m = np.stack([m.real, m.imag], axis=-1).ravel()
+
+            if mask is not None:
+                mask = np.stack([mask, mask], axis=-1)
+                mask = mask.reshape(mask.shape[0], -1)
 
         ac = emc.a
         mc = cond.b
-        if np.iscomplexobj(ac) or np.iscomplexobj(mc):
-            ac = np.hstack([ac.real, ac.imag])
-            mc = np.hstack([mc.real, mc.imag])
+        if cond.iscomplex:
+            # Doubles the dimension preserving the triangular structure.
+            ac = np.stack([ac.real, ac.imag], axis=-1).reshape(ac.shape[0], -1)
+            mc = np.stack([mc.real, mc.imag], axis=-1).ravel()
+
+            if mask is not None:
+                mask = np.stack([mask, mask], axis=-2)
+                mask = mask.reshape(-1, mask.shape[-1])
 
         new_b, new_a = condition(m, a, mc, ac, mask)
 
-        if iscv:
+        if self.iscomplex:
             # Converting back to complex.
-            sz = len(new_b) // 2
-            new_a = new_a[:, :sz] + 1j * new_a[:, sz:]
-            new_b = new_b[:sz] + 1j * new_b[sz:]
+            new_a = new_a[:, 0::2] + 1j * new_a[:, 1::2]
+            new_b = new_b[0::2] + 1j * new_b[1::2]
 
         # Shaping back.
         new_a = np.reshape(new_a, emv.a.shape)
@@ -393,7 +405,7 @@ class Normal:
 
         m = self.b.ravel()
         a = self.emap.a2d
-        if np.iscomplexobj(a) or np.iscomplexobj(m):
+        if self.iscomplex:
             # Converts to real by doubling the space size.
             x = np.hstack([x.real, x.imag])
             m = np.hstack([m.real, m.imag])

@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 from external.Infer import Infer
-from plaingaussian.normal import normal, hstack, covariance
+from plaingaussian.normal import normal, hstack, stack, covariance
 from plaingaussian.func import ConditionError
 from utils import random_normal, random_correlate
 
@@ -203,41 +203,71 @@ def test_complex_conditioning():
 def test_masked_conditioning():
     tol = 1e-10
 
-    sh = (5,)
-    shc = (4,)
-    idx = [1, 2, 2, 4, 4]
-    mask = np.array([[True, True, True, True, True], 
-                     [False, True, True, True, True],
-                     [False, False, False, True, True],
-                     [False, False, False, True, True]])
+    test_sets = [(
+        (5,),  # sh
+        (4,),  # shc
+        [1, 2, 2, 4, 4],  # idx
+    ), (
+        (1,),  # sh
+        (1, 1),  # shc
+        [1],  # idx
+    ), (
+        (7,),  # sh
+        (5, 2),  # shc
+        [1, 1, 2, 3, 4, 5, 5],  # idx
+    ), (
+        (7, 2),  # sh
+        (5,),  # shc
+        [1, 1, 2, 3, 4, 5, 5],  # idx
+    ), (
+        (7, 3, 2),  # sh
+        (6, 2),  # shc
+        [1, 1, 2, 3, 4, 5, 5],  # idx
+    )]
 
-    v = random_normal(sh, dtype=np.float64)
-    vc = random_normal(shc, dtype=np.float64)
-    v, vc = random_correlate([v, vc])
-    
-    assert np.abs(covariance(v, vc)).max() > 0.1  # Asserts correlation.
+    for dt in [np.float64, np.complex128]:
+        for sh, shc, idx in test_sets:
+            mask = np.array([range(shc[0])] * sh[0]).T < idx
 
-    masked_c_cond = v.condition({vc: 0}, mask=mask)  # Causal mask
+            v = random_normal(sh, dtype=dt)
+            vc = random_normal(shc, dtype=dt)
+            v, vc = random_correlate([v, vc])
+            
+            # Ensures correlation. 
+            try:
+                assert np.abs(covariance(v, vc)).max() > 1e-3
+            except Exception:
+                # random_correlate may produce no correlations 
+                # with a probability non-negligible for very small arrays
+                # because it uses random shuffling.
+                vc = vc + v
 
-    ref = hstack([v[i] | {vc[:idx[i]]: 0} for i in range(len(v))])
-    assert np.max(np.abs(ref.mean() - masked_c_cond.mean())) < tol
-    assert np.max(np.abs(ref.covariance() - masked_c_cond.covariance())) < tol
+            mc_cond = v.condition({vc: 0}, mask=mask)  # Causal mask
 
-    masked_a_cond = v.condition({vc: 0}, mask=~mask)  # Anti-causal mask
+            ref = stack([v[i] | {vc[:idx[i]]: 0} for i in range(len(v))])
+            assert np.max(np.abs(ref.mean() - mc_cond.mean())) < tol
+            assert np.max(np.abs(ref.covariance() - mc_cond.covariance())) < tol
 
-    ref = hstack([v[i] | {vc[idx[i]:]: 0} if i<3 else v[i] for i in range(len(v))])
-    assert np.max(np.abs(ref.mean() - masked_a_cond.mean())) < tol
-    assert np.max(np.abs(ref.covariance() - masked_a_cond.covariance())) < tol
+            ma_cond = v.condition({vc: 0}, mask=~mask)  # Anti-causal mask
 
-    # Redundant checks of the variances.
-    for i in range(len(v)):
-        xi1 = v[i] | {vc[:idx[i]]: 0}
-        xi2 = masked_c_cond[i]
-        assert np.abs(xi1.mean() - xi2.mean()) < tol
-        assert np.abs(xi1.variance() - xi2.variance()) < tol
+            ref = stack([(v[i] | vc[idx[i]:]) if len(vc[idx[i]:]) > 0 else v[i] 
+                        for i in range(len(v))])
 
-    for i in range(len(v)-2):
-        xi1 = v[i] | {vc[idx[i]:]: 0}
-        xi2 = masked_a_cond[i]
-        assert np.abs(xi1.mean() - xi2.mean()) < tol
-        assert np.abs(xi1.variance() - xi2.variance()) < tol
+            assert np.max(np.abs(ref.mean() - ma_cond.mean())) < tol
+            assert np.max(np.abs(ref.covariance() - ma_cond.covariance())) < tol
+
+            # Redundant checks of the variances.
+            for i in range(len(v)):
+                xi1 = v[i] | {vc[:idx[i]]: 0}
+                xi2 = mc_cond[i]
+                assert np.max(np.abs(xi1.mean() - xi2.mean())) < tol
+                assert np.max(np.abs(xi1.variance() - xi2.variance())) < tol
+
+            for i in range(len(v)):
+                if len(vc[idx[i]:]) == 0:
+                    break
+
+                xi1 = v[i] | {vc[idx[i]:]: 0}
+                xi2 = ma_cond[i]
+                assert np.max(np.abs(xi1.mean() - xi2.mean())) < tol
+                assert np.max(np.abs(xi1.variance() - xi2.variance())) < tol
