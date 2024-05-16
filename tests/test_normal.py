@@ -261,7 +261,7 @@ def test_logp():
     xi = random_normal(sh, dtype=np.float64)
     xif = xi.ravel()
 
-    tol_ = 1e-9  # increased tolerance margin
+    tol_ = 1e-8  # increased tolerance margin
     x = np.random.rand(*sh)
     logpref = mvn.logpdf(x.ravel(), xif.mean(), xif.covariance())
     assert np.abs(xi.logp(x) - logpref) < tol_

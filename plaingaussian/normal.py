@@ -196,11 +196,11 @@ class Normal:
 
     # ---------- array methods ----------
 
-    def conj(self):
+    def conjugate(self):
         return Normal(self.emap.conj(), self.b.conj())
     
-    def conjugate(self):
-        return self.conj()
+    def conj(self):
+        return self.conjugate()
     
     def cumsum(self, axis=None):    
         b = self.b.cumsum(axis)
@@ -352,22 +352,49 @@ class Normal:
         """Mean"""
         return self.b
 
-    def var(self):
-        """Variance"""
+    def variance(self):
+        """Variance, `<(x-<x>)(x-<x>)^*>` where `*` is complex conjugation."""
+        # Note: has an alias "var"
         a = self.emap.a        
         return np.real(np.einsum("i..., i... -> ...", a, a.conj()))
     
-    def variance(self):
-        return self.var()
+    def var(self):
+        """Variance, `<(x-<x>)(x-<x>)^*>` where `*` is complex conjugation."""
+        # Note: an alias for "variance"
+        return self.variance()
 
-    def cov(self):
-        """Covariance"""
+    def covariance(self):
+        """Covariance. 
+        
+        For a vector variable `x` returns the matrix `C = <(x-<x>)(x-<x>)^H>`, 
+        where `H` is conjugate transpose.
+
+        For a general array `x` returns the array `C` with twice the number of 
+        dimensions of `x` and the components
+        `C[ijk... lmn...] = <(x[ijk..] - <x>) (x[lmn..] - <x>)*>`, 
+        where the indices `ijk...` and `lmn...` run over the components of `x`,
+        and `*` is complex conjugation.
+        """
+        # Note: has an alias "cov"
+
         a = self.emap.a2d
         cov2d = a.T @ a.conj()
         return cov2d.reshape(self.shape * 2)
     
-    def covariance(self):
-        return self.cov()
+    def cov(self):
+        """Covariance. 
+        
+        For a vector variable `x` returns the matrix `C = <(x-<x>)(x-<x>)^H>`, 
+        where `H` is conjugate transpose.
+
+        For a general array `x` returns the array `C` with twice the number of 
+        dimensions of `x` and the components
+        `C[ijk... lmn...] = <(x[ijk..] - <x>) (x[lmn..] - <x>)*>`, 
+        where the indices `ijk...` and `lmn...` run over the components of `x`,
+        and `*` is complex conjugation.
+        """
+        # Note: an alias for "covariance"
+        return self.covariance()
     
     def sample(self, n=None):
         """Samples the random variable `n` times."""
@@ -512,9 +539,21 @@ def _safer_cholesky(x):
     return ltri
 
 
-def cov(*args):
-    """Covariance, defined as <(x-<x>) (y-<y>)^*>, where * is 
-    conjugate transpose."""
+def covariance(*args):
+    """Covariance. For a single variable `x` the same as `x.covariance()`.
+    
+    For two variables `x` and `y` it is defined in an element-wise manner as 
+    `<(x-<x>) (y-<y>)^*>`, where `*` is complex conjugation.
+
+    For two arrays `x` and `y` the function returns the array `C` with 
+    the number of dimensions equal to the sum of the dimensions of `x` and `y` 
+    and the components
+    `C[ijk... lmn...] = <(x[ijk..] - <x>) (y[lmn..] - <y>)*>`, 
+    where the indices `ijk...` and `lmn...` run over the components 
+    of `x` and `y`, respectively.
+    """
+
+    # Note: has an alias "cov"
 
     if len(args) == 0 or len(args) > 2:
         raise ValueError("The function only accepts one or two input "
@@ -530,8 +569,23 @@ def cov(*args):
     return cov2d.reshape(x.shape + y.shape)
 
 
-def covariance(*args):
-    return cov(*args)
+def cov(*args):
+    """Covariance. For a single variable `x` the same as `x.covariance()`.
+    
+    For two variables `x` and `y` it is defined in an element-wise manner as 
+    `<(x-<x>) (y-<y>)^*>`, where `*` is complex conjugation.
+
+    For two arrays `x` and `y` the function returns the array `C` with 
+    the number of dimensions equal to the sum of the dimensions of `x` and `y` 
+    and the components
+    `C[ijk... lmn...] = <(x[ijk..] - <x>) (y[lmn..] - <y>)*>`, 
+    where the indices `ijk...` and `lmn...` run over the components 
+    of `x` and `y`, respectively.
+    """
+
+    # Note: an alias for "covaraince"
+    
+    return covariance(*args)
 
 
 # ---------- linear array functions ----------
@@ -776,4 +830,3 @@ arcsinh = linearized_unary(arcsinh_jmp)
 arccosh = linearized_unary(arccosh_jmp)
 arctanh = linearized_unary(arctanh_jmp)
 conjugate = conj = linearized_unary(conjugate_jmp)
-# In numpy, only conjugate (and not conj) is a ufunc
