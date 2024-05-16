@@ -355,6 +355,7 @@ class Normal:
     def variance(self):
         """Variance, `<(x-<x>)(x-<x>)^*>` where `*` is complex conjugation."""
         # Note: has an alias "var"
+        
         a = self.emap.a        
         return np.real(np.einsum("i..., i... -> ...", a, a.conj()))
     

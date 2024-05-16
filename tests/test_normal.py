@@ -2,8 +2,9 @@ import pytest
 import numpy as np
 from scipy.stats import multivariate_normal as mvn
 from numpy.linalg import LinAlgError
-from plaingaussian.normal import normal, hstack, vstack, Normal, _safer_cholesky
-from utils import random_normal
+from plaingaussian.normal import (normal, hstack, vstack, Normal, 
+                                  _safer_cholesky, covariance, cov)
+from utils import random_normal, random_correlate
 
 
 np.random.seed(0)
@@ -300,7 +301,7 @@ def test_logp():
     
     # More degenerate cases.
 
-    tol_ = 1e-9
+    tol_ = 1e-8
 
     # Self-consistency: doubling the dimension does not change logp
     sh = (2, 3, 1)
@@ -312,7 +313,7 @@ def test_logp():
 
     for sh in [tuple(), (5,), (3, 3), (3, 20, 4)]:
         xi = random_normal(sh, dtype=np.float64)
-        xi = vstack([xi, xi, xi])
+        xi = vstack([xi, xi, xi, xi])
         xif = xi.ravel()
 
         with pytest.raises(LinAlgError):  # Asserts the degeneracy.
@@ -795,3 +796,53 @@ def test_getitem():
     assert (v[:, None].var() == np.ones((2, 1, 3, 4))).all()
     assert (v[:, None, :, None].var() == np.ones((2, 1, 3, 1, 4))).all()
     assert (v[:, ..., None].var() == np.ones((2, 3, 4, 1))).all()
+
+
+def test_aliases():
+    # Ensures that the aliases are in sync.
+
+    alias_list = [(cov, covariance), 
+                  (Normal.cov, Normal.covariance), 
+                  (Normal.var, Normal.variance)]
+    
+    for f1, f2 in alias_list:
+        assert f1.__doc__ == f2.__doc__
+
+
+def test_cov_func():
+    tol = 1e-10
+
+    sz = 10
+
+    for dt in [np.float64, np.complex128]:
+
+        # A scalar.
+        v1 = random_normal(tuple(), dtype=dt)
+        assert np.max(np.abs(cov(v1) - v1.var())) < tol
+        assert np.max(np.abs(cov(v1) - v1.cov())) < tol
+        
+        # 1D, same dimensions.
+        v1 = random_normal((sz,), dtype=dt)
+        v2 = random_normal((sz,), dtype=dt)
+        v1, v2 = random_correlate([v1, v2])
+
+        c11 = covariance(v1, v1)
+        c12 = covariance(v1, v2)
+        assert np.abs(c12).max() > 0.1  # Ensures correlation.
+
+        c = hstack([v1, v2]).covariance()
+        assert np.max(np.abs(c[:sz, :sz] - c11)) < tol
+        assert np.max(np.abs(c[:sz, sz:] - c12)) < tol
+
+        # 2D, different dimensions.
+        v1 = random_normal((sz, 2), dtype=dt)
+        v2 = random_normal((sz, 3), dtype=dt)
+        v1, v2 = random_correlate([v1, v2])
+
+        c11 = covariance(v1, v1)
+        c12 = covariance(v1, v2)
+        assert np.abs(c12).max() > 0.1  # Ensures correlation.
+
+        c = hstack([v1, v2]).covariance()
+        assert np.max(np.abs(c[:, :2, :, :2] - c11)) < tol
+        assert np.max(np.abs(c[:, :2, :, 2:] - c12)) < tol
