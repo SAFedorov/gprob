@@ -43,8 +43,8 @@ def pnormal(f, input_vs, jit=True):
     
     Args:
         f: generating function.
-        input_vs: input random variables - a normal variable or a sequence of 
-        normal variables.
+        input_vs: input random variables - a single normal variable or a 
+            sequence of normal variables.
         jit: if jax.jit should be applied to the intermediate functions.
 
     Returns:
@@ -162,11 +162,15 @@ class ParametricNormal:
             a = np.hstack([a.real, a.imag])
             da = np.concatenate([da.real, da.imag], axis=-1)
 
+            iscomplex = True
+        else:
+            iscomplex = False
+
         cov = a.T @ a
         prod1 = a.T @ da
         dcov = prod1 + prod1.transpose(0, 2, 1)
 
-        return m, dm, cov, dcov
+        return m, dm, cov, dcov, iscomplex
 
     def logp(self, p, x):
         m = self.mean(p)
@@ -197,19 +201,26 @@ class ParametricNormal:
         """The gradient of the log probability density."""
 
         x = np.asanyarray(x).ravel()
-        m, dm, cov, dcov = self._d01(p)
+        m, dm, cov, dcov, iscomplex = self._d01(p)
+        if iscomplex:
+            x = np.hstack([x.real, x.imag])
+
         return dlogp(x, m, cov, dm, dcov)
     
     def fisher(self, p):
         """Fisher information matrix."""
 
-        _, dm, cov, dcov = self._d01(p)
+        _, dm, cov, dcov, _ = self._d01(p)
         return fisher(cov, dm, dcov)
     
     def natdlogp(self, p, x):
         """Natural gradient."""
 
-        m, dm, cov, dcov = self._d01(p)
+        x = np.asanyarray(x).ravel()
+        m, dm, cov, dcov, iscomplex = self._d01(p)
+        if iscomplex:
+            x = np.hstack([x.real, x.imag])
+
         g = dlogp(x, m, cov, dm, dcov)
         fimat = fisher(cov, dm, dcov)
         return np.linalg.solve(fimat, g)

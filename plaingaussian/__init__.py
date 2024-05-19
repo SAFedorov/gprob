@@ -6,3 +6,5 @@ from plaingaussian.normal import (
     einsum, dot, matmul, inner, outer, kron, tensordot, 
     exp, exp2, log, log2, log10, sqrt, cbrt, sin, cos, tan, arcsin, arccos, 
     arctan, sinh, cosh, tanh, arcsinh, arccosh, arctanh, conjugate, conj)
+
+from plaingaussian.parametric import pnormal

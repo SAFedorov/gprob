@@ -775,7 +775,8 @@ def linearized_unary(jmpf):
     if not jmpf.__name__.endswith("_jmp"):
         raise ValueError()
     
-    f = getattr(np, jmpf.__name__[:-4])
+    fnm = jmpf.__name__[:-4]
+    f = getattr(np, fnm)
 
     def flin(x):
         if not isinstance(x, Normal):
@@ -785,6 +786,7 @@ def linearized_unary(jmpf):
         em = jmpf(x.b, new_b, x.emap)
         return Normal(em, new_b)
     
+    flin.__name__ = fnm
     return flin
 
 
