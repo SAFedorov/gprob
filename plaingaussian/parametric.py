@@ -36,18 +36,19 @@ def jmp(fun, primals, tangents):
 
 
 def pnormal(f, input_vs, jit=True):
-    """Creates a parametric normal variable from a function with signature 
-    `f(p, vs) -> u`, where `p` is a 1D array of parameters, `vs` is an input 
-    array or sequence of arrays, and `u` is an output array.
+    """Creates a parametric normal random variable from a function with 
+    the signature `f(p, vs) -> u`, where `p` is a 1D array of parameters, 
+    `vs` is an input array or sequence of arrays whose shapes are consistent 
+    with the input random variables, and `u` is an output array.
     
     Args:
-        f: the generating function.
+        f: generating function.
         input_vs: input random variables - a normal variable or a sequence of 
         normal variables.
-        jit: if jax.jit should be used to speed up the intermediate functions.
+        jit: if jax.jit should be applied to the intermediate functions.
 
     Returns:
-        A parametric normal variable representing the random function 
+        A parametric normal variable corresponding to the random function 
         `lambda p: f(p, input_vs)`.
     """
     # `p` is limited to 1D with the scipy.minimize signature in mind
@@ -93,13 +94,13 @@ class ParametricNormal:
     __slots__ = ("_afun", "_bfun", "_dafun", "_dbfun", "elem")
 
     def __init__(self, afun, bfun, dafun, dbfun, elem):
-        # ... is the array shape of the variable mean, nelem is the number 
+        # ijk... is the array index of the variable, nelem is the number 
         # of the elementary variables, np is the number of the parameters.
 
-        self._afun = afun  # output shape: nelem x ... 
-        self._bfun = bfun  # output shape: ...
-        self._dafun = dafun  # output shape: np x nelem x ... 
-        self._dbfun = dbfun  # output shape: np x ...
+        self._afun = afun       # output shape:    nelem x ijk... 
+        self._bfun = bfun       # output shape:    ijk...
+        self._dafun = dafun     # output shape:    np x nelem x ijk... 
+        self._dbfun = dbfun     # output shape:    np x ijk...
         self.elem = elem
 
     def __call__(self, p):
@@ -121,60 +122,96 @@ class ParametricNormal:
     def dmean(self, p):
         return np.array(self._dbfun(p))
     
+    def covariance(self, p):
+        return self(p).covariance()
+    
     def cov(self, p):
-        a = self.a(p)
-        return a.T @ a
+        return self.covariance(p)
+    
+    def variance(self, p):
+        return self(p).variance()
+    
+    def var(self, p):
+        return self.variance(p)
 
-    def d01cov(self, p):
-        """Covariance matrix with its derivative.
+    def _d01(self, p):
+        """Mean vector and covariance matrix with their derivatives.
 
         Args:
-            p: An array or sequence of parameter values.
+            p: sequence of parameter values.
         
         Returns:
-            (covariance, dcovariance/dp)    
+            (m, dm/dp, cov, dcov/dp), all flattened and converted to real.    
         """
-        
+
+        m = self.mean(p).ravel()
+        dm = self.dmean(p).reshape((-1, len(m)))
+
         a = self.a(p)
-        cov = a.T @ a
+        a = a.reshape((a.shape[0], -1))
+
         da = self.da(p)
+        da = da.reshape((-1,) + a.shape)
+
+        if (np.iscomplexobj(a) or np.iscomplexobj(da) 
+            or np.iscomplexobj(m) or np.iscomplexobj(dm)):
+            
+            # Converts to real by doubling the space size.
+            m = np.hstack([m.real, m.imag])
+            dm = np.hstack([dm.real, dm.imag])
+            a = np.hstack([a.real, a.imag])
+            da = np.concatenate([da.real, da.imag], axis=-1)
+
+        cov = a.T @ a
         prod1 = a.T @ da
         dcov = prod1 + prod1.transpose(0, 2, 1)
 
-        return cov, dcov
+        return m, dm, cov, dcov
 
     def logp(self, p, x):
         m = self.mean(p)
-        cov = self.cov(p)
+        a = self.a(p)
+
+        x = np.asanyarray(x)
+        if m.ndim > 1:
+            # Flattens the sample values.
+
+            if x.ndim == m.ndim:
+                x = x.reshape((x.size,))
+            else:
+                x = x.reshape((x.shape[0], -1))
+
+        m = m.ravel()
+        a = a.reshape((a.shape[0], -1))
+
+        if np.iscomplexobj(a) or np.iscomplexobj(m):
+            # Converts to real by doubling the space size.
+            x = np.hstack([x.real, x.imag])
+            m = np.hstack([m.real, m.imag])
+            a = np.hstack([a.real, a.imag])
+        
+        cov = a.T @ a 
         return logp(x, m, cov)
 
     def dlogp(self, p, x):
         """The gradient of the log probability density."""
 
-        m = self.mean(p)
-        dm = self.dmean(p)
-        cov, dcov = self.d01cov(p)
-
+        x = np.asanyarray(x).ravel()
+        m, dm, cov, dcov = self._d01(p)
         return dlogp(x, m, cov, dm, dcov)
     
     def fisher(self, p):
         """Fisher information matrix."""
 
-        dm = self.dmean(p)
-        cov, dcov = self.d01cov(p)
-
+        _, dm, cov, dcov = self._d01(p)
         return fisher(cov, dm, dcov)
     
     def natdlogp(self, p, x):
         """Natural gradient."""
 
-        m = self.mean(p)
-        dm = self.dmean(p)
-        cov, dcov = self.d01cov(p)
-
+        m, dm, cov, dcov = self._d01(p)
         g = dlogp(x, m, cov, dm, dcov)
         fimat = fisher(cov, dm, dcov)
-
         return np.linalg.solve(fimat, g)
     
 

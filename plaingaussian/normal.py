@@ -355,7 +355,7 @@ class Normal:
     def variance(self):
         """Variance, `<(x-<x>)(x-<x>)^*>` where `*` is complex conjugation."""
         # Note: has an alias "var"
-        
+
         a = self.emap.a        
         return np.real(np.einsum("i..., i... -> ...", a, a.conj()))
     
@@ -457,13 +457,13 @@ def normal(mu=0., sigmasq=1., size=None):
     """Creates a new normal random variable.
     
     Args:
-        mu: Mean value, a scalar or an array.
+        mu: Scalar or array mean value.
         sigmasq: Scalar variance or matrix covariance.
-        size: Optional integer or sequence of integers specifying the shape of 
-            the variable. Only has an effect with scalar mean and variance. 
+        size (optional): Integer or sequence of integers specifying the shape 
+            of the variable. Only has an effect with scalar mean and variance. 
 
     Returns:
-        Normal random variable.
+        A Normal random variable.
     """
 
     sigmasq = np.asanyarray(sigmasq)
@@ -541,9 +541,9 @@ def _safer_cholesky(x):
 
 
 def covariance(*args):
-    """Covariance. For a single variable `x` the same as `x.covariance()`.
+    """Covariance. For a single variable `x` it is the same as `x.cov()`.
     
-    For two variables `x` and `y` it is defined in an element-wise manner as 
+    For two scalar variables `x` and `y` it is defined as 
     `<(x-<x>) (y-<y>)^*>`, where `*` is complex conjugation.
 
     For two arrays `x` and `y` the function returns the array `C` with 
@@ -571,9 +571,9 @@ def covariance(*args):
 
 
 def cov(*args):
-    """Covariance. For a single variable `x` the same as `x.covariance()`.
+    """Covariance. For a single variable `x` it is the same as `x.cov()`.
     
-    For two variables `x` and `y` it is defined in an element-wise manner as 
+    For two scalar variables `x` and `y` it is defined as 
     `<(x-<x>) (y-<y>)^*>`, where `*` is complex conjugation.
 
     For two arrays `x` and `y` the function returns the array `C` with 
