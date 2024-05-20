@@ -14,8 +14,8 @@ class ElementaryMap:
     x[...] = sum_k a[i...] xi[i],
     
     where and `xi`s are elementary Gaussian variables that are independent and 
-    identically-distributed, `xi`[i] ~ N(0, 1) for all i, and ... is a 
-    multi-dimensional index.
+    identically-distributed, `xi`[i] ~ N(0, 1) for all i, 
+    and ... is an arbitrary multi-dimensional index.
     """
 
     __slots__ = ("a", "elem", "vshape", "vndim")
@@ -117,6 +117,9 @@ class ElementaryMap:
         return ElementaryMap(self.a[key], self.elem)
     
     def __setitem__(self, key, value):
+        """Sets `self` at the index `key` to `value`. 
+        `value` must be an `ElementaryMap`. """
+
         if not isinstance(key, tuple):
             key = (key,)
         
@@ -125,21 +128,30 @@ class ElementaryMap:
         if self.elem is not value.elem:
             self_, value = complete([self, value])
             self.a = self_.a
+            self.elem = self_.elem
         
-        self.a[key] = value.a
+        idx_vdim = self.a[key].ndim - 1  # Determines the shape of the indexed 
+                                         # section for broadcasting to work.  
+        self.a[key] = value.unsqueezed_a(idx_vdim)
 
     def extend_to(self, new_elem):
+        """Extends the map to a new list of elementary variables `new_elem` by
+        adding zero entries. All the existing variables from `self.elem` must
+        be present in `new_elem` (in an arbitrary order), 
+        otherwise the function will fail."""
         
         new_shape = (len(new_elem), *self.a.shape[1:])
         new_a = np.zeros(new_shape, dtype=self.a.dtype)
         idx = [new_elem[k] for k in self.elem]
         new_a[idx] = self.a
-
         return ElementaryMap(new_a, new_elem)
 
     def pad_to(self, new_elem):
-        """Extends the map assuming that `new_elem` contain `self.elem` as
-        their beginning."""
+        """Extends the map to a new list of elementary variables `new_elem` by
+        adding zero entries. This function assumes that `new_elem` contains 
+        all the existing variables from `self.elem` in the same order
+        in the beginning, and therefore the map should be just padded 
+        with an appropriate number of zeros."""
 
         new_a = np.zeros((len(new_elem), *self.a.shape[1:]), dtype=self.a.dtype)
         new_a[:len(self.elem)] = self.a        

@@ -798,6 +798,123 @@ def test_getitem():
     assert (v[:, ..., None].var() == np.ones((2, 3, 4, 1))).all()
 
 
+def test_setitem():
+    rdtype_list = [np.float32, np.float64]
+    cdtype_list = [np.complex64, np.complex128]
+
+    for dt in rdtype_list:
+        tol = 10 * np.finfo(dt).eps
+
+        sh = (2, 3, 4)
+        v = random_normal(sh, dtype=dt)
+
+        # A deterministic value
+        c = 0.5
+
+        v[0, 0, 0] = c
+        assert np.abs(v[0, 0, 0].mean() - c) < tol
+        assert np.abs(v[0, 0, 0].cov()) < tol
+        assert v.a.dtype == dt
+
+        v[0, :, 0] = c
+        assert np.max(np.abs(v[0, :, 0].mean() - c)) < tol
+        assert np.max(np.abs(v[0, :, 0].cov())) < tol
+        assert v.a.dtype == dt
+
+        v[1, ...] = c
+        assert np.max(np.abs(v[1, ...].mean() - c)) < tol
+        assert np.max(np.abs(v[1, ...].cov())) < tol
+        assert v.a.dtype == dt
+
+    for dt in cdtype_list:
+        tol = 10 * np.finfo(dt).eps
+
+        sh = (2, 3, 4)
+        v = random_normal(sh, dtype=dt)
+
+        # A deterministic value
+        c = 0.5 - 3j
+
+        v[0, 0, 0] = c
+        assert np.abs(v[0, 0, 0].mean() - c) < tol
+        assert np.abs(v[0, 0, 0].cov()) < tol
+        assert v.a.dtype == dt
+
+        v[0, :, 0] = c
+        assert np.max(np.abs(v[0, :, 0].mean() - c)) < tol
+        assert np.max(np.abs(v[0, :, 0].cov())) < tol
+        assert v.a.dtype == dt
+
+        v[1, ...] = c
+        assert np.max(np.abs(v[1, ...].mean() - c)) < tol
+        assert np.max(np.abs(v[1, ...].cov())) < tol
+        assert v.a.dtype == dt
+
+    for dt in rdtype_list + cdtype_list:
+        tol = 10 * np.finfo(dt).eps
+
+        # A sub-array
+        v = random_normal(sh, dtype=dt)
+        cov_ref = v[:, :, [0, 1, 3]].cov()
+        mean_ref = v[:, :, [0, 1, 3]].mean()
+
+        x = v[0, 0, 1]
+        v[0, 0, 2] = x
+        assert np.max(np.abs(v[:, :, [0, 1, 3]].cov() - cov_ref)) < tol
+        assert np.max(np.abs(v[:, :, [0, 1, 3]].mean() - mean_ref)) < tol
+        assert np.max(np.abs(v[0, 0, 2].mean() - x.mean())) < tol
+        assert np.max(np.abs(v[0, 0, 2].cov())) - x.cov() < tol
+
+        # An independent variable
+        v = random_normal(sh, dtype=dt)
+        cov_ref = v[:, :, [0, 3]].cov()
+        mean_ref = v[:, :, [0, 3]].mean()
+
+        x = random_normal((2,), dtype=dt)
+        v[0, 0, 1:3] = x
+        assert np.max(np.abs(v[:, :, [0, 3]].cov() - cov_ref)) < tol
+        assert np.max(np.abs(v[:, :, [0, 3]].mean() - mean_ref)) < tol
+        assert np.max(np.abs(v[0, 0, 1:3].mean() - x.mean())) < tol
+        assert np.max(np.abs(v[0, 0, 1:3].cov() - x.cov())) < tol
+
+        # With data type conversion
+        tol_ = 10 * np.finfo(np.float32).eps
+        x = random_normal((2,), dtype=np.float32)
+        v[0, 0, 1:3] = x
+        assert np.max(np.abs(v[:, :, [0, 3]].cov() - cov_ref)) < tol_
+        assert np.max(np.abs(v[:, :, [0, 3]].mean() - mean_ref)) < tol_
+        assert np.max(np.abs(v[0, 0, 1:3].mean() - x.mean())) < tol_
+        assert np.max(np.abs(v[0, 0, 1:3].cov() - x.cov())) < tol_
+
+        # With data type conversion 2
+        x = random_normal((2,), dtype=np.float64)
+        v[0, 0, 1:3] = x
+        assert np.max(np.abs(v[:, :, [0, 3]].cov() - cov_ref)) < tol
+        assert np.max(np.abs(v[:, :, [0, 3]].mean() - mean_ref)) < tol
+        assert np.max(np.abs(v[0, 0, 1:3].mean() - x.mean())) < tol
+        assert np.max(np.abs(v[0, 0, 1:3].cov() - x.cov())) < tol
+
+        # Checks if correlations are preserved
+        sz = 50
+        szv = 10
+        v1, v2, v3 = random_correlate([random_normal((sz,), dtype=dt),
+                                       random_normal((sz,), dtype=dt),
+                                       random_normal((szv,), dtype=dt)])
+        
+        # Asserts dependence.
+        assert np.max(np.abs(cov(v1, v2))) > 0.1
+        assert np.max(np.abs(cov(v1, v3))) > 0.1
+        assert np.max(np.abs(cov(v2, v3))) > 0.1
+
+        cov_ref = cov(v1[szv:], v2)
+        assert np.max(np.abs(cov_ref)) > 0.1
+
+        v1[:szv] = v3
+        assert np.max(np.abs(cov(v1[szv:], v2) - cov_ref)) < tol
+        assert np.max(np.abs(v1[:szv].mean() - v3.mean())) < tol
+        assert np.max(np.abs(v1[:szv].cov() - v3.cov())) < tol
+
+
 def test_aliases():
     # Ensures that the aliases are in sync.
 
