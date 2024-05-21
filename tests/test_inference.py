@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 from external.Infer import Infer
-from gprob.normal import normal, hstack, stack, covariance
+from gprob.normal import normal, hstack, stack, cov
 from gprob.func import ConditionError
 from utils import random_normal, random_correlate
 
@@ -164,7 +164,7 @@ def test_complex_conditioning():
     vc = random_normal(shc, dtype=np.complex128)
     v, vc = random_correlate([v, vc])
 
-    assert np.abs(covariance(v, vc)).max() > 0.1  # Asserts correlation.
+    assert np.abs(cov(v, vc)).max() > 0.1  # Asserts correlation.
 
     vr = hstack([v.real, v.imag])
     vcr = hstack([vc.real, vc.imag])
@@ -174,20 +174,20 @@ def test_complex_conditioning():
     vrcond = vr | {vcr: 0}
     vrcond2 = hstack([vcond.real, vcond.imag])
     assert np.max(np.abs(vrcond.mean() - vrcond2.mean())) < tol
-    assert np.max(np.abs(vrcond.covariance() - vrcond2.covariance())) < tol
+    assert np.max(np.abs(vrcond.cov() - vrcond2.cov())) < tol
 
     # Complex-real
     vcond = v | vc.real
     vrcond = vr | vc.real
     vrcond2 = hstack([vcond.real, vcond.imag])
     assert np.max(np.abs(vrcond.mean() - vrcond2.mean())) < tol
-    assert np.max(np.abs(vrcond.covariance() - vrcond2.covariance())) < tol
+    assert np.max(np.abs(vrcond.cov() - vrcond2.cov())) < tol
 
     # Real-complex
     vcond = v.real | vc
     vrcond = v.real | vcr
     assert np.max(np.abs(vrcond.mean() - vcond.mean())) < tol
-    assert np.max(np.abs(vrcond.covariance() - vcond.covariance())) < tol
+    assert np.max(np.abs(vrcond.cov() - vcond.cov())) < tol
 
     # Complex mean but real map
     v.emap.a = v.emap.a.real
@@ -197,7 +197,7 @@ def test_complex_conditioning():
     vrcond = vr | vcr
     vrcond2 = hstack([vcond.real, vcond.imag])
     assert np.max(np.abs(vrcond.mean() - vrcond2.mean())) < tol
-    assert np.max(np.abs(vrcond.covariance() - vrcond2.covariance())) < tol
+    assert np.max(np.abs(vrcond.cov() - vrcond2.cov())) < tol
 
 
 def test_masked_conditioning():
@@ -235,7 +235,7 @@ def test_masked_conditioning():
             
             # Ensures correlation. 
             try:
-                assert np.abs(covariance(v, vc)).max() > 1e-3
+                assert np.abs(cov(v, vc)).max() > 1e-3
             except Exception:
                 # random_correlate may produce no correlations 
                 # with a probability non-negligible for very small arrays
@@ -246,7 +246,7 @@ def test_masked_conditioning():
 
             ref = stack([v[i] | {vc[:idx[i]]: 0} for i in range(len(v))])
             assert np.max(np.abs(ref.mean() - mc_cond.mean())) < tol
-            assert np.max(np.abs(ref.covariance() - mc_cond.covariance())) < tol
+            assert np.max(np.abs(ref.cov() - mc_cond.cov())) < tol
 
             ma_cond = v.condition({vc: 0}, mask=~mask)  # Anti-causal mask
 
@@ -254,14 +254,14 @@ def test_masked_conditioning():
                         for i in range(len(v))])
 
             assert np.max(np.abs(ref.mean() - ma_cond.mean())) < tol
-            assert np.max(np.abs(ref.covariance() - ma_cond.covariance())) < tol
+            assert np.max(np.abs(ref.cov() - ma_cond.cov())) < tol
 
             # Redundant checks of the variances.
             for i in range(len(v)):
                 xi1 = v[i] | {vc[:idx[i]]: 0}
                 xi2 = mc_cond[i]
                 assert np.max(np.abs(xi1.mean() - xi2.mean())) < tol
-                assert np.max(np.abs(xi1.variance() - xi2.variance())) < tol
+                assert np.max(np.abs(xi1.var() - xi2.var())) < tol
 
             for i in range(len(v)):
                 if len(vc[idx[i]:]) == 0:
@@ -270,12 +270,12 @@ def test_masked_conditioning():
                 xi1 = v[i] | {vc[idx[i]:]: 0}
                 xi2 = ma_cond[i]
                 assert np.max(np.abs(xi1.mean() - xi2.mean())) < tol
-                assert np.max(np.abs(xi1.variance() - xi2.variance())) < tol
+                assert np.max(np.abs(xi1.var() - xi2.var())) < tol
 
         # A test with more than one condition variable
         sh = (5,)
         shc1 = (4,)
-        shc2 = (4, 2)
+        shc2 = (4, 3)
         idx = [1, 1, 3, 3, 4]
 
         mask = np.array([range(shc1[0])] * sh[0]).T < idx
@@ -287,8 +287,8 @@ def test_masked_conditioning():
             v, vc2 = random_correlate([v, vc2])
             
             # Ensures correlation.
-            assert np.abs(covariance(v, vc1)).max() > 0.1
-            assert np.abs(covariance(v, vc2)).max() > 0.1
+            assert np.abs(cov(v, vc1)).max() > 0.1
+            assert np.abs(cov(v, vc2)).max() > 0.1
 
             # Causal masking.
             mc_cond = v.condition({vc1: 0, vc2: 0}, mask=mask)
@@ -296,7 +296,7 @@ def test_masked_conditioning():
             ref = stack([(v[i] | {vc1[:idx[i]]: 0, vc2[:idx[i]]: 0}) 
                          for i in range(len(v))])
             assert np.max(np.abs(ref.mean() - mc_cond.mean())) < tol
-            assert np.max(np.abs(ref.covariance() - mc_cond.covariance())) < tol
+            assert np.max(np.abs(ref.cov() - mc_cond.cov())) < tol
 
             # Anti-causal masking.
             ma_cond = v.condition({vc1: 0, vc2: 0}, mask=~mask)
@@ -306,4 +306,4 @@ def test_masked_conditioning():
                          for i in range(len(v))])
 
             assert np.max(np.abs(ref.mean() - ma_cond.mean())) < tol
-            assert np.max(np.abs(ref.covariance() - ma_cond.covariance())) < tol
+            assert np.max(np.abs(ref.cov() - ma_cond.cov())) < tol

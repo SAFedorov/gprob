@@ -352,36 +352,12 @@ class Normal:
         """Mean"""
         return self.b
 
-    def variance(self):
+    def var(self):
         """Variance, `<(x-<x>)(x-<x>)^*>` where `*` is complex conjugation."""
-        # Note: has an alias "var"
 
         a = self.emap.a        
         return np.real(np.einsum("i..., i... -> ...", a, a.conj()))
-    
-    def var(self):
-        """Variance, `<(x-<x>)(x-<x>)^*>` where `*` is complex conjugation."""
-        # Note: an alias for "variance"
-        return self.variance()
 
-    def covariance(self):
-        """Covariance. 
-        
-        For a vector variable `x` returns the matrix `C = <(x-<x>)(x-<x>)^H>`, 
-        where `H` is conjugate transpose.
-
-        For a general array `x` returns the array `C` with twice the number of 
-        dimensions of `x` and the components
-        `C[ijk... lmn...] = <(x[ijk..] - <x>) (x[lmn..] - <x>)*>`, 
-        where the indices `ijk...` and `lmn...` run over the components of `x`,
-        and `*` is complex conjugation.
-        """
-        # Note: has an alias "cov"
-
-        a = self.emap.a2d
-        cov2d = a.T @ a.conj()
-        return cov2d.reshape(self.shape * 2)
-    
     def cov(self):
         """Covariance. 
         
@@ -394,8 +370,10 @@ class Normal:
         where the indices `ijk...` and `lmn...` run over the components of `x`,
         and `*` is complex conjugation.
         """
-        # Note: an alias for "covariance"
-        return self.covariance()
+
+        a = self.emap.a2d
+        cov2d = a.T @ a.conj()
+        return cov2d.reshape(self.shape * 2)
     
     def sample(self, n=None):
         """Samples the random variable `n` times."""
@@ -540,21 +518,19 @@ def _safer_cholesky(x):
     return ltri
 
 
-def covariance(*args):
-    """Covariance. For a single variable `x` it is the same as `x.cov()`.
+def cov(*args):
+    """Covariance. For a single variable `x` returns `x.cov()`.
     
-    For two scalar variables `x` and `y` it is defined as 
+    For two scalar variables `x` and `y` returns the expectation 
     `<(x-<x>) (y-<y>)^*>`, where `*` is complex conjugation.
 
-    For two arrays `x` and `y` the function returns the array `C` with 
-    the number of dimensions equal to the sum of the dimensions of `x` and `y` 
-    and the components
+    For two arrays `x` and `y` returns the array `C` whose number of 
+    dimensions is equal to the sum of the dimensions of `x` and `y` and 
+    whose components are
     `C[ijk... lmn...] = <(x[ijk..] - <x>) (y[lmn..] - <y>)*>`, 
     where the indices `ijk...` and `lmn...` run over the components 
     of `x` and `y`, respectively.
     """
-
-    # Note: has an alias "cov"
 
     if len(args) == 0 or len(args) > 2:
         raise ValueError("The function only accepts one or two input "
@@ -563,30 +539,11 @@ def covariance(*args):
     if len(args) == 1:
         return args[0].cov()
     
-    # len(args) == 2
+    # For the case len(args) == 2.
     x, y = args
     ax, ay = [em.a2d for em in emaps.complete([x.emap, y.emap])]
     cov2d = ax.T @ ay.conj()
     return cov2d.reshape(x.shape + y.shape)
-
-
-def cov(*args):
-    """Covariance. For a single variable `x` it is the same as `x.cov()`.
-    
-    For two scalar variables `x` and `y` it is defined as 
-    `<(x-<x>) (y-<y>)^*>`, where `*` is complex conjugation.
-
-    For two arrays `x` and `y` the function returns the array `C` with 
-    the number of dimensions equal to the sum of the dimensions of `x` and `y` 
-    and the components
-    `C[ijk... lmn...] = <(x[ijk..] - <x>) (y[lmn..] - <y>)*>`, 
-    where the indices `ijk...` and `lmn...` run over the components 
-    of `x` and `y`, respectively.
-    """
-
-    # Note: an alias for "covaraince"
-    
-    return covariance(*args)
 
 
 # ---------- linear array functions ----------

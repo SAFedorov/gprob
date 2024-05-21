@@ -1,5 +1,5 @@
 from gprob.normal import (
-    Normal, normal, asnormal, covariance, cov, 
+    Normal, normal, asnormal, cov, cov, 
     stack, hstack, vstack, dstack, concatenate, 
     split, hsplit, vsplit, dsplit, sum, cumsum, trace, diagonal, reshape, 
     moveaxis, ravel, transpose, add, subtract, multiply, divide, power, 

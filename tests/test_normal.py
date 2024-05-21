@@ -3,9 +3,8 @@ import numpy as np
 from scipy.stats import multivariate_normal as mvn
 from numpy.linalg import LinAlgError
 from gprob.normal import (normal, hstack, vstack, Normal, 
-                          _safer_cholesky, covariance, cov)
+                          _safer_cholesky, cov, cov)
 from utils import random_normal, random_correlate
-
 
 np.random.seed(0)
 
@@ -66,7 +65,7 @@ def test_creation():
     xi = normal(mu, cov)
     assert xi.shape == sh
     assert (xi.mean() == mu).all()
-    assert np.allclose(xi.covariance(), cov, rtol=tol, atol=tol)
+    assert np.allclose(xi.cov(), cov, rtol=tol, atol=tol)
 
     # Complex
     a = np.random.rand(vsz * 2, *sh) + 1j * np.random.rand(vsz * 2, *sh)
@@ -74,7 +73,7 @@ def test_creation():
     xi = normal(mu, cov)
     assert xi.shape == sh
     assert (xi.mean() == mu).all()
-    assert np.allclose(xi.covariance(), cov, rtol=tol, atol=tol)
+    assert np.allclose(xi.cov(), cov, rtol=tol, atol=tol)
 
     # Degenerate complex
     a = np.random.rand(vsz // 2, *sh) + 1j * np.random.rand(vsz // 2, *sh)
@@ -86,7 +85,7 @@ def test_creation():
     xi = normal(mu, cov)
     assert xi.shape == sh
     assert (xi.mean() == mu).all()
-    assert np.allclose(xi.covariance(), cov, rtol=tol, atol=tol)
+    assert np.allclose(xi.cov(), cov, rtol=tol, atol=tol)
 
     # Inputs for the covaraince array with inappropriate shapes.
     with pytest.raises(ValueError):
@@ -264,12 +263,12 @@ def test_logp():
 
     tol_ = 1e-8  # increased tolerance margin
     x = np.random.rand(*sh)
-    logpref = mvn.logpdf(x.ravel(), xif.mean(), xif.covariance())
+    logpref = mvn.logpdf(x.ravel(), xif.mean(), xif.cov())
     assert np.abs(xi.logp(x) - logpref) < tol_
     assert xi.logp(x).shape == x.shape[:-xi.ndim]
 
     x = np.random.rand(3, *sh)
-    logpref = mvn.logpdf(x.reshape(-1, xif.size), xif.mean(), xif.covariance())
+    logpref = mvn.logpdf(x.reshape(-1, xif.size), xif.mean(), xif.cov())
     assert np.max(np.abs(xi.logp(x) - logpref)) < tol_
     assert xi.logp(x).shape == x.shape[:-xi.ndim]
 
@@ -317,12 +316,12 @@ def test_logp():
         xif = xi.ravel()
 
         with pytest.raises(LinAlgError):  # Asserts the degeneracy.
-            np.linalg.cholesky(xif.covariance())
+            np.linalg.cholesky(xif.cov())
 
         # Single possible sample.
         x = xi.sample()
         xf = x.ravel()
-        logpref = mvn.logpdf(xf, xif.mean(), xif.covariance(), 
+        logpref = mvn.logpdf(xf, xif.mean(), xif.cov(), 
                              allow_singular=True)
         assert np.abs(xi.logp(x) - logpref) < tol_
         assert xi.logp(x).shape == x.shape[:-xi.ndim]
@@ -334,7 +333,7 @@ def test_logp():
         # Multiple possible samples.
         x = xi.sample(3)
         xf = x.reshape(-1, xi.size)
-        logpref = mvn.logpdf(xf, xif.mean(), xif.covariance(), 
+        logpref = mvn.logpdf(xf, xif.mean(), xif.cov(), 
                              allow_singular=True)
         assert np.max(np.abs(xi.logp(x) - logpref)) < tol_
         assert xi.logp(x).shape == x.shape[:-xi.ndim]
@@ -342,7 +341,7 @@ def test_logp():
         # One impossible sample among several possible.
         x[0] = np.random.rand(*xi.shape)
         xf = x.reshape(-1, xi.size)
-        logpref = mvn.logpdf(xf, xif.mean(), xif.covariance(), 
+        logpref = mvn.logpdf(xf, xif.mean(), xif.cov(), 
                              allow_singular=True)
         assert np.max(np.abs(xi.logp(x)[1:] - logpref[1:])) < tol_
         assert xi.logp(x)[0] == float("-inf")
@@ -915,17 +914,6 @@ def test_setitem():
         assert np.max(np.abs(v1[:szv].cov() - v3.cov())) < tol
 
 
-def test_aliases():
-    # Ensures that the aliases are in sync.
-
-    alias_list = [(cov, covariance), 
-                  (Normal.cov, Normal.covariance), 
-                  (Normal.var, Normal.variance)]
-    
-    for f1, f2 in alias_list:
-        assert f1.__doc__ == f2.__doc__
-
-
 def test_cov_func():
     tol = 1e-10
 
@@ -943,11 +931,11 @@ def test_cov_func():
         v2 = random_normal((sz,), dtype=dt)
         v1, v2 = random_correlate([v1, v2])
 
-        c11 = covariance(v1, v1)
-        c12 = covariance(v1, v2)
+        c11 = cov(v1, v1)
+        c12 = cov(v1, v2)
         assert np.abs(c12).max() > 0.1  # Ensures correlation.
 
-        c = hstack([v1, v2]).covariance()
+        c = hstack([v1, v2]).cov()
         assert np.max(np.abs(c[:sz, :sz] - c11)) < tol
         assert np.max(np.abs(c[:sz, sz:] - c12)) < tol
 
@@ -956,10 +944,10 @@ def test_cov_func():
         v2 = random_normal((sz, 3), dtype=dt)
         v1, v2 = random_correlate([v1, v2])
 
-        c11 = covariance(v1, v1)
-        c12 = covariance(v1, v2)
+        c11 = cov(v1, v1)
+        c12 = cov(v1, v2)
         assert np.abs(c12).max() > 0.1  # Ensures correlation.
 
-        c = hstack([v1, v2]).covariance()
+        c = hstack([v1, v2]).cov()
         assert np.max(np.abs(c[:, :2, :, :2] - c11)) < tol
         assert np.max(np.abs(c[:, :2, :, 2:] - c12)) < tol

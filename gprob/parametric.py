@@ -122,17 +122,11 @@ class ParametricNormal:
     def dmean(self, p):
         return np.array(self._dbfun(p))
     
-    def covariance(self, p):
-        return self(p).covariance()
-    
     def cov(self, p):
-        return self.covariance(p)
-    
-    def variance(self, p):
-        return self(p).variance()
+        return self(p).cov()
     
     def var(self, p):
-        return self.variance(p)
+        return self(p).var()
 
     def _d01(self, p):
         """Mean vector and covariance matrix with their derivatives.

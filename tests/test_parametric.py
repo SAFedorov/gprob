@@ -1,14 +1,13 @@
 import pytest
 import numpy as np
+from gprob import (exp, exp2, log, log2, log10, sqrt, cbrt, sin, cos, 
+                   tan, arcsin, arccos, arctan, sinh, cosh, tanh, 
+                   arcsinh, arccosh, arctanh, conjugate, conj)
+from gprob import pnormal
+from utils import random_normal
 
 np.random.seed(0)
 
-from gprob import (exp, exp2, log, log2, log10, sqrt, cbrt, sin, cos, 
-                           tan, arcsin, arccos, arctan, sinh, cosh, tanh, 
-                           arcsinh, arccosh, arctanh, conjugate, conj)
-from gprob import pnormal
-
-from utils import random_normal
 
 try:
     import jax
