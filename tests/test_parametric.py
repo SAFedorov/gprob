@@ -3,10 +3,10 @@ import numpy as np
 
 np.random.seed(0)
 
-from plaingaussian import (exp, exp2, log, log2, log10, sqrt, cbrt, sin, cos, 
+from gprob import (exp, exp2, log, log2, log10, sqrt, cbrt, sin, cos, 
                            tan, arcsin, arccos, arctan, sinh, cosh, tanh, 
                            arcsinh, arccosh, arctanh, conjugate, conj)
-from plaingaussian import pnormal
+from gprob import pnormal
 
 from utils import random_normal
 

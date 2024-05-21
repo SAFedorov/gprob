@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "plaingaussian"
+name = "gprob"
 version = "0.2"
 description = "Probabilistic programming with arrays of Gaussian variables."
 requires-python = ">=3.6"

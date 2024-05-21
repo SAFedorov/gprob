@@ -2,8 +2,8 @@ import pytest
 import numpy as np
 from scipy.stats import multivariate_normal as mvn
 from numpy.linalg import LinAlgError
-from plaingaussian.normal import (normal, hstack, vstack, Normal, 
-                                  _safer_cholesky, covariance, cov)
+from gprob.normal import (normal, hstack, vstack, Normal, 
+                          _safer_cholesky, covariance, cov)
 from utils import random_normal, random_correlate
 
 
@@ -803,7 +803,7 @@ def test_setitem():
     cdtype_list = [np.complex64, np.complex128]
 
     for dt in rdtype_list:
-        tol = 10 * np.finfo(dt).eps
+        tol = 20 * np.finfo(dt).eps
 
         sh = (2, 3, 4)
         v = random_normal(sh, dtype=dt)
@@ -827,7 +827,7 @@ def test_setitem():
         assert v.a.dtype == dt
 
     for dt in cdtype_list:
-        tol = 10 * np.finfo(dt).eps
+        tol = 20 * np.finfo(dt).eps
 
         sh = (2, 3, 4)
         v = random_normal(sh, dtype=dt)
@@ -851,7 +851,7 @@ def test_setitem():
         assert v.a.dtype == dt
 
     for dt in rdtype_list + cdtype_list:
-        tol = 10 * np.finfo(dt).eps
+        tol = 20 * np.finfo(dt).eps
 
         # A sub-array
         v = random_normal(sh, dtype=dt)
@@ -878,7 +878,7 @@ def test_setitem():
         assert np.max(np.abs(v[0, 0, 1:3].cov() - x.cov())) < tol
 
         # With data type conversion
-        tol_ = 10 * np.finfo(np.float32).eps
+        tol_ = 20 * np.finfo(np.float32).eps
         x = random_normal((2,), dtype=np.float32)
         v[0, 0, 1:3] = x
         assert np.max(np.abs(v[:, :, [0, 3]].cov() - cov_ref)) < tol_

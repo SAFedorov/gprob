@@ -1,5 +1,5 @@
-# Plain Gaussain
-Plain Gaussain is a python package that implements a simple probabilistic programming language for Gaussian random variables with exact conditioning and the support of array variables.
+# GProb
+GProb is a python package that implements the functionality of a simple probabilistic programming language for Gaussian random variables with exact conditioning and the support of array operations.
 
 ## Requirements
 The core fnctionality requires:

@@ -3,15 +3,15 @@ import numpy as np
 
 np.random.seed(0)
 
-import plaingaussian.emaps as emaps
-from plaingaussian import (normal,
+import gprob.emaps as emaps
+from gprob import (normal,
                            stack, hstack, vstack, dstack, concatenate,
                            split, hsplit, vsplit, dsplit,
                            sum, cumsum, trace, diagonal, reshape, moveaxis, ravel, transpose,
                            add, subtract, multiply, divide, power, 
                            einsum, dot, matmul, inner, outer, kron, tensordot)
 
-from plaingaussian.fft import (fft, fft2, fftn, 
+from gprob.fft import (fft, fft2, fftn, 
                                ifft, ifft2, ifftn,
                                rfft, rfft2, rfftn,
                                irfft, irfft2, irfftn,

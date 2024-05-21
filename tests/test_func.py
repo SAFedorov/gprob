@@ -4,8 +4,8 @@ from scipy.stats import multivariate_normal as mvn
 
 np.random.seed(0)
 
-from plaingaussian.normal import normal, hstack
-from plaingaussian.func import logp, logp_lstsq, dlogp, d2logp, fisher
+from gprob.normal import normal, hstack
+from gprob.func import logp, logp_lstsq, dlogp, d2logp, fisher
 
 from reffunc import logp as logp_
 from reffunc import dlogp_eigh as dlogp_

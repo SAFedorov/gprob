@@ -1,8 +1,8 @@
 import pytest
 import numpy as np
 from external.Infer import Infer
-from plaingaussian.normal import normal, hstack, stack, covariance
-from plaingaussian.func import ConditionError
+from gprob.normal import normal, hstack, stack, covariance
+from gprob.func import ConditionError
 from utils import random_normal, random_correlate
 
 np.random.seed(0)
