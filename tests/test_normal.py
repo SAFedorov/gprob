@@ -227,6 +227,15 @@ def test_creation_w_dtype():
         assert np.allclose(xi.cov(), cov, rtol=tol, atol=tol)
 
 
+def test_properties():
+    # Checks the descriptive properties
+    prop_names = ["size", "shape", "ndim"]
+
+    v = random_normal((3, 4))
+    for pn in prop_names:
+        assert getattr(v, pn) == getattr(v.b, pn)
+
+
 def test_logp():
     # The validation of the log likelihood calculation for real normal arrays.
 
