@@ -285,6 +285,8 @@ def test_masked_conditioning():
             vc1 = random_normal(shc1, dtype=dt)
             vc2 = -2.1 * vc1.reshape((4, 1)) + random_normal(shc2, dtype=dt)
             v, vc2 = random_correlate([v, vc2])
+            v, vc2 = random_correlate([v, vc2]) # Repeat to ensure correlation.
+            v, vc2 = random_correlate([v, vc2])
             
             # Ensures correlation.
             assert np.abs(cov(v, vc1)).max() > 0.1

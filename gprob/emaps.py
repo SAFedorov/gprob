@@ -41,18 +41,24 @@ class ElementaryMap:
         return np.ascontiguousarray(self.a.reshape((self.a.shape[0], vsz)))
 
     def __neg__(self):
-        return ElementaryMap(-self.a, self.elem)  # TODO: test how this performs-----
+        return ElementaryMap(-self.a, self.elem)
 
     def __add__(self, other):
         """Adds two maps."""
 
         if self.elem is other.elem:
-            # This optimization is mostly to speed up in-place 
+            # This is an optimization, primarily made to speed up in-place 
             # manipulations with array elements.
 
             new_a = (self.unsqueezed_a(other.vndim) 
                      + other.unsqueezed_a(self.vndim))
             return ElementaryMap(new_a, self.elem)
+        
+        if len(other.elem) == 0:  # TODO: add a test case for this
+            # An optimization for the addition of empty maps, that emerge,
+            # for example, when constants are lifted to normal variables.
+
+            return self.broadcast_to(other.vshape)
     
         op1, op2 = self, other
         union_elem, swapped = elementary.ounion(op1.elem, op2.elem)
@@ -170,7 +176,6 @@ class ElementaryMap:
         return self.a
     
     def broadcast_to(self, vshape):
-
         vndim = len(vshape)
         dn = vndim - self.vndim
 

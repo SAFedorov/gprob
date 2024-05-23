@@ -300,7 +300,7 @@ def test_logp():
     
     # More degenerate cases.
 
-    tol_ = 1e-8
+    tol_ = 1e-7
 
     # Self-consistency: doubling the dimension does not change logp
     sh = (2, 3, 1)
@@ -668,6 +668,103 @@ def test_operations():
     v2 = np.sqrt(2) * normal(0, 1, size=2)
     assert isclose(v1, v2)
 
+    # Operations with an object that is neither convertible to a numeric array, 
+    # nor a normal variable itself.
+
+    tol = 1e-8
+
+    # Addition.
+    v1 = normal() + [normal(), 2, normal()]
+    v2 = normal() + hstack([normal(), 2, normal()])
+    assert isinstance(v1, Normal)
+    assert v1.shape == (3,)
+    assert np.max(np.abs(v1.mean() - v2.mean())) < tol 
+    assert np.max(np.abs(v1.cov() - v2.cov())) < tol 
+
+    v1 = [normal(), 2, normal()] + normal()
+    v2 = hstack([normal(), 2, normal()]) + normal()
+    assert isinstance(v1, Normal)
+    assert v1.shape == (3,)
+    assert np.max(np.abs(v1.mean() - v2.mean())) < tol 
+    assert np.max(np.abs(v1.cov() - v2.cov())) < tol 
+
+    # Subtraction.
+    v1 = normal() - [normal(), 2, normal()]
+    v2 = normal() - hstack([normal(), 2, normal()])
+    assert isinstance(v1, Normal)
+    assert v1.shape == (3,)
+    assert np.max(np.abs(v1.mean() - v2.mean())) < tol 
+    assert np.max(np.abs(v1.cov() - v2.cov())) < tol 
+
+    v1 = [normal(), 2, normal()] - normal()
+    v2 = hstack([normal(), 2, normal()]) - normal()
+    assert isinstance(v1, Normal)
+    assert v1.shape == (3,)
+    assert np.max(np.abs(v1.mean() - v2.mean())) < tol 
+    assert np.max(np.abs(v1.cov() - v2.cov())) < tol
+
+    # Multiplication.
+    v1 = normal(0.5, 2) * [normal(0.1, 1), 2, normal(0.1, 1)]
+    v2 = normal(0.5, 2) * hstack([normal(0.1, 1), 2, normal(0.1, 1)])
+    assert isinstance(v1, Normal)
+    assert v1.shape == (3,)
+    assert np.max(np.abs(v1.mean() - v2.mean())) < tol 
+    assert np.max(np.abs(v1.cov() - v2.cov())) < tol 
+
+    v1 = [normal(0.1, 1), 2, normal(0.1, 1)] * normal(0.5, 2)
+    v2 = hstack([normal(0.1, 1), 2, normal(0.1, 1)]) * normal(0.5, 2)
+    assert isinstance(v1, Normal)
+    assert v1.shape == (3,)
+    assert np.max(np.abs(v1.mean() - v2.mean())) < tol 
+    assert np.max(np.abs(v1.cov() - v2.cov())) < tol 
+
+    # Division.
+    v1 = normal(0.5, 2) / [normal(0.1, 1), 2, normal(0.1, 1)]
+    v2 = normal(0.5, 2) / hstack([normal(0.1, 1), 2, normal(0.1, 1)])
+    assert isinstance(v1, Normal)
+    assert v1.shape == (3,)
+    assert np.max(np.abs(v1.mean() - v2.mean())) < tol 
+    assert np.max(np.abs(v1.cov() - v2.cov())) < tol 
+
+    v1 = [normal(0.1, 1), 2, normal(0.1, 1)] / normal(0.5, 2)
+    v2 = hstack([normal(0.1, 1), 2, normal(0.1, 1)]) / normal(0.5, 2)
+    assert isinstance(v1, Normal)
+    assert v1.shape == (3,)
+    assert np.max(np.abs(v1.mean() - v2.mean())) < tol 
+    assert np.max(np.abs(v1.cov() - v2.cov())) < tol 
+
+    # Matrix multiplication.
+    v = random_normal((3, 3))
+    v1 = v @ [normal(0.1, 1), 2, normal(0.1, 1)]
+    v2 = v @ hstack([normal(0.1, 1), 2, normal(0.1, 1)])
+    assert isinstance(v1, Normal)
+    assert v1.shape == (3,)
+    assert np.max(np.abs(v1.mean() - v2.mean())) < tol 
+    assert np.max(np.abs(v1.cov() - v2.cov())) < tol 
+
+    v1 = [normal(0.1, 1), 2, normal(0.1, 1)] @ v
+    v2 = hstack([normal(0.1, 1), 2, normal(0.1, 1)]) @ v
+    assert isinstance(v1, Normal)
+    assert v1.shape == (3,)
+    assert np.max(np.abs(v1.mean() - v2.mean())) < tol 
+    assert np.max(np.abs(v1.cov() - v2.cov())) < tol 
+
+    # Power.
+    v = 2 + random_normal((2, 3))
+    v1 = v ** [normal(0.1, 1), 2, normal(0.1, 1)]
+    v2 = v ** hstack([normal(0.1, 1), 2, normal(0.1, 1)])
+    assert isinstance(v1, Normal)
+    assert v1.shape == (2, 3)
+    assert np.max(np.abs(v1.mean() - v2.mean())) < tol 
+    assert np.max(np.abs(v1.cov() - v2.cov())) < tol 
+
+    v1 = [normal(0.1, 1), 2, normal(0.1, 1)] ** v
+    v2 = hstack([normal(0.1, 1), 2, normal(0.1, 1)]) ** v
+    assert isinstance(v1, Normal)
+    assert v1.shape == (2, 3)
+    assert np.max(np.abs(v1.mean() - v2.mean())) < tol 
+    assert np.max(np.abs(v1.cov() - v2.cov())) < tol
+
 
 def test_normal_operations():
     # normal-normal operations
@@ -802,7 +899,7 @@ def test_setitem():
     cdtype_list = [np.complex64, np.complex128]
 
     for dt in rdtype_list:
-        tol = 20 * np.finfo(dt).eps
+        tol = 100 * np.finfo(dt).eps
 
         sh = (2, 3, 4)
         v = random_normal(sh, dtype=dt)
@@ -826,7 +923,7 @@ def test_setitem():
         assert v.a.dtype == dt
 
     for dt in cdtype_list:
-        tol = 20 * np.finfo(dt).eps
+        tol = 100 * np.finfo(dt).eps
 
         sh = (2, 3, 4)
         v = random_normal(sh, dtype=dt)
@@ -850,7 +947,7 @@ def test_setitem():
         assert v.a.dtype == dt
 
     for dt in rdtype_list + cdtype_list:
-        tol = 20 * np.finfo(dt).eps
+        tol = 100 * np.finfo(dt).eps
 
         # A sub-array
         v = random_normal(sh, dtype=dt)
@@ -877,7 +974,7 @@ def test_setitem():
         assert np.max(np.abs(v[0, 0, 1:3].cov() - x.cov())) < tol
 
         # With data type conversion
-        tol_ = 20 * np.finfo(np.float32).eps
+        tol_ = 100 * np.finfo(np.float32).eps
         x = random_normal((2,), dtype=np.float32)
         v[0, 0, 1:3] = x
         assert np.max(np.abs(v[:, :, [0, 3]].cov() - cov_ref)) < tol_

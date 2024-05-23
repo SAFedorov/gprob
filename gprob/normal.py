@@ -85,9 +85,10 @@ class Normal:
         return Normal(-self.emap, -self.b)
 
     def __add__(self, other):
-        if isinstance(other, Normal):
+        other, isnormal = _prepare_op(other)
+        if isnormal:
             return Normal(self.emap + other.emap, self.b + other.b)
-        
+
         b = self.b + other
         em = self.emap.broadcast_to(b.shape)
         return Normal(em, b)
@@ -96,7 +97,8 @@ class Normal:
         return self.__add__(other)
     
     def __sub__(self, other):
-        if isinstance(other, Normal):
+        other, isnormal = _prepare_op(other)
+        if isnormal:
             return Normal(self.emap + (-other.emap), self.b - other.b)
         
         b = self.b - other
@@ -107,7 +109,9 @@ class Normal:
         return -self + other
     
     def __mul__(self, other):
-        if isinstance(other, Normal):
+        other, isnormal = _prepare_op(other)
+
+        if isnormal:
             # Linearized product  x * y = <x><y> + <y>dx + <x>dy,
             # for  x = <x> + dx  and  y = <y> + dy.
 
@@ -121,7 +125,9 @@ class Normal:
         return self * other
     
     def __truediv__(self, other):
-        if isinstance(other, Normal):
+        other, isnormal = _prepare_op(other)
+
+        if isnormal:
             # Linearized fraction  x/y = <x>/<y> + dx/<y> - dy<x>/<y>^2,
             # for  x = <x> + dx  and  y = <y> + dy.
 
@@ -134,14 +140,19 @@ class Normal:
     def __rtruediv__(self, other):
         # Linearized fraction  x/y = <x>/<y> - dy<x>/<y>^2,
         # for  x = <x>  and  y = <y> + dy.
-        # Only need the case when `other` is not a normal variable.
+
+        other, isnormal = _prepare_op(other)
+        if isnormal:
+            return other / self
         
         b = other / self.b
         em = self.emap * ((-other) / self.b**2)
         return Normal(em, b)
     
     def __pow__(self, other):
-        if isinstance(other, Normal):
+        other, isnormal = _prepare_op(other)
+
+        if isnormal:
             # x^y = <x>^<y> + dx <y> <x>^(<y>-1) + dy ln(<x>) <x>^<y>
             
             b = self.b ** other.b
@@ -149,25 +160,33 @@ class Normal:
             em2 = other.emap * (np.log(np.where(self.b, self.b, 1.)) * b)
             return Normal(em1 + em2, b)
         
-        other = np.asanyarray(other)
         b = self.b ** other
         em = self.emap * (other * (self.b ** np.where(other, other-1, 1.)))
         return Normal(em, b)
 
     def __rpow__(self, other):
         # x^y = <x>^<y> + dy ln(<x>) <x>^<y>
-        # Only need the case when `other` is not a normal variable.
+
+        other, isnormal = _prepare_op(other)
+        if isnormal:
+            return other ** self
 
         b = other ** self.b
         em = self.emap * (np.log(np.where(other, other, 1.)) * b)
         return Normal(em, b)
 
     def __matmul__(self, other):
-        if isinstance(other, Normal):
+        other, isnormal = _prepare_op(other)
+        if isnormal:
             return self @ other.b + self.b @ other
+        
         return Normal(self.emap @ other, self.b @ other)
 
     def __rmatmul__(self, other):
+        other, isnormal = _prepare_op(other)
+        if isnormal:
+            return other @ self.b + other.b @ self
+        
         return Normal(other @ self.emap, other @ self.b)
 
     def __getitem__(self, key):
@@ -421,12 +440,41 @@ class Normal:
         return logp(x, m, cov)
 
 
-def asnormal(v):
-    if isinstance(v, Normal):
-        return v
+NUMERIC_ARRAY_KINDS = {"b", "i", "u", "f", "c"}
 
-    # v is a number or array
-    b = np.asanyarray(v)
+
+def _prepare_op(x):
+    """Prepares the operand `x` for an arithmetic operation by converting 
+    it to either a numeric array or a normal variable.
+    
+    Returns:
+        Tuple (`numeric_or_normal_x`, `isnormal`)
+    """
+
+    if isinstance(x, Normal):
+        return x, True
+    
+    x_ = np.asanyarray(x)
+    if x_.dtype.kind not in NUMERIC_ARRAY_KINDS:
+        return asnormal(x), True
+
+    return x_, False
+
+
+def asnormal(x):
+    """Converts `x` to a normal variable. If `x` is 
+    a normal variable already, returns it unchanged."""
+
+    if isinstance(x, Normal):
+        return x
+
+    b = np.asanyarray(x)
+    if b.dtype.kind not in NUMERIC_ARRAY_KINDS:
+        if b.ndim == 0:
+            raise TypeError(f"Variable of type '{x.__class__.__name__}' cannot "
+                            "be converted to a normal variable.")
+        return stack([asnormal(vi) for vi in b])
+
     em = ElementaryMap(np.zeros((0, *b.shape), dtype=b.dtype))
     return Normal(em, b)
 
@@ -537,7 +585,7 @@ def cov(*args):
                          f"arguments, while {len(args)} areguments are given.")
     
     if len(args) == 1:
-        return args[0].cov()
+        return asnormal(args[0]).cov()
     
     # For the case len(args) == 2.
     x, y = args
@@ -645,15 +693,18 @@ def dsplit(x, indices_or_sections):
     
 
 def einsum(subs, op1, op2):
-    if isinstance(op2, Normal) and isinstance(op1, Normal):
+    op1, isnormal1 = _prepare_op(op1)
+    op2, isnormal2 = _prepare_op(op2)
+
+    if isnormal2 and isnormal1:
         return einsum(subs, op1.b, op2) + einsum(subs, op1, op2.b)
 
-    if isinstance(op1, Normal) and not isinstance(op2, Normal):
+    if isnormal1 and not isnormal2:
         b = np.einsum(subs, op1.b, op2)
         em = op1.emap.einsum(subs, op2)
         return Normal(em, b)
     
-    if isinstance(op2, Normal) and not isinstance(op1, Normal):
+    if isnormal2 and not isnormal1:
         b = np.einsum(subs, op1, op2.b)
         em = op2.emap.einsum(subs, op1, otherfirst=True)
         return Normal(em, b)
@@ -706,17 +757,20 @@ def tensordot(op1, op2, axes=2):
 
 
 def _bilinearfunc(name, op1, op2, *args, **kwargs):
-    if isinstance(op2, Normal) and isinstance(op1, Normal):
+    op1, isnormal1 = _prepare_op(op1)
+    op2, isnormal2 = _prepare_op(op2)
+
+    if isnormal2 and isnormal1:
         t1 = _bilinearfunc(name, op1.b, op2, *args, **kwargs)
         t2 = _bilinearfunc(name, op1, op2.b, *args, **kwargs)
         return t1 + t2
 
-    if isinstance(op1, Normal) and not isinstance(op2, Normal):
+    if isnormal1 and not isnormal2:
         b = getattr(np, name)(op1.b, op2, *args, **kwargs)
         em = getattr(op1.emap, name)(op2, *args, **kwargs)
         return Normal(em, b)
     
-    if isinstance(op2, Normal) and not isinstance(op1, Normal):
+    if isnormal2 and not isnormal1:
         b = getattr(np, name)(op1, op2.b, *args, **kwargs)
 
         kwargs.update(otherfirst=True)
@@ -736,7 +790,9 @@ def linearized_unary(jmpf):
     f = getattr(np, fnm)
 
     def flin(x):
-        if not isinstance(x, Normal):
+        x, isnormal = _prepare_op(x)
+
+        if not isnormal:
             return f(x)
         
         new_b = f(x.b)
