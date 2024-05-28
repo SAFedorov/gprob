@@ -236,6 +236,11 @@ def test_properties():
         assert getattr(v, pn) == getattr(v.b, pn)
 
 
+def test_repr():
+    for v in [normal(), normal(size=(2, 3))]:
+        assert type(repr(v)) == type("")
+        
+
 def test_logp():
     # The validation of the log likelihood calculation for real normal arrays.
 

@@ -14,6 +14,7 @@ class Normal:
 
     __slots__ = ("emap", "b", "size", "shape", "ndim")
     __array_ufunc__ = None
+    __normal_priority__ = 0
 
     def __init__(self, emap, b):
         if not isinstance(emap, ElementaryMap):
@@ -50,31 +51,7 @@ class Normal:
         return (np.iscomplexobj(self.emap.a) or np.iscomplexobj(self.b))
 
     def __repr__(self):
-        csn = self.__class__.__name__
-
-        if self.ndim == 0:
-            meanstr = f"{self.mean():.8g}"
-            varstr = f"{self.var():.8g}"
-            # To make the displays of scalars consistent with the display 
-            # of array elements.
-        else:
-            meanstr = str(self.mean())
-            varstr = str(self.var())
-
-        if "\n" not in meanstr and "\n" not in varstr:
-            return (f"{csn}(mean={meanstr}, var={varstr})")
-
-        meanln = meanstr.splitlines()
-        h = "  mean="
-        meanln_ = [h + meanln[0]]
-        meanln_.extend(" " * len(h) + ln for ln in meanln[1:])
-
-        varln = varstr.splitlines()
-        h = "   var="
-        varln_ = [h + varln[0]]
-        varln_.extend(" " * len(h) + ln for ln in varln[1:])
-
-        return "\n".join([f"{csn}(", *meanln_, *varln_, ")"])
+        return print_normal(self)
 
     def __len__(self):
         if self.ndim == 0:
@@ -85,6 +62,9 @@ class Normal:
         return Normal(-self.emap, -self.b)
 
     def __add__(self, other):
+        if self._is_lower_than(other):
+            return NotImplemented  # The operation must be handled by `other`.
+
         other, isnormal = _prepare_op(other)
         if isnormal:
             return Normal(self.emap + other.emap, self.b + other.b)
@@ -97,6 +77,9 @@ class Normal:
         return self.__add__(other)
     
     def __sub__(self, other):
+        if self._is_lower_than(other):
+            return NotImplemented  # The operation must be handled by `other`.
+        
         other, isnormal = _prepare_op(other)
         if isnormal:
             return Normal(self.emap + (-other.emap), self.b - other.b)
@@ -109,6 +92,9 @@ class Normal:
         return -self + other
     
     def __mul__(self, other):
+        if self._is_lower_than(other):
+            return NotImplemented  # The operation must be handled by `other`.
+        
         other, isnormal = _prepare_op(other)
 
         if isnormal:
@@ -122,9 +108,12 @@ class Normal:
         return Normal(self.emap * other, self.b * other)
     
     def __rmul__(self, other):
-        return self * other
+        return self.__mul__(other)
     
     def __truediv__(self, other):
+        if self._is_lower_than(other):
+            return NotImplemented  # The operation must be handled by `other`.
+        
         other, isnormal = _prepare_op(other)
 
         if isnormal:
@@ -150,6 +139,9 @@ class Normal:
         return Normal(em, b)
     
     def __pow__(self, other):
+        if self._is_lower_than(other):
+            return NotImplemented  # The operation must be handled by `other`.
+        
         other, isnormal = _prepare_op(other)
 
         if isnormal:
@@ -176,6 +168,9 @@ class Normal:
         return Normal(em, b)
 
     def __matmul__(self, other):
+        if self._is_lower_than(other):
+            return NotImplemented  # The operation must be handled by `other`.
+        
         other, isnormal = _prepare_op(other)
         if isnormal:
             return self @ other.b + self.b @ other
@@ -201,7 +196,7 @@ class Normal:
         self.b[key] = value.b
         self.emap[key] = value.emap
 
-    def __or__(self, observations: dict):
+    def __or__(self, observations):
         """Conditioning operation."""
         return self.condition(observations)
     
@@ -212,6 +207,13 @@ class Normal:
     def __rand__(self, other):
         """Combines two random variables into one vector."""
         return hstack([other, self])
+    
+    def _is_lower_than(self, other):
+        """Checks if `self` has lower operation priority than `other`."""
+        
+        r = (hasattr(other, "__normal_priority__") 
+             and other.__normal_priority__ > self.__normal_priority__)
+        return r
 
     # ---------- array methods ----------
 
@@ -440,6 +442,34 @@ class Normal:
         return logp(x, m, cov)
 
 
+def print_normal(x):
+    csn = x.__class__.__name__
+
+    if x.ndim == 0:
+        meanstr = f"{x.mean():.8g}"
+        varstr = f"{x.var():.8g}"
+        # To make the displays of scalars consistent with the display 
+        # of array elements.
+    else:
+        meanstr = str(x.mean())
+        varstr = str(x.var())
+
+    if "\n" not in meanstr and "\n" not in varstr:
+        return (f"{csn}(mean={meanstr}, var={varstr})")
+
+    meanln = meanstr.splitlines()
+    h = "  mean="
+    meanln_ = [h + meanln[0]]
+    meanln_.extend(" " * len(h) + ln for ln in meanln[1:])
+
+    varln = varstr.splitlines()
+    h = "   var="
+    varln_ = [h + varln[0]]
+    varln_.extend(" " * len(h) + ln for ln in varln[1:])
+
+    return "\n".join([f"{csn}(", *meanln_, *varln_, ")"])
+
+
 NUMERIC_ARRAY_KINDS = {"b", "i", "u", "f", "c"}
 
 
@@ -470,9 +500,17 @@ def asnormal(x):
 
     b = np.asanyarray(x)
     if b.dtype.kind not in NUMERIC_ARRAY_KINDS:
+        if (hasattr(x, "__normal_priority__") 
+            and x.__normal_priority__ > Normal.__normal_priority__):
+
+            raise TypeError(f"The variable {x} of type {type(x)} cannot be "
+                            "converted to a normal variable because it is of "
+                            f"higher priority ({x.__normal_priority__}).")
+    
         if b.ndim == 0:
             raise TypeError(f"Variable of type '{x.__class__.__name__}' cannot "
                             "be converted to a normal variable.")
+        
         return stack([asnormal(vi) for vi in b])
 
     em = ElementaryMap(np.zeros((0, *b.shape), dtype=b.dtype))
