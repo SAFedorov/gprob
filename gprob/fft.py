@@ -1,6 +1,4 @@
-import numpy as np
-from .normal import Normal, asnormal
-from .emaps import ElementaryMap, vax_to_ax
+from .normal import get_highest_class
 
 
 def fft(x, n=None, axis=-1, norm=None):
@@ -27,16 +25,9 @@ def ihfft(x, n=None, axis=-1, norm=None):
     return _fftfunc("ihfft", x, n, axis, norm)
 
 
-def _fftfunc(name, x, n, axis, norm):  # maybe make fft a sub-package to hide this from importing
-    x = asnormal(x)
-
-    axis_a, = vax_to_ax([axis])
-    func = getattr(np.fft, name)
-    b = func(x.b, n, axis, norm)
-    a = func(x.emap.a, n, axis_a, norm)
-
-    em = ElementaryMap(a, x.emap.elem)
-    return Normal(em, b)
+def _fftfunc(name, x, n, axis, norm):
+    cls = get_highest_class(x)
+    return cls.fftfunc(name, x, n, axis, norm)
 
 
 def fft2(x, s=None, axes=(-2, -1), norm=None):
@@ -72,15 +63,5 @@ def irfftn(x, s=None, axes=None, norm=None):
 
 
 def _fftfunc_n(name, x, s, axes, norm):
-    x = asnormal(x)
-
-    if axes is None:
-        axes = list(range(x.ndim))
-
-    axes_a = vax_to_ax(axes)
-    func = getattr(np.fft, name)
-    b = func(x.b, s, axes, norm)
-    a = func(x.emap.a, s, axes_a, norm)
-
-    em = ElementaryMap(a, x.emap.elem)
-    return Normal(em, b)
+    cls = get_highest_class(x)
+    return cls.fftfunc_n(name, x, s, axes, norm)

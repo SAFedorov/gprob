@@ -253,6 +253,11 @@ class Normal:
         em = self.emap.reshape(newshape, order=order)
         return Normal(em, b)
     
+    def split(self, indices_or_sections, axis=0):
+        bs = np.split(self.b, indices_or_sections, axis=axis)
+        ems = self.emap.split(indices_or_sections, vaxis=axis)
+        return [Normal(em, b) for em, b in zip(ems, bs)]
+    
     def sum(self, axis=None, keepdims=False):
         # "where" is absent because its broadcasting is not implemented.
         # "initial" is also not implemented.
@@ -268,6 +273,73 @@ class Normal:
     def trace(self, offset=0, axis1=0, axis2=1):
         b = self.b.trace(offset=offset, axis1=axis1, axis2=axis2)
         em = self.emap.trace(offset, axis1, axis2)
+        return Normal(em, b)
+    
+    @staticmethod
+    def concatfunc(name, arrays, *args, **kwargs):
+        arrays = [asnormal(ar) for ar in arrays]
+        b = getattr(np, name)([x.b for x in arrays], *args, **kwargs)
+        em = getattr(emaps, name)([x.emap for x in arrays], *args, **kwargs)
+        return Normal(em, b)
+
+    @staticmethod
+    def bilinearfunc(name, op1, op2, *args, **kwargs):
+        op1, isnormal1 = _prepare_op(op1)
+        op2, isnormal2 = _prepare_op(op2)
+
+        if isnormal2 and isnormal1:
+            t1 = _bilinearfunc(name, op1.b, op2, *args, **kwargs)
+            t2 = _bilinearfunc(name, op1, op2.b, *args, **kwargs)
+            return t1 + t2
+
+        if isnormal1 and not isnormal2:
+            b = getattr(np, name)(op1.b, op2, *args, **kwargs)
+            em = getattr(op1.emap, name)(op2, *args, **kwargs)
+            return Normal(em, b)
+        
+        if isnormal2 and not isnormal1:
+            b = getattr(np, name)(op1, op2.b, *args, **kwargs)
+
+            kwargs.update(otherfirst=True)
+            em = getattr(op2.emap, name)(op1, *args, **kwargs)
+            return Normal(em, b)
+
+        return getattr(np, name)(op1, op2, *args, **kwargs)
+
+    @staticmethod
+    def einsum(subs, op1, op2):
+        op1, isnormal1 = _prepare_op(op1)
+        op2, isnormal2 = _prepare_op(op2)
+
+        if isnormal2 and isnormal1:
+            return einsum(subs, op1.b, op2) + einsum(subs, op1, op2.b)
+
+        if isnormal1 and not isnormal2:
+            b = np.einsum(subs, op1.b, op2)
+            em = op1.emap.einsum(subs, op2)
+            return Normal(em, b)
+        
+        if isnormal2 and not isnormal1:
+            b = np.einsum(subs, op1, op2.b)
+            em = op2.emap.einsum(subs, op1, otherfirst=True)
+            return Normal(em, b)
+
+        return np.einsum(subs, op1, op2)
+
+    @staticmethod
+    def fftfunc(name, x, n, axis, norm):
+        x = asnormal(x)
+        func = getattr(np.fft, name)
+        b = func(x.b, n, axis, norm)
+        em = x.emap.fftfunc(name, n, axis, norm)
+        return Normal(em, b)
+
+    @staticmethod
+    def fftfunc_n(name, x, s, axes, norm):
+        x = asnormal(x)
+        func = getattr(np.fft, name)
+        b = func(x.b, s, axes, norm)
+        em = x.emap.fftfunc_n(name, s, axes, norm)
         return Normal(em, b)
 
     # ---------- probability-related methods ----------
@@ -492,8 +564,10 @@ def _prepare_op(x):
 
 
 def asnormal(x):
-    """Converts `x` to a normal variable. If `x` is 
-    a normal variable already, returns it unchanged."""
+    """Converts `x` to a normal variable. If `x` is a normal variable already, 
+    returns it unchanged. If `x` is a higher-priority normal subtype, raises a 
+    `OrderError`. If `x` is of another non-numeric type, raises 
+    a `TypeError`."""
 
     if isinstance(x, Normal):
         return x
@@ -503,9 +577,10 @@ def asnormal(x):
         if (hasattr(x, "__normal_priority__") 
             and x.__normal_priority__ > Normal.__normal_priority__):
 
-            raise TypeError(f"The variable {x} of type {type(x)} cannot be "
-                            "converted to a normal variable because it is of "
-                            f"higher priority ({x.__normal_priority__}).")
+            raise TypeError(f"The variable {x} cannot be converted to "
+                            "a normal variable because it is already "
+                            f"of higher priority ({x.__normal_priority__} "
+                            f"> {Normal.__normal_priority__}).")
     
         if b.ndim == 0:
             raise TypeError(f"Variable of type '{x.__class__.__name__}' cannot "
@@ -571,7 +646,7 @@ def normal(mu=0., sigmasq=1., size=None):
     sigmasq2d = sigmasq.reshape((mu.size, mu.size))
         
     try:
-        a2dtr = _safer_cholesky(sigmasq2d)
+        a2dtr = safer_cholesky(sigmasq2d)
         a = np.reshape(a2dtr.T, (mu.size,) + vshape)
         return Normal(a, mu)
     except LinAlgError:
@@ -593,7 +668,7 @@ def normal(mu=0., sigmasq=1., size=None):
     return Normal(a, mu)
 
 
-def _safer_cholesky(x):
+def safer_cholesky(x):
     ltri = np.linalg.cholesky(x)
 
     d = np.diagonal(ltri)
@@ -633,7 +708,6 @@ def cov(*args):
 
 
 # ---------- linear array functions ----------
-# These functions apply to numpy arrays without converting them to Normal.
 
 
 def diagonal(x, offset=0, axis1=0, axis2=1):
@@ -650,7 +724,7 @@ def cumsum(x, axis=None):
 
 def moveaxis(x, source, destination):
     if not isinstance(x, Normal):
-        return np.moveaxis(x, source, destination)
+        return np.moveaxis(x, source, destination)  # TODO: support higher types ----------------
     return x.moveaxis(source, destination)
 
 
@@ -691,23 +765,25 @@ def dstack(arrays):
 
 
 def _concatfunc(name, arrays, *args, **kwargs):
-    if not any(isinstance(a, Normal) for a in arrays):
-        return getattr(np, name)(arrays, *args, **kwargs)
+    cls = get_highest_class(arrays)
+    return cls.concatfunc(name, arrays, *args, **kwargs)
 
-    arrays = [asnormal(ar) for ar in arrays]
+
+def get_highest_class(seq):
+    """Returns the class of the highest-priority object in the sequence `seq`
+    according to `__normal_priority__`, defaulting to `Normal`."""
+
+    obj = max(seq, key=lambda a: getattr(a.__class__, "__normal_priority__",
+                                          Normal.__normal_priority__ - 1))
+    cls = obj.__class__
+    if not hasattr(cls, "__normal_priority__"):
+        return Normal 
     
-    b = getattr(np, name)([x.b for x in arrays], *args, **kwargs)
-    em = getattr(emaps, name)([x.emap for x in arrays], *args, **kwargs)
-    return Normal(em, b)
+    return cls
 
 
 def split(x, indices_or_sections, axis=0):   
-    if not isinstance(x, Normal):
-        return np.split(x, indices_or_sections, axis=axis)
-    
-    bs = np.split(x.b, indices_or_sections, axis=axis)
-    ems = x.emap.split(indices_or_sections, vaxis=axis)
-    return [Normal(em, b) for em, b in zip(ems, bs)]
+    return x.split(indices_or_sections=indices_or_sections, axis=axis)
 
 
 def hsplit(x, indices_or_sections):
@@ -731,23 +807,8 @@ def dsplit(x, indices_or_sections):
     
 
 def einsum(subs, op1, op2):
-    op1, isnormal1 = _prepare_op(op1)
-    op2, isnormal2 = _prepare_op(op2)
-
-    if isnormal2 and isnormal1:
-        return einsum(subs, op1.b, op2) + einsum(subs, op1, op2.b)
-
-    if isnormal1 and not isnormal2:
-        b = np.einsum(subs, op1.b, op2)
-        em = op1.emap.einsum(subs, op2)
-        return Normal(em, b)
-    
-    if isnormal2 and not isnormal1:
-        b = np.einsum(subs, op1, op2.b)
-        em = op2.emap.einsum(subs, op1, otherfirst=True)
-        return Normal(em, b)
-
-    return np.einsum(subs, op1, op2)
+    cls = get_highest_class([op1, op2])
+    return cls.einsum(subs, op1, op2)
 
 
 def add(op1, op2):
@@ -795,27 +856,8 @@ def tensordot(op1, op2, axes=2):
 
 
 def _bilinearfunc(name, op1, op2, *args, **kwargs):
-    op1, isnormal1 = _prepare_op(op1)
-    op2, isnormal2 = _prepare_op(op2)
-
-    if isnormal2 and isnormal1:
-        t1 = _bilinearfunc(name, op1.b, op2, *args, **kwargs)
-        t2 = _bilinearfunc(name, op1, op2.b, *args, **kwargs)
-        return t1 + t2
-
-    if isnormal1 and not isnormal2:
-        b = getattr(np, name)(op1.b, op2, *args, **kwargs)
-        em = getattr(op1.emap, name)(op2, *args, **kwargs)
-        return Normal(em, b)
-    
-    if isnormal2 and not isnormal1:
-        b = getattr(np, name)(op1, op2.b, *args, **kwargs)
-
-        kwargs.update(otherfirst=True)
-        em = getattr(op2.emap, name)(op1, *args, **kwargs)
-        return Normal(em, b)
-
-    return getattr(np, name)(op1, op2, *args, **kwargs)
+    cls = get_highest_class([op1, op2])
+    return cls.bilinearfunc(name, op1, op2, *args, **kwargs)
 
 
 # ---------- linear and linearized unary array ufuncs ----------

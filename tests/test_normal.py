@@ -3,7 +3,7 @@ import numpy as np
 from scipy.stats import multivariate_normal as mvn
 from numpy.linalg import LinAlgError
 from gprob.normal import (normal, hstack, vstack, Normal, 
-                          _safer_cholesky, cov, cov)
+                          safer_cholesky, cov, cov)
 from utils import random_normal, random_correlate
 
 np.random.seed(0)
@@ -80,7 +80,7 @@ def test_creation():
     cov = np.einsum("ijkl, imno -> jklmno", a, a.conj())
 
     with pytest.raises(LinAlgError):  # confirms the degeneracy
-        _safer_cholesky(cov.reshape((vsz, vsz)))
+        safer_cholesky(cov.reshape((vsz, vsz)))
 
     xi = normal(mu, cov)
     assert xi.shape == sh
@@ -156,7 +156,7 @@ def test_creation_w_dtype():
 
         cov = (evects * evals) @ evects.T
         with pytest.raises(LinAlgError):  # confirms the degeneracy
-            _safer_cholesky(cov)
+            safer_cholesky(cov)
 
         mu = np.random.rand(sz).astype(dt)
         xi = normal(mu, cov)
@@ -169,7 +169,7 @@ def test_creation_w_dtype():
         evals[2] = 0.
         cov = (evects * evals) @ evects.T
         with pytest.raises(LinAlgError):
-            _safer_cholesky(cov)
+            safer_cholesky(cov)
 
         mu = np.random.rand(sz).astype(dt)
         xi = normal(mu, cov)
@@ -204,7 +204,7 @@ def test_creation_w_dtype():
 
         cov = (evects * evals) @ evects.T.conj()
         with pytest.raises(LinAlgError):  # confirms the degeneracy
-            _safer_cholesky(cov)
+            safer_cholesky(cov)
 
         mu = (np.random.rand(sz) + 1j * np.random.rand(sz)).astype(dt)
         xi = normal(mu, cov)
@@ -217,7 +217,7 @@ def test_creation_w_dtype():
         evals[2] = 0.
         cov = (evects * evals) @ evects.T.conj()
         with pytest.raises(LinAlgError):
-            _safer_cholesky(cov)
+            safer_cholesky(cov)
 
         mu = (np.random.rand(sz) + 1j * np.random.rand(sz)).astype(dt)
         xi = normal(mu, cov)

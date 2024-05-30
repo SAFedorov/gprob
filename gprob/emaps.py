@@ -278,6 +278,21 @@ class ElementaryMap:
         new_as = np.split(self.a, ios, axis=axis)
         return [ElementaryMap(a, self.elem) for a in new_as]
     
+    def fftfunc(self, name, n, vaxis, norm):
+        axis_a, = vax_to_ax([vaxis])
+        func = getattr(np.fft, name)
+        new_a = func(self.a, n, axis_a, norm)
+        return ElementaryMap(new_a, self.elem)
+
+    def fftfunc_n(self, name, s, vaxes, norm):
+        if vaxes is None:
+            vaxes = list(range(self.vndim))
+
+        axes_a = vax_to_ax(vaxes)
+        func = getattr(np.fft, name)
+        new_a = func(self.a, s, axes_a, norm)
+        return ElementaryMap(new_a, self.elem)
+    
     # ---------- bilinear functions with numeric arrays ----------
     
     def einsum(self, vsubs, other, otherfirst=False):
