@@ -1,4 +1,4 @@
-from gprob.normal import (
+from gprob.normal_ import (
     Normal, normal, asnormal, cov, cov, 
     stack, hstack, vstack, dstack, concatenate, 
     split, hsplit, vsplit, dsplit, sum, cumsum, trace, diagonal, reshape, 

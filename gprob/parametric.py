@@ -3,7 +3,7 @@ import numpy as np
 import jax
 from jax import numpy as jnp
 
-from .normal import Normal
+from .normal_ import Normal
 from .emaps import complete, ElementaryMap
 from .func import logp, dlogp, fisher
 

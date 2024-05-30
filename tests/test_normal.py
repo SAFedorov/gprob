@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 from scipy.stats import multivariate_normal as mvn
 from numpy.linalg import LinAlgError
-from gprob.normal import (normal, hstack, vstack, Normal, 
+from gprob.normal_ import (normal, hstack, vstack, Normal, 
                           safer_cholesky, cov, cov)
 from utils import random_normal, random_correlate
 

@@ -1,6 +1,6 @@
 import numpy as np
 from functools import reduce
-from gprob.normal import Normal
+from gprob.normal_ import Normal
 
 
 def random_normal(shape, dtype=np.float64):

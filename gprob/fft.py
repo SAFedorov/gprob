@@ -1,4 +1,4 @@
-from .normal import get_highest_class
+from .normal_ import get_highest_class
 
 
 def fft(x, n=None, axis=-1, norm=None):
