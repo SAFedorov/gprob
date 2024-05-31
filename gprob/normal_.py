@@ -14,7 +14,7 @@ class Normal:
 
     __slots__ = ("emap", "b", "size", "shape", "ndim")
     __array_ufunc__ = None
-    _normal_priority_ = 0
+    __normal_priority__ = 0
 
     def __init__(self, emap, b):
         if not isinstance(emap, ElementaryMap):
@@ -65,8 +65,8 @@ class Normal:
         if self._is_lower_than(other):
             return NotImplemented  # The operation must be handled by `other`.
 
-        other, isnumeric = _prepare_op(other)
-        if not isnumeric:
+        other, isnormal = _prepare_op(other)
+        if isnormal:
             return Normal(self.emap + other.emap, self.b + other.b)
 
         b = self.b + other
@@ -80,8 +80,8 @@ class Normal:
         if self._is_lower_than(other):
             return NotImplemented  # The operation must be handled by `other`.
         
-        other, isnumeric = _prepare_op(other)
-        if not isnumeric:
+        other, isnormal = _prepare_op(other)
+        if isnormal:
             return Normal(self.emap + (-other.emap), self.b - other.b)
         
         b = self.b - other
@@ -95,9 +95,9 @@ class Normal:
         if self._is_lower_than(other):
             return NotImplemented  # The operation must be handled by `other`.
         
-        other, isnumeric = _prepare_op(other)
+        other, isnormal = _prepare_op(other)
 
-        if not isnumeric:
+        if isnormal:
             # Linearized product  x * y = <x><y> + <y>dx + <x>dy,
             # for  x = <x> + dx  and  y = <y> + dy.
 
@@ -114,9 +114,9 @@ class Normal:
         if self._is_lower_than(other):
             return NotImplemented  # The operation must be handled by `other`.
         
-        other, isnumeric = _prepare_op(other)
+        other, isnormal = _prepare_op(other)
 
-        if not isnumeric:
+        if isnormal:
             # Linearized fraction  x/y = <x>/<y> + dx/<y> - dy<x>/<y>^2,
             # for  x = <x> + dx  and  y = <y> + dy.
 
@@ -130,8 +130,8 @@ class Normal:
         # Linearized fraction  x/y = <x>/<y> - dy<x>/<y>^2,
         # for  x = <x>  and  y = <y> + dy.
 
-        other, isnumeric = _prepare_op(other)
-        if not isnumeric:
+        other, isnormal = _prepare_op(other)
+        if isnormal:
             return other / self
         
         b = other / self.b
@@ -142,9 +142,9 @@ class Normal:
         if self._is_lower_than(other):
             return NotImplemented  # The operation must be handled by `other`.
         
-        other, isnumeric = _prepare_op(other)
+        other, isnormal = _prepare_op(other)
 
-        if not isnumeric:
+        if isnormal:
             # x^y = <x>^<y> + dx <y> <x>^(<y>-1) + dy ln(<x>) <x>^<y>
             
             b = self.b ** other.b
@@ -159,8 +159,8 @@ class Normal:
     def __rpow__(self, other):
         # x^y = <x>^<y> + dy ln(<x>) <x>^<y>
 
-        other, isnumeric = _prepare_op(other)
-        if not isnumeric:
+        other, isnormal = _prepare_op(other)
+        if isnormal:
             return other ** self
 
         b = other ** self.b
@@ -171,15 +171,15 @@ class Normal:
         if self._is_lower_than(other):
             return NotImplemented  # The operation must be handled by `other`.
         
-        other, isnumeric = _prepare_op(other)
-        if not isnumeric:
+        other, isnormal = _prepare_op(other)
+        if isnormal:
             return self @ other.b + self.b @ other
         
         return Normal(self.emap @ other, self.b @ other)
 
     def __rmatmul__(self, other):
-        other, isnumeric = _prepare_op(other)
-        if not isnumeric:
+        other, isnormal = _prepare_op(other)
+        if isnormal:
             return other @ self.b + other.b @ self
         
         return Normal(other @ self.emap, other @ self.b)
@@ -211,8 +211,8 @@ class Normal:
     def _is_lower_than(self, other):
         """Checks if `self` has lower operation priority than `other`."""
         
-        r = (hasattr(other, "_normal_priority_") 
-             and other._normal_priority_ > self._normal_priority_)
+        r = (hasattr(other, "__normal_priority__") 
+             and other.__normal_priority__ > self.__normal_priority__)
         return r
 
     # ---------- array methods ----------
@@ -284,20 +284,20 @@ class Normal:
 
     @staticmethod
     def bilinearfunc(name, op1, op2, *args, **kwargs):
-        op1, isnumeric1 = _prepare_op(op1)
-        op2, isnumeric2 = _prepare_op(op2)
+        op1, isnormal1 = _prepare_op(op1)
+        op2, isnormal2 = _prepare_op(op2)
 
-        if not isnumeric2 and not isnumeric1:
-            t1 = Normal.bilinearfunc(name, op1.b, op2, *args, **kwargs)
-            t2 = Normal.bilinearfunc(name, op1, op2.b, *args, **kwargs)
+        if isnormal2 and isnormal1:
+            t1 = _bilinearfunc(name, op1.b, op2, *args, **kwargs)
+            t2 = _bilinearfunc(name, op1, op2.b, *args, **kwargs)
             return t1 + t2
 
-        if not isnumeric1 and isnumeric2:
+        if isnormal1 and not isnormal2:
             b = getattr(np, name)(op1.b, op2, *args, **kwargs)
             em = getattr(op1.emap, name)(op2, *args, **kwargs)
             return Normal(em, b)
         
-        if not isnumeric2 and isnumeric1:
+        if isnormal2 and not isnormal1:
             b = getattr(np, name)(op1, op2.b, *args, **kwargs)
 
             kwargs.update(otherfirst=True)
@@ -308,19 +308,18 @@ class Normal:
 
     @staticmethod
     def einsum(subs, op1, op2):
-        op1, isnumeric1 = _prepare_op(op1)
-        op2, isnumeric2 = _prepare_op(op2)
+        op1, isnormal1 = _prepare_op(op1)
+        op2, isnormal2 = _prepare_op(op2)
 
-        if not isnumeric2 and not isnumeric1:
-            return (Normal.einsum(subs, op1.b, op2) 
-                    + Normal.einsum(subs, op1, op2.b))
+        if isnormal2 and isnormal1:
+            return einsum(subs, op1.b, op2) + einsum(subs, op1, op2.b)
 
-        if not isnumeric1 and isnumeric2:
+        if isnormal1 and not isnormal2:
             b = np.einsum(subs, op1.b, op2)
             em = op1.emap.einsum(subs, op2)
             return Normal(em, b)
         
-        if not isnumeric2 and isnumeric1:
+        if isnormal2 and not isnormal1:
             b = np.einsum(subs, op1, op2.b)
             em = op2.emap.einsum(subs, op1, otherfirst=True)
             return Normal(em, b)
@@ -551,17 +550,17 @@ def _prepare_op(x):
     it to either a numeric array or a normal variable.
     
     Returns:
-        Tuple (`numeric_or_normal_x`, `isnumeric`)
+        Tuple (`numeric_or_normal_x`, `isnormal`)
     """
 
     if isinstance(x, Normal):
-        return x, False
+        return x, True
     
     x_ = np.asanyarray(x)
     if x_.dtype.kind not in NUMERIC_ARRAY_KINDS:
-        return asnormal(x), False
+        return asnormal(x), True
 
-    return x_, True
+    return x_, False
 
 
 def asnormal(x):
@@ -575,13 +574,13 @@ def asnormal(x):
 
     b = np.asanyarray(x)
     if b.dtype.kind not in NUMERIC_ARRAY_KINDS:
-        if (hasattr(x, "_normal_priority_") 
-            and x._normal_priority_ > Normal._normal_priority_):
+        if (hasattr(x, "__normal_priority__") 
+            and x.__normal_priority__ > Normal.__normal_priority__):
 
             raise TypeError(f"The variable {x} cannot be converted to "
                             "a normal variable because it is already "
-                            f"of higher priority ({x._normal_priority_} "
-                            f"> {Normal._normal_priority_}).")
+                            f"of higher priority ({x.__normal_priority__} "
+                            f"> {Normal.__normal_priority__}).")
     
         if b.ndim == 0:
             raise TypeError(f"Variable of type '{x.__class__.__name__}' cannot "
@@ -772,12 +771,12 @@ def _concatfunc(name, arrays, *args, **kwargs):
 
 def get_highest_class(seq):
     """Returns the class of the highest-priority object in the sequence `seq`
-    according to `_normal_priority_`, defaulting to `Normal`."""
+    according to `__normal_priority__`, defaulting to `Normal`."""
 
-    obj = max(seq, key=lambda a: getattr(a.__class__, "_normal_priority_",
-                                          Normal._normal_priority_ - 1))
+    obj = max(seq, key=lambda a: getattr(a.__class__, "__normal_priority__",
+                                          Normal.__normal_priority__ - 1))
     cls = obj.__class__
-    if not hasattr(cls, "_normal_priority_"):
+    if not hasattr(cls, "__normal_priority__"):
         return Normal 
     
     return cls
@@ -871,9 +870,9 @@ def linearized_unary(jmpf):
     f = getattr(np, fnm)
 
     def flin(x):
-        x, isnumeric = _prepare_op(x)
+        x, isnormal = _prepare_op(x)
 
-        if isnumeric:
+        if not isnormal:
             return f(x)
         
         new_b = f(x.b)
