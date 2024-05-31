@@ -506,28 +506,3 @@ def stack(emaps, vaxis=0):
     cat_a[idx, *base_jidx, j2] = op2.a
 
     return ElementaryMap(cat_a, union_elem)
-
-
-def hstack(emaps):
-    emaps = [em.ravel() if em.vndim == 0 else em for em in emaps]
-
-    if emaps[0].vndim == 1:
-        return concatenate(emaps, vaxis=0)
-    
-    return concatenate(emaps, vaxis=1)
-    
-
-def vstack(emaps):
-    if emaps[0].vndim <= 1:
-        emaps = [em.reshape((1, -1)) for em in emaps]
-    
-    return concatenate(emaps, vaxis=0)
-
-
-def dstack(emaps):
-    if emaps[0].vndim <= 1:
-        emaps = [em.reshape((1, -1, 1)) for em in emaps]
-    elif emaps[0].vndim == 2:
-        emaps = [em.reshape((*em.vshape, 1)) for em in emaps]
-    
-    return concatenate(emaps, vaxis=2)

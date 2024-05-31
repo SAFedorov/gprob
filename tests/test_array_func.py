@@ -1,5 +1,6 @@
 from functools import reduce
 import numpy as np
+import pytest
 
 np.random.seed(0)
 
@@ -653,6 +654,23 @@ def test_concatenate():
         vins = random_correlate([random_normal((*s[:ax+1], i, *s[ax+1:]))
                                   for i in range(1, 4)])
         _test_concat_func(concatenate, axis=ax, vins_list=[vins])
+
+
+def test_zero_arg_concat_func():
+    with pytest.raises(ValueError):
+        concatenate([])
+
+    with pytest.raises(ValueError):
+        stack([])
+    
+    with pytest.raises(ValueError):
+        hstack([])
+
+    with pytest.raises(ValueError):
+        vstack([])
+
+    with pytest.raises(ValueError):
+        dstack([])
 
 
 def _test_split_func(f, test_shapes="1dmin", test_axis=None, **kwargs):

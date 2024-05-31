@@ -14,7 +14,7 @@ class Normal:
 
     __slots__ = ("emap", "b", "size", "shape", "ndim")
     __array_ufunc__ = None
-    __normal_priority__ = 0
+    _normal_priority_ = 0
 
     def __init__(self, emap, b):
         if not isinstance(emap, ElementaryMap):
@@ -65,7 +65,7 @@ class Normal:
         if self._is_lower_than(other):
             return NotImplemented  # The operation must be handled by `other`.
 
-        other, isnormal = _prepare_op(other)
+        other, isnormal = as_numeric_or_normal(other)
         if isnormal:
             return Normal(self.emap + other.emap, self.b + other.b)
 
@@ -80,7 +80,7 @@ class Normal:
         if self._is_lower_than(other):
             return NotImplemented  # The operation must be handled by `other`.
         
-        other, isnormal = _prepare_op(other)
+        other, isnormal = as_numeric_or_normal(other)
         if isnormal:
             return Normal(self.emap + (-other.emap), self.b - other.b)
         
@@ -95,7 +95,7 @@ class Normal:
         if self._is_lower_than(other):
             return NotImplemented  # The operation must be handled by `other`.
         
-        other, isnormal = _prepare_op(other)
+        other, isnormal = as_numeric_or_normal(other)
 
         if isnormal:
             # Linearized product  x * y = <x><y> + <y>dx + <x>dy,
@@ -114,7 +114,7 @@ class Normal:
         if self._is_lower_than(other):
             return NotImplemented  # The operation must be handled by `other`.
         
-        other, isnormal = _prepare_op(other)
+        other, isnormal = as_numeric_or_normal(other)
 
         if isnormal:
             # Linearized fraction  x/y = <x>/<y> + dx/<y> - dy<x>/<y>^2,
@@ -130,7 +130,7 @@ class Normal:
         # Linearized fraction  x/y = <x>/<y> - dy<x>/<y>^2,
         # for  x = <x>  and  y = <y> + dy.
 
-        other, isnormal = _prepare_op(other)
+        other, isnormal = as_numeric_or_normal(other)
         if isnormal:
             return other / self
         
@@ -142,7 +142,7 @@ class Normal:
         if self._is_lower_than(other):
             return NotImplemented  # The operation must be handled by `other`.
         
-        other, isnormal = _prepare_op(other)
+        other, isnormal = as_numeric_or_normal(other)
 
         if isnormal:
             # x^y = <x>^<y> + dx <y> <x>^(<y>-1) + dy ln(<x>) <x>^<y>
@@ -159,7 +159,7 @@ class Normal:
     def __rpow__(self, other):
         # x^y = <x>^<y> + dy ln(<x>) <x>^<y>
 
-        other, isnormal = _prepare_op(other)
+        other, isnormal = as_numeric_or_normal(other)
         if isnormal:
             return other ** self
 
@@ -171,14 +171,14 @@ class Normal:
         if self._is_lower_than(other):
             return NotImplemented  # The operation must be handled by `other`.
         
-        other, isnormal = _prepare_op(other)
+        other, isnormal = as_numeric_or_normal(other)
         if isnormal:
             return self @ other.b + self.b @ other
         
         return Normal(self.emap @ other, self.b @ other)
 
     def __rmatmul__(self, other):
-        other, isnormal = _prepare_op(other)
+        other, isnormal = as_numeric_or_normal(other)
         if isnormal:
             return other @ self.b + other.b @ self
         
@@ -211,8 +211,8 @@ class Normal:
     def _is_lower_than(self, other):
         """Checks if `self` has lower operation priority than `other`."""
         
-        r = (hasattr(other, "__normal_priority__") 
-             and other.__normal_priority__ > self.__normal_priority__)
+        r = (hasattr(other, "_normal_priority_") 
+             and other._normal_priority_ > self._normal_priority_)
         return r
 
     # ---------- array methods ----------
@@ -276,16 +276,23 @@ class Normal:
         return Normal(em, b)
     
     @staticmethod
-    def concatfunc(name, arrays, *args, **kwargs):
+    def concatenate(arrays, axis):
         arrays = [asnormal(ar) for ar in arrays]
-        b = getattr(np, name)([x.b for x in arrays], *args, **kwargs)
-        em = getattr(emaps, name)([x.emap for x in arrays], *args, **kwargs)
+        b = np.concatenate([x.b for x in arrays], axis=axis)
+        em = emaps.concatenate([x.emap for x in arrays], vaxis=axis)
+        return Normal(em, b)
+    
+    @staticmethod
+    def stack(arrays, axis):
+        arrays = [asnormal(ar) for ar in arrays]
+        b = np.stack([x.b for x in arrays], axis=axis)
+        em = emaps.stack([x.emap for x in arrays], vaxis=axis)
         return Normal(em, b)
 
     @staticmethod
     def bilinearfunc(name, op1, op2, *args, **kwargs):
-        op1, isnormal1 = _prepare_op(op1)
-        op2, isnormal2 = _prepare_op(op2)
+        op1, isnormal1 = as_numeric_or_normal(op1)
+        op2, isnormal2 = as_numeric_or_normal(op2)
 
         if isnormal2 and isnormal1:
             t1 = _bilinearfunc(name, op1.b, op2, *args, **kwargs)
@@ -308,8 +315,8 @@ class Normal:
 
     @staticmethod
     def einsum(subs, op1, op2):
-        op1, isnormal1 = _prepare_op(op1)
-        op2, isnormal2 = _prepare_op(op2)
+        op1, isnormal1 = as_numeric_or_normal(op1)
+        op2, isnormal2 = as_numeric_or_normal(op2)
 
         if isnormal2 and isnormal1:
             return einsum(subs, op1.b, op2) + einsum(subs, op1, op2.b)
@@ -545,7 +552,7 @@ def print_normal(x):
 NUMERIC_ARRAY_KINDS = {"b", "i", "u", "f", "c"}
 
 
-def _prepare_op(x):
+def as_numeric_or_normal(x):
     """Prepares the operand `x` for an arithmetic operation by converting 
     it to either a numeric array or a normal variable.
     
@@ -574,13 +581,13 @@ def asnormal(x):
 
     b = np.asanyarray(x)
     if b.dtype.kind not in NUMERIC_ARRAY_KINDS:
-        if (hasattr(x, "__normal_priority__") 
-            and x.__normal_priority__ > Normal.__normal_priority__):
+        if (hasattr(x, "_normal_priority_") 
+            and x._normal_priority_ > Normal._normal_priority_):
 
             raise TypeError(f"The variable {x} cannot be converted to "
                             "a normal variable because it is already "
-                            f"of higher priority ({x.__normal_priority__} "
-                            f"> {Normal.__normal_priority__}).")
+                            f"of higher priority ({x._normal_priority_} "
+                            f"> {Normal._normal_priority_}).")
     
         if b.ndim == 0:
             raise TypeError(f"Variable of type '{x.__class__.__name__}' cannot "
@@ -744,42 +751,71 @@ def trace(x, offset=0, axis1=0, axis2=1):
     return x.trace(offset=offset, axis1=axis1, axis2=axis2)
 
 
-def concatenate(arrays, axis=0):
-    return _concatfunc("concatenate", arrays, axis)
-
-
-def stack(arrays, axis=0):
-    return _concatfunc("stack", arrays, axis)
-
-
-def hstack(arrays):
-    return _concatfunc("hstack", arrays)
-
-
-def vstack(arrays):
-    return _concatfunc("vstack", arrays)
-
-
-def dstack(arrays):
-    return _concatfunc("dstack", arrays)
-
-
-def _concatfunc(name, arrays, *args, **kwargs):
-    cls = get_highest_class(arrays)
-    return cls.concatfunc(name, arrays, *args, **kwargs)
-
-
 def get_highest_class(seq):
     """Returns the class of the highest-priority object in the sequence `seq`
-    according to `__normal_priority__`, defaulting to `Normal`."""
+    according to `_normal_priority_`, defaulting to `Normal`."""
 
-    obj = max(seq, key=lambda a: getattr(a.__class__, "__normal_priority__",
-                                          Normal.__normal_priority__ - 1))
+    obj = max(seq, default=0, key=lambda a: getattr(a, "_normal_priority_", 
+                                                    Normal._normal_priority_-1))
     cls = obj.__class__
-    if not hasattr(cls, "__normal_priority__"):
+    if not hasattr(cls, "_normal_priority_"):
         return Normal 
     
     return cls
+
+
+def concatenate(arrays, axis=0):
+    if len(arrays) == 0:
+        raise ValueError("Need at least one array to stack.")
+    cls = get_highest_class(arrays)
+    return cls.concatenate(arrays, axis)
+
+
+def stack(arrays, axis=0):
+    if len(arrays) == 0:
+        raise ValueError("Need at least one array to stack.")
+    cls = get_highest_class(arrays)
+    return cls.stack(arrays, axis)
+
+
+def _as_array_seq(arrays_or_scalars):
+    return [x if hasattr(x, "ndim") else np.array(x) for x in arrays_or_scalars]
+    
+
+def hstack(arrays):
+    if len(arrays) == 0:
+        raise ValueError("Need at least one array to stack.")
+    
+    arrays = _as_array_seq(arrays)
+    arrays = [a.ravel() if a.ndim == 0 else a for a in arrays]
+    if arrays[0].ndim == 1:
+        return concatenate(arrays, axis=0)
+    
+    return concatenate(arrays, axis=1)
+    
+
+def vstack(arrays):
+    if len(arrays) == 0:
+        raise ValueError("Need at least one array to stack.")
+    
+    arrays = _as_array_seq(arrays)
+    if arrays[0].ndim <= 1:
+        arrays = [a.reshape((1, -1)) for a in arrays]
+    
+    return concatenate(arrays, axis=0)
+
+
+def dstack(arrays):
+    if len(arrays) == 0:
+        raise ValueError("Need at least one array to stack.")
+    
+    arrays = _as_array_seq(arrays)
+    if arrays[0].ndim <= 1:
+        arrays = [a.reshape((1, -1, 1)) for a in arrays]
+    elif arrays[0].ndim == 2:
+        arrays = [a.reshape((*a.shape, 1)) for a in arrays]
+    
+    return concatenate(arrays, axis=2)
 
 
 def split(x, indices_or_sections, axis=0):   
@@ -870,7 +906,7 @@ def linearized_unary(jmpf):
     f = getattr(np, fnm)
 
     def flin(x):
-        x, isnormal = _prepare_op(x)
+        x, isnormal = as_numeric_or_normal(x)
 
         if not isnormal:
             return f(x)
