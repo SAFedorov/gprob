@@ -521,7 +521,7 @@ class Normal:
         return logp(x, m, cov)
 
 
-def print_normal(x):
+def print_normal(x, extra_attrs=tuple()):
     csn = x.__class__.__name__
 
     if x.ndim == 0:
@@ -532,21 +532,23 @@ def print_normal(x):
     else:
         meanstr = str(x.mean())
         varstr = str(x.var())
+    
+    d = {"mean": meanstr, "var": varstr}
+    d.update({p: str(getattr(x, p)) for p in extra_attrs})
 
-    if "\n" not in meanstr and "\n" not in varstr:
-        return (f"{csn}(mean={meanstr}, var={varstr})")
-
-    meanln = meanstr.splitlines()
-    h = "  mean="
-    meanln_ = [h + meanln[0]]
-    meanln_.extend(" " * len(h) + ln for ln in meanln[1:])
-
-    varln = varstr.splitlines()
-    h = "   var="
-    varln_ = [h + varln[0]]
-    varln_.extend(" " * len(h) + ln for ln in varln[1:])
-
-    return "\n".join([f"{csn}(", *meanln_, *varln_, ")"])
+    if all("\n" not in d[k] for k in d):
+        s = ", ".join([f"{k}={d[k]}" for k in d])
+        return f"{csn}({s})"
+    
+    padl = max(max([len(k) for k in d]), 6)
+    lines = []
+    for k in d:
+        h = k.rjust(padl, " ") + "="
+        addln = d[k].splitlines()
+        lines.append(h + addln[0])
+        lines.extend(" " * len(h) + l for l in addln[1:])
+    
+    return "\n".join([f"{csn}(", *lines, ")"])
 
 
 NUMERIC_ARRAY_KINDS = {"b", "i", "u", "f", "c"}
@@ -730,8 +732,6 @@ def cumsum(x, axis=None):
 
 
 def moveaxis(x, source, destination):
-    if not isinstance(x, Normal):
-        return np.moveaxis(x, source, destination)  # TODO: support higher types ----------------
     return x.moveaxis(source, destination)
 
 
@@ -766,7 +766,7 @@ def get_highest_class(seq):
 
 def concatenate(arrays, axis=0):
     if len(arrays) == 0:
-        raise ValueError("Need at least one array to stack.")
+        raise ValueError("Need at least one array to concatenate.")
     cls = get_highest_class(arrays)
     return cls.concatenate(arrays, axis)
 
