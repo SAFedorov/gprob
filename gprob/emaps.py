@@ -176,11 +176,8 @@ class ElementaryMap:
         return self.a
     
     def broadcast_to(self, vshape):
-        vndim = len(vshape)
-        dn = vndim - self.vndim
-
-        if dn > 0:
-            new_a = self.unsqueezed_a(vndim)
+        if self.vshape != vshape:
+            new_a = self.unsqueezed_a(len(vshape))
             new_a = np.broadcast_to(new_a, (new_a.shape[0], *vshape))
             return ElementaryMap(new_a, self.elem)
             
