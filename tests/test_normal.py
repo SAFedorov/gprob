@@ -239,7 +239,9 @@ def test_properties():
 def test_repr():
     for v in [normal(), normal(size=(2, 3))]:
         assert type(repr(v)) == type("")
-        
+    
+    assert "\n" not in repr(5 + normal(size=(3,)))
+    assert "\n" in repr(normal(size=(2, 3)))
 
 def test_logp():
     # The validation of the log likelihood calculation for real normal arrays.

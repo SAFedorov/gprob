@@ -719,6 +719,13 @@ def cov(*args):
 # ---------- linear array functions ----------
 
 
+def broadcast_to(x, shape):
+    """Broadcasts the normal variable to a new shape."""    
+    em = x.emap.broadcast_to(shape)
+    b = np.broadcast_to(x.b, shape)
+    return Normal(em, b)
+
+
 def diagonal(x, offset=0, axis1=0, axis2=1):
     return x.diagonal(offset=offset, axis1=axis1, axis2=axis2)
 
