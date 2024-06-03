@@ -2,8 +2,8 @@ import pytest
 import numpy as np
 from scipy.stats import multivariate_normal as mvn
 from numpy.linalg import LinAlgError
-from gprob.normal_ import (normal, hstack, vstack, Normal, 
-                          safer_cholesky, cov, cov)
+from gprob.normal_ import (normal, hstack, vstack, Normal, broadcast_to,
+                           safer_cholesky, cov, cov)
 from utils import random_normal, random_correlate
 
 np.random.seed(0)
@@ -242,6 +242,7 @@ def test_repr():
     
     assert "\n" not in repr(5 + normal(size=(3,)))
     assert "\n" in repr(normal(size=(2, 3)))
+
 
 def test_logp():
     # The validation of the log likelihood calculation for real normal arrays.
@@ -798,9 +799,40 @@ def test_normal_operations():
 
 
 def test_broadcasting():
-
     # In this test, normal arrays interacts with a higher-dimensional constant
     # or normal arrays that broadcast them to new shapes.
+
+    s = (5, 3)
+    assert broadcast_to(normal(size=(1, 3)), s).shape == s
+
+    s = (5, 2, 2)
+    assert broadcast_to(normal(size=(5, 1, 2)), s).shape == s
+
+    # Numeric operand smaller than the random variable
+    xi = normal(size=(1, 2, 3))
+    y = np.array([2, 3, 4])
+    assert (xi + y).shape == xi.shape
+    assert (y + xi).shape == xi.shape
+    assert (xi - y).shape == xi.shape
+    assert (y - xi).shape == xi.shape
+    assert (xi * y).shape == xi.shape
+    assert (y * xi).shape == xi.shape
+    assert (xi / y).shape == xi.shape
+    assert (xi ** y).shape == xi.shape
+    assert broadcast_to(xi, xi.shape).shape == xi.shape
+
+    # Numeric operand larger than the random variable
+    xi = normal(size=(1, 2, 3))
+    y = np.ones((4, 2, 2, 3))
+    assert (xi + y).shape == y.shape
+    assert (y + xi).shape == y.shape
+    assert (xi - y).shape == y.shape
+    assert (y - xi).shape == y.shape
+    assert (xi * y).shape == y.shape
+    assert (y * xi).shape == y.shape
+    assert (xi / y).shape == y.shape
+    assert (xi ** y).shape == y.shape
+    assert broadcast_to(xi, y.shape).shape == y.shape
 
     tol = 1e-15
 

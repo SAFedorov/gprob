@@ -1,6 +1,6 @@
 from gprob.normal_ import (
     Normal, normal, asnormal, cov, cov, 
-    stack, hstack, vstack, dstack, concatenate, 
+    stack, hstack, vstack, dstack, concatenate, broadcast_to,
     split, hsplit, vsplit, dsplit, sum, cumsum, trace, diagonal, reshape, 
     moveaxis, ravel, transpose, add, subtract, multiply, divide, power, 
     einsum, dot, matmul, inner, outer, kron, tensordot, 
