@@ -1,15 +1,13 @@
 import numpy as np
 
-import gprob.normal_ as gpn
-from .normal_ import Normal, asnormal, print_normal, as_numeric_or_normal, broadcast_to
+from .normal_ import (Normal, asnormal, print_normal, as_numeric_or_normal, 
+                      broadcast_to)
 from .external import einsubs
 
 
 def iid_repeat(x, nrep=1, axis=0):
-    """Creates a sparse array of independent identically distributed copies of `x`."""
-
-    # TODO: support multiple axes
-    # TODO: broadcasting does not work when the axis != 0
+    """Creates a sparse array of independent identically distributed 
+    copies of `x`."""
     
     if axis < 0:
         axis = x.ndim + axis
@@ -22,7 +20,7 @@ def iid_repeat(x, nrep=1, axis=0):
         iax = (axis,)
         v = asnormal(x)
 
-    # Index that adds a new axis.
+    # Index to add a new axis for broadcasting.
     idx = [slice(None, None, None)] * v.ndim
     idx.insert(axis, None)
     idx = tuple(idx)
@@ -38,8 +36,9 @@ def iid_copy(x):
     """Creates an independent identically distributed duplicate of `x`."""
     # TODO: Make it a method function? Sparse Normals need to implement it on their own. 
 
-    # Copies are needed for the case if the original array is modified 
-    # in-place later. Such modifications should not affect the new variable.
+    # Copies of `a` and `b` are needed for the case if the original array 
+    # is in-place modified later. Such modifications should not affect 
+    # the new variable.
     return Normal(x.a.copy(), x.b.copy())
 
 
@@ -285,11 +284,35 @@ class SparseNormal:
         raise NotImplementedError  # TODO-----------------------------------------------
 
 
-def _validate_iaxes(seq):  # TODO: rename, maybe, since now it returns a value-------
-    iaxs = set([x.iaxes for x in seq if len(x.v.emap.elem) !=0])
+def _validate_iaxes(seq):
+    """Checks that the independence axes of the sparse normal arrays in `seq`
+    are compatible, and returns them."""
+
+    def reverse_axes(ndim, axes):
+        """Converts a sequance of positive axes numbers into a sequence 
+        of negative axes numbers.
+        
+        Examles:
+        >>> reverse_axes(4, (1, 2))
+        (-3, -2)
+
+        >>> reverse_axes(3, (0,))
+        (-2,)
+        """
+        return tuple(ndim - ax for ax in axes)
+
+    iaxs = set(reverse_axes(x.ndim, x.iaxes) for x in seq 
+               if len(x.v.emap.elem) !=0)
+    # Reversing is to account for broadcasting - the independence 
+    # axes numbers counted from the beginning of the array may not be 
+    # the same for broadcastable arrys. When counted from the end, 
+    # the axes numbers must always be the same as broadcasting 
+    # cannot add new independence axes. 
     
+    ndim = max(x.ndim for x in seq)
+
     if len(iaxs) == 1:
-        return iaxs.pop()
+        return reverse_axes(ndim, iaxs.pop())
     elif len(iaxs) == 0:
         return tuple()
     
