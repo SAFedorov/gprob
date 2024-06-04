@@ -54,11 +54,12 @@ class ElementaryMap:
                      + other.unsqueezed_a(self.vndim))
             return ElementaryMap(new_a, self.elem)
         
-        if len(other.elem) == 0:  # TODO: add a test case for this
+        if len(other.elem) == 0:
             # An optimization for the addition of empty maps, that emerge,
             # for example, when constants are lifted to normal variables.
 
-            return self.broadcast_to(other.vshape)
+            new_vshape = np.broadcast_shapes(self.vshape, other.vshape)
+            return self.broadcast_to(new_vshape)
     
         op1, op2 = self, other
         union_elem, swapped = elementary.ounion(op1.elem, op2.elem)

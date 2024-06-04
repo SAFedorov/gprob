@@ -3,7 +3,7 @@ import numpy as np
 from scipy.stats import multivariate_normal as mvn
 from numpy.linalg import LinAlgError
 from gprob.normal_ import (normal, hstack, vstack, Normal, broadcast_to,
-                           safer_cholesky, cov, cov)
+                           asnormal, safer_cholesky, cov, cov)
 from utils import random_normal, random_correlate
 
 np.random.seed(0)
@@ -923,6 +923,26 @@ def test_broadcasting():
     assert (xi1 * xi2).shape == sz1
     assert (xi1 / (xi2 + 2.)).shape == sz1
 
+    # lifted constants - there can be separate optimization paths for them
+    assert (normal(size=(2, 3)) + asnormal(1)).shape == (2, 3)
+    assert (normal(size=(2, 3)) - asnormal(1)).shape == (2, 3)
+    assert (normal(size=(2, 3)) * asnormal(1)).shape == (2, 3)
+    assert (normal(size=(2, 3)) / asnormal(1)).shape == (2, 3)
+
+    assert (normal(size=(1, 3)) + asnormal(np.ones((2, 3)))).shape == (2, 3)
+    assert (normal(size=(1, 3)) - asnormal(np.ones((2, 3)))).shape == (2, 3)
+    assert (normal(size=(1, 3)) * asnormal(np.ones((2, 3)))).shape == (2, 3)
+    assert (normal(size=(1, 3)) / asnormal(np.ones((2, 3)))).shape == (2, 3)
+
+    assert (normal(size=(3,)) + asnormal(np.ones((2, 3)))).shape == (2, 3)
+    assert (normal(size=(3,)) - asnormal(np.ones((2, 3)))).shape == (2, 3)
+    assert (normal(size=(3,)) * asnormal(np.ones((2, 3)))).shape == (2, 3)
+    assert (normal(size=(3,)) / asnormal(np.ones((2, 3)))).shape == (2, 3)
+
+    assert (normal(size=(2, 3)) + asnormal(np.ones((2, 1)))).shape == (2, 3)
+    assert (normal(size=(2, 3)) - asnormal(np.ones((2, 1)))).shape == (2, 3)
+    assert (normal(size=(2, 3)) * asnormal(np.ones((2, 1)))).shape == (2, 3)
+    assert (normal(size=(2, 3)) / asnormal(np.ones((2, 1)))).shape == (2, 3)
 
 def test_getitem():
     v = normal(size=(2, 3, 4))
