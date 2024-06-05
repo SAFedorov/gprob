@@ -574,9 +574,8 @@ def as_numeric_or_normal(x):
 
 def asnormal(x):
     """Converts `x` to a normal variable. If `x` is a normal variable already, 
-    returns it unchanged. If `x` is a higher-priority normal subtype, raises a 
-    `OrderError`. If `x` is of another non-numeric type, raises 
-    a `TypeError`."""
+    returns it unchanged. If `x` is neither a normal nor numeric variable, 
+    raises a `TypeError`."""
 
     if isinstance(x, Normal):
         return x
