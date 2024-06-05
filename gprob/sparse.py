@@ -169,7 +169,7 @@ class SparseNormal:
 
     def ravel(self, order="C"):
         if self.ndim > 1:
-            raise NotImplementedError # TODO: give a more meaningful error message
+            raise NotImplementedError # TODO: give a more meaningful error message. Do we need this function at all?
         
         return SparseNormal(self.v.ravel(order=order), self.iaxes)
     
@@ -185,6 +185,10 @@ class SparseNormal:
     def concatenate(arrays, axis):
         arrays = [assparsenormal(ar) for ar in arrays]
         iaxes = _validate_iaxes(arrays)
+        if axis in iaxes:
+            raise ValueError("Concatenation along independence axes "
+                             "is not allowed.")
+
         v = Normal.concatenate([x.v for x in arrays], axis=axis)
         return SparseNormal(v, iaxes)
     
@@ -328,19 +332,32 @@ def _parse_index_key(x, key):
     if not isinstance(key, tuple):
         key = (key,)
 
+    iaxes = set(x.iaxes)
+    iax_err_msg = ("Full slices (':') and ellipses ('...') are the only "
+                   "valid indexing keys for independence axes.")
+
     has_ellipsis = False
-    has_bool = False
     
-    out_ax = []
+    out_axs = []
     new_dim = 0
 
     for k in key:
         if isinstance(k, int):
-            out_ax.append(None)
+            in_ax = len(out_axs)
+            if in_ax in iaxes:
+                raise IndexError(f"{iax_err_msg} Now the axis {in_ax} is "
+                                 f"indexed with the int {k}.")
+
+            out_axs.append(None)
             continue
 
         if isinstance(k, slice):
-            out_ax.append(new_dim)
+            in_ax = len(out_axs)
+            if in_ax in iaxes and k != slice(None, None, None):
+                raise IndexError(f"{iax_err_msg} Now the axis {in_ax} is "
+                                 f"indexed with the slice {k}.")
+            
+            out_axs.append(new_dim)
             new_dim += 1
             continue
         
@@ -350,7 +367,7 @@ def _parse_index_key(x, key):
                                  "ellipsis ('...').")
             
             has_ellipsis = True
-            ellipsis_pos = len(out_ax)
+            ellipsis_pos = len(out_axs)
             ellipsis_dim = new_dim
             continue
 
@@ -358,47 +375,25 @@ def _parse_index_key(x, key):
             new_dim += 1
             continue
 
-        # Advanced indices. The limitations compared to numpy are that 
-        # integer arrays are not allowed, and it is not allowed to combine 
-        # multiple fancy indices in one key.
-         
-        ak = np.asarray(k)
-        if np.issubdtype(ak.dtype, bool):
-            if has_bool:
-                raise IndexError("Only one bool index is allowed in a key.")
-            else:
-                has_bool = True
-
-            used_dims = set(range(len(out_ax), len(out_ax) + ak.ndim))
-            iaxes = set(x.iaxes)
-            
-            if not (used_dims.issubset(iaxes) or used_dims.isdisjoint(iaxes)):
-                raise IndexError(f"Mixing independece {x.iaxes} and regular "
-                                 "axes by the bool index affecting "
-                                 f"the dimensions {tuple(sorted(used_dims))}.")
-
-            out_ax.extend(new_dim for _ in range(ak.ndim))
-            new_dim += 1
-            continue
+        # Advanced indices (int and bool arrays) are not implemented. 
 
         raise IndexError("Only integers, slices (':'), ellipsis ('...'), "
-                         "numpy.newaxis ('None') and boolean arrays are "
-                         "valid indices.")
+                         "numpy.newaxis ('None') are valid indices.")
     
     # Checks if any input dimensions remain unconsumed.
-    delta = x.ndim - len(out_ax)
+    delta = x.ndim - len(out_axs)
     if delta > 0:
         if has_ellipsis:
-            for i in range(ellipsis_pos, len(out_ax)):
-                if out_ax[i] is not None:
-                    out_ax[i] += delta
+            for i in range(ellipsis_pos, len(out_axs)):
+                if out_axs[i] is not None:
+                    out_axs[i] += delta
 
-            out_ax[ellipsis_pos: ellipsis_pos] = range(ellipsis_dim, 
+            out_axs[ellipsis_pos: ellipsis_pos] = range(ellipsis_dim, 
                                                        ellipsis_dim + delta)
         else:
-            out_ax.extend(range(new_dim, new_dim + delta))
+            out_axs.extend(range(new_dim, new_dim + delta))
     elif delta < 0:
         raise IndexError(f"Too many indices: the array is {x.ndim}-dimensional,"
-                         f" but {len(out_ax)} indices were given.")
+                         f" but {len(out_axs)} indices were given.")
 
-    return out_ax
+    return out_axs
