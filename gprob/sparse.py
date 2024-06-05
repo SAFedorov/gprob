@@ -5,6 +5,8 @@ from .normal_ import (Normal, asnormal, print_normal, as_numeric_or_normal,
 from .external import einsubs
 
 
+# TODO: as_numeric_or_normal, can it be simplified away? -------------------------------
+
 def iid_repeat(x, nrep=1, axis=0):
     """Creates a sparse array of independent identically distributed 
     copies of `x`."""
@@ -52,6 +54,11 @@ def assparsenormal(x):
                         f"> {SparseNormal._normal_priority_}).")
     
     v = asnormal(x)
+    if len(v.emap.elem) != 0:
+        v = iid_copy(v)  # Correlations between normals and sparse normals 
+                         # are not consistently handled at the moment,
+                         # and thus must be avoided.
+
     return SparseNormal(v, tuple())
 
 
@@ -282,7 +289,67 @@ class SparseNormal:
 
         iaxes = tuple(iaxes)
         return SparseNormal(self.v.diagonal(offset, axis1, axis2), iaxes)
+
+    def flatten(self, order="C"):
+        if not self.iaxes or self.ndim <= 1:
+            return SparseNormal(self.v.flatten(order=order), self.iaxes)
+        
+        # Checks if all dimensions except maybe one are <= 1.
+        max_sz = max(self.shape)
+        max_dim = self.shape.index(max_sz)
+        if all(x <= 1 for i, x in enumerate(self.shape) if i != max_dim):
+            if max_dim in self.iaxes:
+                iaxes = (0,)
+            else:
+                iaxes = tuple()
+
+            return SparseNormal(self.v.flatten(order=order), iaxes)
+        
+        raise ValueError("Sparse normal variables cannot be flattened unless "
+                         "they have no independence axes, "
+                         "their number of dimensions is <=1 or "
+                         "all dimensions except maybe one have size <=1.")
     
+    def moveaxis(self, source, destination):
+        if source < 0:
+            source = self.ndim + source
+
+        if destination < 0:
+            destination = self.ndim + destination
+        
+        iaxes = []
+        for ax in self.iaxes:
+            if ax == source:
+                ax = destination
+            elif ax > source and ax <= destination:
+                ax -= 1
+            elif ax >= destination and ax < source:
+                ax += 1
+            
+            iaxes.append(ax)
+        iaxes = tuple(sorted(iaxes))
+
+        return SparseNormal(self.v.moveaxis(source, destination), iaxes)
+    
+    def ravel(self, order="C"):
+        if not self.iaxes or self.ndim <= 1:
+            return SparseNormal(self.v.ravel(order=order), self.iaxes)
+        
+        # Checks if all dimensions except maybe one are <= 1.
+        max_sz = max(self.shape)
+        max_dim = self.shape.index(max_sz)
+        if all(x <= 1 for i, x in enumerate(self.shape) if i != max_dim):
+            if max_dim in self.iaxes:
+                iaxes = (0,)
+            else:
+                iaxes = tuple()
+
+            return SparseNormal(self.v.ravel(order=order), iaxes)
+        
+        raise ValueError("Sparse normal variables cannot be flattened unless "
+                         "they have no independence axes, "
+                         "their number of dimensions is <=1 or "
+                         "all dimensions except maybe one have size <=1.")
     
     
     @staticmethod

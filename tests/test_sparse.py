@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 
 from gprob.normal_ import normal
-from gprob.sparse import _parse_index_key, iid_repeat
+from gprob.sparse import _parse_index_key, iid_repeat, assparsenormal
 
 
 def test_iid_repeat():
@@ -16,6 +16,9 @@ def test_iid_repeat():
     assert iid_repeat(arr, 5, axis=0).iaxes == (0,)
 
     # One independence axis.
+
+    assert iid_repeat(normal(), 0, axis=0).shape == (0,)
+    assert iid_repeat(normal(), 0, axis=0).iaxes == (0,)
 
     assert iid_repeat(normal(), 5, axis=0).shape == (5,)
     assert iid_repeat(normal(), 5, axis=0).iaxes == (0,)
@@ -228,3 +231,126 @@ def test_diagonal():
 
     with pytest.raises(ValueError):
         v.diagonal(axis1=-2, axis2=1)
+
+
+def test_flatten_ravel():
+    names = ["flatten", "ravel"]
+
+    for nm in names:
+        v = assparsenormal([])        
+        v_ = getattr(v, nm)()
+        assert v_.ndim == 1
+        assert v_.shape == (0,)
+        assert v_.size == 0
+        assert v_.iaxes == tuple()
+
+        v = assparsenormal(1.)        
+        v_ = getattr(v, nm)()
+        assert v_.ndim == 1
+        assert v_.iaxes == tuple()
+        
+        v = iid_repeat(normal(), 3)
+        v_ = getattr(v, nm)()
+        assert v_.ndim == 1
+        assert v_.size == 3
+        assert v_.iaxes == (0,)
+
+        v = iid_repeat(normal(size=(1, 1, 1, 1)), 3, axis=2)
+        assert v.shape == (1, 1, 3, 1, 1)
+        assert v.iaxes == (2,)
+        v_ = getattr(v, nm)()
+        assert v_.ndim == 1
+        assert v_.size == 3
+        assert v_.iaxes == (0,)
+
+        v = iid_repeat(normal(size=(1, 1, 1)), 3, axis=2)
+        v = iid_repeat(v, 1, axis=0)
+        v = iid_repeat(v, 1, axis=-1)
+        assert v.shape == (1, 1, 1, 3, 1, 1)
+        assert v.iaxes == (0, 3, 5)
+        v_ = getattr(v, nm)()
+        assert v_.ndim == 1
+        assert v_.size == 3
+        assert v_.iaxes == (0,)
+
+        v = iid_repeat(normal(size=(0, 1, 0)), 3, axis=2)
+        v = iid_repeat(v, 1, axis=0)
+        v = iid_repeat(v, 1, axis=-1)
+        assert v.shape == (1, 0, 1, 3, 0, 1)
+        assert v.iaxes == (0, 3, 5)
+        v_ = getattr(v, nm)()
+        assert v_.ndim == 1
+        assert v_.size == 0
+        assert v_.iaxes == (0,)
+
+        v = iid_repeat(normal(size=(1, 3, 1)), 1, axis=1)
+        v = iid_repeat(v, 1, axis=0)
+        v = iid_repeat(v, 1, axis=-1)
+        assert v.shape == (1, 1, 1, 3, 1, 1)
+        assert v.iaxes == (0, 2, 5)
+        v_ = getattr(v, nm)()
+        assert v_.ndim == 1
+        assert v_.size == 3
+        assert v_.iaxes == tuple()
+
+        with pytest.raises(ValueError):
+            v = iid_repeat(normal(size=(2,)), 3)
+            v_ = getattr(v, nm)()
+
+        with pytest.raises(ValueError):
+            v = iid_repeat(iid_repeat(normal(), 3), 2)
+            v_ = getattr(v, nm)()
+
+
+def test_moveaxis():
+    v = iid_repeat(iid_repeat(normal(size=(4, 6, 5)), 2, axis=1), 3, axis=1)
+    # v.shape is (4, 3, 2, 6, 5), v.iaxes are (1, 2)
+
+    v_ = v.moveaxis(3, 4)
+    assert v_.shape == (4, 3, 2, 5, 6)
+    assert v_.iaxes == (1, 2)
+
+    v_ = v.moveaxis(4, 3)
+    assert v_.shape == (4, 3, 2, 5, 6)
+    assert v_.iaxes == (1, 2)
+
+    v_ = v.moveaxis(0, 1)
+    assert v_.shape == (3, 4, 2, 6, 5)
+    assert v_.iaxes == (0, 2)
+
+    v_ = v.moveaxis(1, 0)
+    assert v_.shape == (3, 4, 2, 6, 5)
+    assert v_.iaxes == (0, 2)
+
+    v_ = v.moveaxis(0, 2)
+    assert v_.shape == (3, 2, 4, 6, 5)
+    assert v_.iaxes == (0, 1)
+
+    v_ = v.moveaxis(2, 0)
+    assert v_.shape == (2, 4, 3, 6, 5)
+    assert v_.iaxes == (0, 2)
+
+    v_ = v.moveaxis(3, 0)
+    assert v_.shape == (6, 4, 3, 2, 5)
+    assert v_.iaxes == (2, 3)
+
+    v_ = v.moveaxis(4, 2)
+    assert v_.shape == (4, 3, 5, 2, 6)
+    assert v_.iaxes == (1, 3)
+
+    v_ = v.moveaxis(-3, -1)
+    assert v_.shape == (4, 3, 6, 5, 2)
+    assert v_.iaxes == (1, 4)
+
+    v_ = v.moveaxis(-3, -5)
+    assert v_.shape == (2, 4, 3, 6, 5)
+    assert v_.iaxes == (0, 2)
+
+    v_ = v.moveaxis(-3, 0)
+    assert v_.shape == (2, 4, 3, 6, 5)
+    assert v_.iaxes == (0, 2)
+
+    v_ = v.moveaxis(1, -4)
+    v__ = v_.moveaxis(-4, 1)
+    assert v.shape == v__.shape
+    assert v.iaxes == v__.iaxes
