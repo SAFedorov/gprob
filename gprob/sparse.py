@@ -12,13 +12,10 @@ def iid_repeat(x, nrep=1, axis=0):
     if axis < 0:
         axis = x.ndim + axis + 1
 
-    if isinstance(x, SparseNormal):
-        iax = sorted([ax + 1 if ax >= axis else ax for ax in x.iaxes] + [axis])
-        iax = tuple(iax)
-        v = x.v
-    else:
-        iax = (axis,)
-        v = asnormal(x)
+    x = assparsenormal(x)
+    iax = sorted([ax + 1 if ax >= axis else ax for ax in x.iaxes] + [axis])
+    iax = tuple(iax)
+    v = x.v
 
     # Index that adds a new axis.
     idx = [slice(None, None, None)] * v.ndim
@@ -55,7 +52,7 @@ def assparsenormal(x):
                         f"> {SparseNormal._normal_priority_}).")
     
     v = asnormal(x)
-    return SparseNormal(v, tuple(range(v.ndim)))
+    return SparseNormal(v, tuple())
 
 
 class SparseNormal:

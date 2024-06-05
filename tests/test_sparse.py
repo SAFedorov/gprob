@@ -13,7 +13,7 @@ def test_iid_repeat():
 
     arr = np.ones((3, 4))
     assert iid_repeat(arr, 5, axis=0).shape == (5, 3, 4)
-    assert iid_repeat(arr, 5, axis=0).iaxes == (0, 1, 2)
+    assert iid_repeat(arr, 5, axis=0).iaxes == (0,)
 
     # One independence axis.
 
