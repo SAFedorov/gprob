@@ -20,7 +20,7 @@ def iid_repeat(x, nrep=1, axis=0):
         iax = (axis,)
         v = asnormal(x)
 
-    # Index to add a new axis for broadcasting.
+    # Index that adds a new axis.
     idx = [slice(None, None, None)] * v.ndim
     idx.insert(axis, None)
     idx = tuple(idx)
@@ -46,6 +46,14 @@ def assparsenormal(x):
     if isinstance(x, SparseNormal):
         return x
     
+    if (hasattr(x, "_normal_priority_") 
+        and x._normal_priority_ > SparseNormal._normal_priority_):
+
+        raise TypeError(f"The variable {x} cannot be converted to "
+                        "a sparse normal variable because it is already "
+                        f"of higher priority ({x._normal_priority_} "
+                        f"> {SparseNormal._normal_priority_}).")
+    
     v = asnormal(x)
     return SparseNormal(v, tuple(range(v.ndim)))
 
@@ -56,12 +64,12 @@ def _lifted_binary_op(name):
     and produces a new sparse normal."""
 
     def f(self, other):
-        other = assparsenormal(other)
-        v = getattr(self.v, name)(other.v)  # TODO: implement via operators for automatic handling of NotImplemented
-        
-        if v is NotImplemented:  # TODO: does this make any sense?
+        try:
+            other = assparsenormal(other)
+        except TypeError:
             return NotImplemented
         
+        v = getattr(self.v, name)(other.v)  # TODO: implement via operators for automatic handling of NotImplemented
         _validate_iaxes([self, other])
         return SparseNormal(v, self.iaxes)
     return f
