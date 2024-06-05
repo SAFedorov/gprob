@@ -409,32 +409,22 @@ def _parse_index_key(x, key):
 
     if not isinstance(key, tuple):
         key = (key,)
-
-    iaxes = set(x.iaxes)
-    iax_err_msg = ("Full slices (':') and ellipses ('...') are the only "
-                   "valid indexing keys for independence axes.")
+    
+    out_axs = []  # out_axs[i] is the number of the i-th input axis 
+                  # in the indexing result
+    idx = []  # idx[i] is the index used for the i-th input axis.
 
     has_ellipsis = False
-    
-    out_axs = []
     new_dim = 0
 
     for k in key:
         if isinstance(k, int):
-            in_ax = len(out_axs)
-            if in_ax in iaxes:
-                raise IndexError(f"{iax_err_msg} Now the axis {in_ax} is "
-                                 f"indexed with the int {k}.")
-
+            idx.append(k)
             out_axs.append(None)
             continue
 
         if isinstance(k, slice):
-            in_ax = len(out_axs)
-            if in_ax in iaxes and k != slice(None, None, None):
-                raise IndexError(f"{iax_err_msg} Now the axis {in_ax} is "
-                                 f"indexed with the slice {k}.")
-            
+            idx.append(k)
             out_axs.append(new_dim)
             new_dim += 1
             continue
@@ -445,8 +435,8 @@ def _parse_index_key(x, key):
                                  "ellipsis ('...').")
             
             has_ellipsis = True
-            ellipsis_pos = len(out_axs)
-            ellipsis_dim = new_dim
+            ep_in = len(out_axs)  # ellipsis position in the input
+            ep_out = new_dim  # ellipsis position in the output
             continue
 
         if k is np.newaxis:
@@ -462,16 +452,23 @@ def _parse_index_key(x, key):
     delta = x.ndim - len(out_axs)
     if delta > 0:
         if has_ellipsis:
-            for i in range(ellipsis_pos, len(out_axs)):
+            for i in range(ep_in, len(out_axs)):
                 if out_axs[i] is not None:
                     out_axs[i] += delta
 
-            out_axs[ellipsis_pos: ellipsis_pos] = range(ellipsis_dim, 
-                                                       ellipsis_dim + delta)
+            out_axs[ep_in: ep_in] = range(ep_out, ep_out + delta)
+            idx[ep_in: ep_in] = (slice(None, None, None) for _ in range(delta))
         else:
             out_axs.extend(range(new_dim, new_dim + delta))
+            idx.extend(slice(None, None, None) for _ in range(delta))
     elif delta < 0:
         raise IndexError(f"Too many indices: the array is {x.ndim}-dimensional,"
                          f" but {len(out_axs)} indices were given.")
-
+    
+    iaxes = set(x.iaxes)
+    for i, k in enumerate(idx):
+        if i in iaxes and k != slice(None, None, None):
+            raise IndexError("Only full slices (':') and ellipses ('...') "
+                             "are valid indices for independence axes. "
+                             f"Now the axis {i} is indexed with {k}.")
     return out_axs
