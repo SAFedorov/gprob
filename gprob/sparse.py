@@ -58,23 +58,6 @@ def assparsenormal(x):
     return SparseNormal(v, tuple(range(v.ndim)))
 
 
-def _lifted_binary_op(name):
-    """Generates a binary operation that applies a function to the operands' v, 
-    checks the conformity of their independence axes, 
-    and produces a new sparse normal."""
-
-    def f(self, other):
-        try:
-            other = assparsenormal(other)
-        except TypeError:
-            return NotImplemented
-        
-        v = getattr(self.v, name)(other.v)  # TODO: implement via operators for automatic handling of NotImplemented
-        _validate_iaxes([self, other])
-        return SparseNormal(v, self.iaxes)
-    return f
-
-
 class SparseNormal:
     """Array of block-independent normal random variables."""
 
@@ -126,18 +109,105 @@ class SparseNormal:
     def __neg__(self):
         return SparseNormal(-self.v, self.iaxes)
 
-    # TODO: add a test that all the binary operations defined 
+    def __add__(self, other):
+        try:
+            other = assparsenormal(other)
+        except TypeError:
+            return NotImplemented
 
-    __add__ = _lifted_binary_op("__add__")
-    __radd__ = _lifted_binary_op("__radd__")
-    __sub__ = _lifted_binary_op("__sub__")
-    __rsub__ = _lifted_binary_op("__rsub__")
-    __mul__ = _lifted_binary_op("__mul__")
-    __rmul__ = _lifted_binary_op("__rmul__")
-    __truediv__ = _lifted_binary_op("__truediv__")
-    __rtruediv__ = _lifted_binary_op("__rtruediv__")
-    __pow__ = _lifted_binary_op("__pow__")
-    __rpow__ = _lifted_binary_op("__rpow__")
+        v = self.v + other.v
+        iaxes = _validate_iaxes([self, other])
+        return SparseNormal(v, iaxes)
+
+    def __radd__(self, other):
+        try:
+            other = assparsenormal(other)
+        except TypeError:
+            return NotImplemented
+
+        v = other.v + self.v
+        iaxes = _validate_iaxes([self, other])
+        return SparseNormal(v, iaxes)
+
+    def __sub__(self, other):
+        try:
+            other = assparsenormal(other)
+        except TypeError:
+            return NotImplemented
+
+        v = self.v - other.v
+        iaxes = _validate_iaxes([self, other])
+        return SparseNormal(v, iaxes)
+
+    def __rsub__(self, other):
+        try:
+            other = assparsenormal(other)
+        except TypeError:
+            return NotImplemented
+
+        v = other.v - self.v
+        iaxes = _validate_iaxes([self, other])
+        return SparseNormal(v, iaxes)
+
+    def __mul__(self, other):
+        try:
+            other = assparsenormal(other)
+        except TypeError:
+            return NotImplemented
+
+        v = self.v * other.v
+        iaxes = _validate_iaxes([self, other])
+        return SparseNormal(v, iaxes)
+
+    def __rmul__(self, other):
+        try:
+            other = assparsenormal(other)
+        except TypeError:
+            return NotImplemented
+
+        v = other.v * self.v
+        iaxes = _validate_iaxes([self, other])
+        return SparseNormal(v, iaxes)
+
+    def __truediv__(self, other):
+        try:
+            other = assparsenormal(other)
+        except TypeError:
+            return NotImplemented
+
+        v = self.v / other.v
+        iaxes = _validate_iaxes([self, other])
+        return SparseNormal(v, iaxes)
+
+    def __rtruediv__(self, other):
+        try:
+            other = assparsenormal(other)
+        except TypeError:
+            return NotImplemented
+
+        v = other.v / self.v
+        iaxes = _validate_iaxes([self, other])
+        return SparseNormal(v, iaxes)
+
+    def __pow__(self, other):
+        try:
+            other = assparsenormal(other)
+        except TypeError:
+            return NotImplemented
+
+        v = self.v ** other.v
+        iaxes = _validate_iaxes([self, other])
+        return SparseNormal(v, iaxes)
+
+    def __rpow__(self, other):
+        try:
+            other = assparsenormal(other)
+        except TypeError:
+            return NotImplemented
+
+        v = other.v ** self.v
+        iaxes = _validate_iaxes([self, other])
+        return SparseNormal(v, iaxes)
 
     def __matmul__(self, other):
         other, isnormal = as_numeric_or_normal(other)
@@ -298,7 +368,7 @@ class SparseNormal:
 
 def _validate_iaxes(seq):
     """Checks that the independence axes of the sparse normal arrays in `seq`
-    are compatible, and returns them."""
+    are compatible, and returns those axes for the final broadcasted shape."""
 
     def reverse_axes(ndim, axes):
         """Converts a sequance of positive axes numbers into a sequence 
