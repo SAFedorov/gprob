@@ -10,7 +10,7 @@ def iid_repeat(x, nrep=1, axis=0):
     copies of `x`."""
     
     if axis < 0:
-        axis = x.ndim + axis
+        axis = x.ndim + axis + 1
 
     if isinstance(x, SparseNormal):
         iax = sorted([ax + 1 if ax >= axis else ax for ax in x.iaxes] + [axis])
@@ -92,7 +92,7 @@ class SparseNormal:
     
     @property
     def T(self):
-        # TODO: when transpose() method is implemented, switch to calling it here
+        # TODO: when transpose() method is implemented, switch to calling it here-----------
         iaxes = tuple(sorted([self.ndim - ax - 1 for ax in self.iaxes]))
         return SparseNormal(self.v.T, iaxes)
     
@@ -224,7 +224,7 @@ class SparseNormal:
     def __rmatmul__(self, other):
         other, isnormal = as_numeric_or_normal(other)
 
-        # TODO: add priority check
+        # TODO: add priority check ----------------------------------------------------------------------------
         ax = 0 if self.ndim == 1 else self.ndim-2
         if ax in self.iaxes:
             raise NotImplementedError("Matrix multiplication along "
@@ -240,27 +240,57 @@ class SparseNormal:
         
     # ---------- array methods ----------
 
-    # TODO
-
-    def moveaxis(self, source, destination):
-        pass
-
-    def ravel(self, order="C"):
-        if self.ndim > 1:
-            raise NotImplementedError # TODO: give a more meaningful error message. Do we need this function at all?
-        
-        return SparseNormal(self.v.ravel(order=order), self.iaxes)
+    def conjugate(self):
+        return SparseNormal(self.v.conjugate(), self.iaxes)
     
-    def reshape(self, newshape, order="C"):
-        
-        b = self.b.reshape(newshape, order=order)
-        em = self.emap.reshape(newshape, order=order)
+    def conj(self):
+        return self.conjugate()
+    
+    def cumsum(self, axis):
+        if not np.issubdtype(np.array(axis).dtype, int):
+            # For regular arrays, None is the default value. For sparse arrays, 
+            # it is not supported because these arrays usually 
+            # cannot be flattened.
 
-        # reshing is used by stacking and concatenation functions. TODO 
-        raise NotImplementedError
+            raise ValueError("Axis must be an integer.")
+        
+        if axis < 0:
+            axis = self.ndim + axis
+        
+        if axis in self.iaxes:
+            raise ValueError("Computing cumulative sums along independence "
+                             "axes is not supported.")
+
+        return SparseNormal(self.v.cumsum(axis), self.iaxes)
+    
+    def diagonal(self, offset=0, axis1=0, axis2=1):
+        if axis1 < 0:
+            axis1 = self.ndim + axis1
+
+        if axis2 < 0:
+            axis2 = self.ndim + axis2
+
+        if (axis1 in self.iaxes) or (axis2 in self.iaxes):
+            raise ValueError("Taking diagonals along independence axes "
+                             "is not supported.")
+        
+        iaxes = []
+        for ax in self.iaxes:
+            ax_ = ax
+            if ax > axis1:
+                ax_ -= 1
+            if ax > axis2:
+                ax_ -= 1
+            iaxes.append(ax_)
+
+        iaxes = tuple(iaxes)
+        return SparseNormal(self.v.diagonal(offset, axis1, axis2), iaxes)
+    
+    
     
     @staticmethod
     def concatenate(arrays, axis):
+         # TODO: account for the case when axis is negative -----------------------------
         arrays = [assparsenormal(ar) for ar in arrays]
         iaxes = _validate_iaxes(arrays)
         if axis in iaxes:
@@ -272,6 +302,7 @@ class SparseNormal:
     
     @staticmethod
     def stack(arrays, axis):
+        # TODO: account for the case when axis is negative -----------------------------
         arrays = [assparsenormal(ar) for ar in arrays]
         iaxes = _validate_iaxes(arrays)
         iaxes = tuple(ax + 1 if ax >= axis else ax for ax in iaxes)
