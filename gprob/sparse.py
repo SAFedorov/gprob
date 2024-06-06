@@ -15,6 +15,8 @@ def iid_repeat(x, nrep=1, axis=0):
         axis = x.ndim + axis + 1
 
     x = assparsenormal(x)
+    x = x.iid_copy()
+    
     iax = sorted([ax + 1 if ax >= axis else ax for ax in x.iaxes] + [axis])
     iax = tuple(iax)
     v = x.v
@@ -27,18 +29,7 @@ def iid_repeat(x, nrep=1, axis=0):
     new_shape = v.shape[:axis] + (nrep,) + v.shape[axis:]
     v = broadcast_to(v[idx], new_shape)
 
-    v = iid_copy(v)
     return SparseNormal(v, iax)
-
-
-def iid_copy(x):
-    """Creates an independent identically distributed duplicate of `x`."""
-    # TODO: Make it a method function? Sparse Normals need to implement it on their own. 
-
-    # Copies of `a` and `b` are needed for the case if the original array 
-    # is in-place modified later. Such modifications should not affect 
-    # the new variable.
-    return Normal(x.a.copy(), x.b.copy())
 
 
 def assparsenormal(x):
@@ -54,11 +45,6 @@ def assparsenormal(x):
                         f"> {SparseNormal._normal_priority_}).")
     
     v = asnormal(x)
-    if len(v.emap.elem) != 0:
-        v = iid_copy(v)  # Correlations between normals and sparse normals 
-                         # are not consistently handled at the moment,
-                         # and thus must be avoided.
-
     return SparseNormal(v, tuple())
 
 
@@ -399,6 +385,35 @@ class SparseNormal:
         iaxes = tuple(sorted(iaxes))
         return SparseNormal(v, iaxes)
     
+    def split(self, indices_or_sections, axis=0):
+        if axis < 0:
+            axis = self.ndim + axis
+
+        if axis in self.iaxes:
+            raise ValueError("Splitting along independence axes "
+                             "is not supported.")
+        
+        vpieces = self.v.split(indices_or_sections, axis)
+        return [SparseNormal(v, self.iaxes) for v in vpieces]
+    
+    # TODO -----------------------------------------------------------------------------
+    
+    def sum(self, axis=None, keepdims=False):
+        # "where" is absent because its broadcasting is not implemented.
+        # "initial" is also not implemented.
+        b = self.b.sum(axis, keepdims=keepdims)
+        em = self.emap.sum(axis, keepdims=keepdims)
+        return Normal(em, b)
+
+    def transpose(self, axes=None):
+        b = self.b.transpose(axes)
+        em = self.emap.transpose(axes)
+        return Normal(em, b)
+    
+    def trace(self, offset=0, axis1=0, axis2=1):
+        b = self.b.trace(offset=offset, axis1=axis1, axis2=axis2)
+        em = self.emap.trace(offset, axis1, axis2)
+        return Normal(em, b)
     
     @staticmethod
     def concatenate(arrays, axis):
@@ -462,6 +477,9 @@ class SparseNormal:
     # ---------- probability-related methods ----------
 
     # TODO: add a test that the doc strings are in sync with those of Normal --------------------
+
+    def iid_copy(self):
+        return SparseNormal(self.v.iid_copy(), self.iaxes)
 
     def condition(self, observations, mask=None):  # TODO-----------------------------
         raise NotImplementedError

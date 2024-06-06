@@ -351,6 +351,14 @@ class Normal:
 
     # ---------- probability-related methods ----------
 
+    def iid_copy(self):
+        """Creates an independent identically distributed copy."""
+
+        # Copies of `a` and `b` are needed for the case if the original array 
+        # is in-place modified later. Such modifications should not affect 
+        # the new variable.
+        return Normal(self.a.copy(), self.b.copy())
+
     def condition(self, observations, mask=None):
         """Conditioning operation.
         
@@ -713,6 +721,11 @@ def cov(*args):
     ax, ay = [em.a2d for em in emaps.complete([x.emap, y.emap])]
     cov2d = ax.T @ ay.conj()
     return cov2d.reshape(x.shape + y.shape)
+
+
+def iid_copy(x):
+    """Creates an independent identically distributed copy of `x`."""
+    return x.iid_copy()
 
 
 # ---------- linear array functions ----------
