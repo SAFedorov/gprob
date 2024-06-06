@@ -351,6 +351,50 @@ class SparseNormal:
                          "their number of dimensions is <=1 or "
                          "all dimensions except maybe one have size <=1.")
     
+    def reshape(self, newshape, order="C"):
+
+        v = self.v.reshape(newshape, order)  
+        # Reshaping the underlying varibale before the axes check is
+        # to yield a meaningful error message if the shapes are inconsistent.
+
+        if v.size == 0:
+            # The transformation of independence axes for zero-size variables 
+            # cannot be determined unambiguously, so we always assume that 
+            # the transformed variable has no independence axes.
+            return SparseNormal(v, tuple())
+
+        new_dim = 0
+
+        new_cnt = 1
+        old_cnt = 1
+
+        iaxes = []
+        for i, n in enumerate(self.shape):
+            old_cnt = old_cnt * n
+            
+            d = 0
+            while new_cnt < old_cnt:
+                ns = newshape[new_dim + d]
+                new_cnt = new_cnt * ns
+
+                if ns == 1:
+                    new_dim += 1  # To skip trivial axes of size 1.
+                else:
+                    d += 1
+
+            if i in self.iaxes:
+                if new_cnt == old_cnt and d == 1:
+                    iaxes.append(new_dim)
+                else:
+                    raise ValueError("Reshaping that affects independence axes "
+                                     f"is not supported. Axis {i} is affected "
+                                     "by the requested shape transformation "
+                                     f"{self.shape} -> {newshape}.")
+            new_dim = new_dim + d
+        
+        iaxes = tuple(sorted(iaxes))
+        return SparseNormal(v, iaxes)
+    
     
     @staticmethod
     def concatenate(arrays, axis):
