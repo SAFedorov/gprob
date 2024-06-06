@@ -470,9 +470,9 @@ def test_reshape():
         v_ = v_.reshape(sh)
 
     # Checking the arrangement of elements.
-    v = iid_repeat(random_normal((8, 9)), 5)
-
     tol = 1e-10
+
+    v = iid_repeat(random_normal((8, 9)), 5)  # First axis.
 
     sh = (5, 3, 4, 2, 3)
     vvar = v.var()
@@ -480,7 +480,232 @@ def test_reshape():
     assert np.max(v.reshape(sh, order="F").var() 
                   - vvar.reshape(sh, order="F")) < tol
     
-    # A sanity check that changing the order is not trivial.
+    # A sanity check that changing the order is not doing nothing.
     assert np.max(v.reshape(sh, order="F").var() 
                   - vvar.reshape(sh, order="C")) > tol
+    
+    v = iid_repeat(random_normal((8, 9)), 5, axis=-1)  # Last axis.
+
+    sh = (3, 4, 2, 3, 5)
+    vvar = v.var()
+    assert np.max(v.reshape(sh).var() - vvar.reshape(sh)) < tol
+    assert np.max(v.reshape(sh, order="F").var() 
+                  - vvar.reshape(sh, order="F")) < tol
+    
+    # A sanity check that changing the order is not doing nothing.
+    assert np.max(v.reshape(sh, order="F").var() 
+                  - vvar.reshape(sh, order="C")) > tol
+    
+
+    v = iid_repeat(random_normal((8, 9)), 5, axis=1)  # Middle axis.
+
+    sh = (2, 4, 5, 3, 3)
+    vvar = v.var()
+    assert np.max(v.reshape(sh).var() - vvar.reshape(sh)) < tol
+    assert np.max(v.reshape(sh, order="F").var() 
+                  - vvar.reshape(sh, order="F")) < tol
+    
+    # A sanity check that changing the order is not doing nothing.
+    assert np.max(v.reshape(sh, order="F").var() 
+                  - vvar.reshape(sh, order="C")) > tol
+    
+    # A shape that affects the iaxis.
+    sh = (3, 4, 5, 2, 3)
+    with pytest.raises(ValueError):
+        v.reshape(sh)
+    assert vvar.reshape(sh).shape == sh  # But this should work.
+    
+
+def test_split():
+    v = iid_repeat(iid_repeat(normal(size=(4, 6, 5)), 2, axis=1), 3, axis=1)
+    # v.shape is (4, 3, 2, 6, 5), v.iaxes are (1, 2)
+
+    with pytest.raises(ValueError):
+        v.split(3, axis=1)
+    np.split(v.var(), 3, axis=1)  # To check that a numeric array can be split.
+
+    with pytest.raises(ValueError):
+        v.split(3, axis=-4)
+    np.split(v.var(), 3, axis=-4)
+
+    with pytest.raises(ValueError):
+        v.split(2, axis=2)
+    np.split(v.var(), 2, axis=2)
+
+    with pytest.raises(ValueError):
+        v.split(2, axis=-3)
+    np.split(v.var(), 2, axis=-3)
+
+    tol = 1e-10
+
+    v = iid_repeat(iid_repeat(random_normal((4, 6, 5)), 2, axis=1), 3, axis=1)
+    # v.shape is (4, 3, 2, 6, 5), v.iaxes are (1, 2)
+
+    assert len(v.split(3, axis=-2)) == 3
+    for vs in v.split(3, axis=-2):
+        assert vs.__class__ == v.__class__
+    
+    vvars = [vs.var() for vs in v.split(3, axis=-2)]
+    vvars_ref = np.split(v.var(), 3, axis=-2)
+    for vv, vvr in zip(vvars, vvars_ref):
+        assert vv.shape == vvr.shape
+        assert np.max(vv - vvr) < tol
+
+    vvars = [vs.var() for vs in v.split([2, 3], axis=0)]
+    vvars_ref = np.split(v.var(), [2, 3], axis=0)
+    for vv, vvr in zip(vvars, vvars_ref):
+        assert vv.shape == vvr.shape
+        assert np.max(vv - vvr) < tol
+
+    vvars = [vs.var() for vs in v.split([2, 4], axis=4)]
+    vvars_ref = np.split(v.var(), [2, 4], axis=4)
+    for vv, vvr in zip(vvars, vvars_ref):
+        assert vv.shape == vvr.shape
+        assert np.max(vv - vvr) < tol
+
+
+def test_transpose():
+    # Also .T property
+
+    tol = 1e-10
+
+    v = assparsenormal(1).transpose()
+    assert v.shape == tuple()
+    assert v.iaxes == tuple()
+
+    v = assparsenormal(normal(size=(2, 3, 4))).transpose()
+    assert v.shape == (4, 3, 2)
+    assert v.iaxes == tuple()
+
+    v = assparsenormal(normal(size=(2, 3, 4))).transpose((1, 0, 2))
+    assert v.shape == (3, 2, 4)
+    assert v.iaxes == tuple()
+
+    # A matrix variable with one independence axis.
+    v = iid_repeat(random_normal((4,)), 2, axis=1)
+    # v.shape is (4, 2), v.iaxes are (1,)
+
+    assert v.transpose().iaxes == (0,)
+
+    vvar1 = v.transpose().var()
+    vvar2 = v.var().transpose()
+    assert vvar1.shape == vvar2.shape
+    assert np.max(vvar1 - vvar2) < tol
+
+    vvar1 = v.T.var()
+    assert vvar1.shape == vvar2.shape
+    assert np.max(vvar1 - vvar2) < tol
+    
+    # A multi-dimensional variable.
+    v = iid_repeat(iid_repeat(random_normal((4, 6, 5)), 2, axis=1), 3, axis=1)
+    # v.shape is (4, 3, 2, 6, 5), v.iaxes are (1, 2)
+
+    assert v.T.shape == (5, 6, 2, 3, 4)
+    assert v.T.iaxes == (2, 3)
+
+    ax = (0, 1, 3, 4, 2)
+    vvar1 = v.transpose(ax).var()
+    vvar2 = v.var().transpose(ax)
+    assert vvar1.shape == vvar2.shape
+    assert np.max(vvar1 - vvar2) < tol
+    assert v.transpose(ax).iaxes == (1, 4)
+
+    ax = (-1, 2, 3, 0, 1)
+    vvar1 = v.transpose(ax).var()
+    vvar2 = v.var().transpose(ax)
+    assert vvar1.shape == vvar2.shape
+    assert np.max(vvar1 - vvar2) < tol
+    assert v.transpose(ax).iaxes == (1, 4)
+
+    ax = (-1, 3, 2, 0, 1)
+    vvar1 = v.transpose(ax).var()
+    vvar2 = v.var().transpose(ax)
+    assert vvar1.shape == vvar2.shape
+    assert np.max(vvar1 - vvar2) < tol
+    assert v.transpose(ax).iaxes == (2, 4)
+
+    ax = (1, -2, 2, -1, 0)
+    vvar1 = v.transpose(ax).var()
+    vvar2 = v.var().transpose(ax)
+    assert vvar1.shape == vvar2.shape
+    assert np.max(vvar1 - vvar2) < tol
+    assert v.transpose(ax).iaxes == (0, 2)
+
+    ax = None
+    vvar1 = v.transpose(ax).var()
+    vvar2 = v.var().transpose(ax)
+    assert vvar1.shape == vvar2.shape
+    assert np.max(vvar1 - vvar2) < tol
+    assert v.transpose(ax).iaxes == (2, 3)
+
+    vvar1 = v.T.var()
+    assert vvar1.shape == vvar2.shape
+    assert np.max(vvar1 - vvar2) < tol
+    assert v.transpose(ax).iaxes == (2, 3)
+
+    v = iid_repeat(iid_repeat(random_normal((4, 5)), 2, axis=1), 3, axis=3)
+    # v.shape is (4, 2, 5, 3), v.iaxes are (1, 3)
+
+    ax = (2, 3, 0, 1)
+    vvar1 = v.transpose(ax).var()
+    vvar2 = v.var().transpose(ax)
+    assert vvar1.shape == vvar2.shape
+    assert np.max(vvar1 - vvar2) < tol
+    assert v.transpose(ax).iaxes == (1, 3)
+
+    ax = (1, 0, -1, -2)
+    vvar1 = v.transpose(ax).var()
+    vvar2 = v.var().transpose(ax)
+    assert vvar1.shape == vvar2.shape
+    assert np.max(vvar1 - vvar2) < tol
+    assert v.transpose(ax).iaxes == (0, 2)
+
+    ax = (1, 0, -2, 3)
+    vvar1 = v.transpose(ax).var()
+    vvar2 = v.var().transpose(ax)
+    assert vvar1.shape == vvar2.shape
+    assert np.max(vvar1 - vvar2) < tol
+    assert v.transpose(ax).iaxes == (0, 3)
+
+
+def test_trace():
+    v = iid_repeat(iid_repeat(normal(size=(4, 5)), 2, axis=0), 3, axis=0)
+    # v.shape is (3, 2, 4, 5), v.iaxes are (0, 1)
+    assert v.trace(axis1=-2, axis2=-1).shape == (3, 2)
+    assert v.trace(axis1=-2, axis2=-1).iaxes == (0, 1)
+
+    assert v.trace(axis1=3, axis2=2).shape == (3, 2)
+    assert v.trace(axis1=3, axis2=2).iaxes == (0, 1)
+
+    with pytest.raises(ValueError):
+        v.trace(axis1=0, axis2=1)
+
+    with pytest.raises(ValueError):
+        v.trace(axis1=1, axis2=2)
+
+    v = iid_repeat(iid_repeat(normal(size=(4, 5)), 2, axis=-1), 3, axis=-1)
+    # v.shape is (4, 5, 2, 3), v.iaxes are (2, 3)
+    assert v.trace(axis1=0, axis2=1).shape == (2, 3)
+    assert v.trace(axis1=0, axis2=1).iaxes == (0, 1)
+
+    v = iid_repeat(iid_repeat(normal(size=(4, 5)), 2, axis=1), 3, axis=1)
+    # v.shape is (4, 3, 2, 5), v.iaxes are (1, 2)
+
+    assert v.trace(axis1=0, axis2=-1).shape == (3, 2)
+    assert v.trace(axis1=0, axis2=-1).iaxes == (0, 1)
+
+    assert v[:, :, None].trace(axis1=0, axis2=2).shape == (3, 2, 5)
+    assert v[:, :, None].trace(axis1=0, axis2=2).iaxes == (0, 1)
+
+    assert v[:, :, None].trace(axis1=2, axis2=4).shape == (4, 3, 2)
+    assert v[:, :, None].trace(axis1=2, axis2=4).iaxes == (1, 2)
+
+    with pytest.raises(ValueError):
+        v.trace(axis1=0, axis2=1)
+
+    with pytest.raises(ValueError):
+        v.trace(axis1=-1, axis2=-2)
+
+    with pytest.raises(ValueError):
+        v.trace(axis1=-2, axis2=1)
 

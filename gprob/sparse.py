@@ -16,7 +16,7 @@ def iid_repeat(x, nrep=1, axis=0):
 
     x = assparsenormal(x)
     x = x.iid_copy()
-    
+
     iax = sorted([ax + 1 if ax >= axis else ax for ax in x.iaxes] + [axis])
     iax = tuple(iax)
     v = x.v
@@ -82,9 +82,7 @@ class SparseNormal:
     
     @property
     def T(self):
-        # TODO: when transpose() method is implemented, switch to calling it here-----------
-        iaxes = tuple(sorted([self.ndim - ax - 1 for ax in self.iaxes]))
-        return SparseNormal(self.v.T, iaxes)
+        return self.transpose()
     
     @property
     def iscomplex(self):
@@ -248,8 +246,8 @@ class SparseNormal:
             axis = self.ndim + axis
         
         if axis in self.iaxes:
-            raise ValueError("Computing cumulative sums along independence "
-                             "axes is not supported.")
+            raise ValueError("The computation of cumulative sums along "
+                             "independence axes is not supported.")
 
         return SparseNormal(self.v.cumsum(axis), self.iaxes)
     
@@ -263,7 +261,6 @@ class SparseNormal:
         if (axis1 in self.iaxes) or (axis2 in self.iaxes):
             raise ValueError("Taking diagonals along independence axes "
                              "is not supported.")
-        
         iaxes = []
         for ax in self.iaxes:
             ax_ = ax
@@ -396,24 +393,63 @@ class SparseNormal:
         vpieces = self.v.split(indices_or_sections, axis)
         return [SparseNormal(v, self.iaxes) for v in vpieces]
     
-    # TODO -----------------------------------------------------------------------------
-    
-    def sum(self, axis=None, keepdims=False):
-        # "where" is absent because its broadcasting is not implemented.
-        # "initial" is also not implemented.
-        b = self.b.sum(axis, keepdims=keepdims)
-        em = self.emap.sum(axis, keepdims=keepdims)
-        return Normal(em, b)
+    def sum(self, axis, keepdims=False):
+        if not isinstance(axis, int) and not isinstance(axis, tuple):
+            raise ValueError("`axis` must be an integer or "
+                             "a tuple of integers.")
+            # None, the default value for non-sparse arrays, is not supported,
+            # because in the typical case the variable has at least one 
+            # independence axis that cannot be contracted.
+
+        if not isinstance(axis, tuple):
+            axis = (axis,)
+
+        sum_axes = [self.ndim + ax if ax < 0 else ax for ax in axis]
+
+        if any(ax in self.iaxes for ax in sum_axes):
+            raise ValueError("The computation of sums along "
+                             "independence axes is not supported.")
+        
+        if keepdims:
+            iaxes = self.iaxes
+        else:
+            iaxes = tuple(iax - [sax < iax for sax in sum_axes].count(True) 
+                          for iax in self.iaxes) 
+
+        v = self.v.sum(axis=axis, keepdims=keepdims)
+        return SparseNormal(v, iaxes)
 
     def transpose(self, axes=None):
-        b = self.b.transpose(axes)
-        em = self.emap.transpose(axes)
-        return Normal(em, b)
+        if axes is None:
+            iaxes = [self.ndim - ax - 1 for ax in self.iaxes]
+        else:
+            axes_ = [self.ndim + ax if ax < 0 else ax for ax in axes]
+            iaxes = [axes_.index(ax) for ax in self.iaxes]
+
+        iaxes = tuple(sorted(iaxes))
+        return SparseNormal(self.v.transpose(axes), iaxes)
     
     def trace(self, offset=0, axis1=0, axis2=1):
-        b = self.b.trace(offset=offset, axis1=axis1, axis2=axis2)
-        em = self.emap.trace(offset, axis1, axis2)
-        return Normal(em, b)
+        if axis1 < 0:
+            axis1 = self.ndim + axis1
+
+        if axis2 < 0:
+            axis2 = self.ndim + axis2
+
+        if (axis1 in self.iaxes) or (axis2 in self.iaxes):
+            raise ValueError("Traces along independence axes "
+                             "are not supported.")
+        iaxes = []
+        for ax in self.iaxes:
+            ax_ = ax
+            if ax > axis1:
+                ax_ -= 1
+            if ax > axis2:
+                ax_ -= 1
+            iaxes.append(ax_)
+
+        iaxes = tuple(iaxes)
+        return SparseNormal(self.v.trace(offset, axis1, axis2), iaxes)
     
     @staticmethod
     def concatenate(arrays, axis):
