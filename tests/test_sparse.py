@@ -4,6 +4,10 @@ import numpy as np
 from gprob.normal_ import normal
 from gprob.sparse import _parse_index_key, iid_repeat, assparsenormal
 
+from utils import random_normal
+
+np.random.seed(0)
+
 
 def test_iid_repeat():
     # A numeric constant.
@@ -357,6 +361,50 @@ def test_moveaxis():
 
 
 def test_reshape():
+
+    # A constant array.
+    v = assparsenormal(np.ones((9, 8)))
+    
+    sh = (9*8,)
+    assert v.reshape(sh).shape == sh
+    assert v.reshape(sh).iaxes == tuple()
+
+    sh = (2, 3, 4, 3)
+    assert v.reshape(sh).shape == sh
+    assert v.reshape(sh).iaxes == tuple()
+
+    # Zero-sized arrays.
+    v = iid_repeat(iid_repeat(normal(size=(2, 3, 0)), 0), 5, axis=-2)
+
+    sh = (1, 0, 3, 4, 0)
+    assert v.reshape(sh).shape == sh
+    assert v.reshape(sh).iaxes == tuple()
+
+    v = assparsenormal([])
+
+    sh = (1, 0, 3, 4, 0)
+    assert v.reshape(sh).shape == sh
+    assert v.reshape(sh).iaxes == tuple()
+
+    # A scalar.
+    v = assparsenormal(normal())
+    
+    sh = (1,)
+    assert v.reshape(sh).shape == sh
+    assert v.reshape(sh).iaxes == tuple()
+
+    sh = (1, 1, 1, 1)
+    assert v.reshape(sh).shape == sh
+    assert v.reshape(sh).iaxes == tuple()
+
+    with pytest.raises(ValueError):
+        v.reshape((1, 2, 1))
+
+    with pytest.raises(ValueError):
+        v.reshape((1, 0, 1))
+
+    # Non-trivial examples.
+
     v = iid_repeat(iid_repeat(normal(size=(4, 5)), 2, axis=0), 3, axis=0)
     assert v.shape == (3, 2, 4, 5)
     assert v.iaxes == (0, 1)
@@ -401,7 +449,6 @@ def test_reshape():
     assert v_.reshape(sh).shape == sh
     assert v_.reshape(sh).iaxes == (1, 2)
 
-
     v_ = iid_repeat(v, 1, axis=-1)
     assert v_.shape == (3, 2, 4, 5, 1)
     assert v_.iaxes == (0, 1, 4)
@@ -421,3 +468,19 @@ def test_reshape():
     sh = (3, 2, 5, 4)
     with pytest.raises(ValueError):
         v_ = v_.reshape(sh)
+
+    # Checking the arrangement of elements.
+    v = iid_repeat(random_normal((8, 9)), 5)
+
+    tol = 1e-10
+
+    sh = (5, 3, 4, 2, 3)
+    vvar = v.var()
+    assert np.max(v.reshape(sh).var() - vvar.reshape(sh)) < tol
+    assert np.max(v.reshape(sh, order="F").var() 
+                  - vvar.reshape(sh, order="F")) < tol
+    
+    # A sanity check that changing the order is not trivial.
+    assert np.max(v.reshape(sh, order="F").var() 
+                  - vvar.reshape(sh, order="C")) > tol
+
