@@ -370,27 +370,31 @@ class SparseNormal:
 
         iaxes = []
         for i, n in enumerate(self.shape):
-            old_cnt = old_cnt * n
-            
-            d = 0
-            while new_cnt < old_cnt:
-                ns = newshape[new_dim + d]
-                new_cnt = new_cnt * ns
-
-                if ns == 1:
-                    new_dim += 1  # To skip trivial axes of size 1.
-                else:
-                    d += 1
-
             if i in self.iaxes:
-                if new_cnt == old_cnt and d == 1:
+                if n != 1:
+                    # Skips all trivial dimensions first.
+                    while new_dim < len(newshape) and newshape[new_dim] == 1:
+                        new_dim += 1
+
+                if (new_dim < len(newshape) and newshape[new_dim] == n 
+                    and new_cnt == old_cnt):
+                    
                     iaxes.append(new_dim)
                 else:
                     raise ValueError("Reshaping that affects independence axes "
                                      f"is not supported. Axis {i} is affected "
                                      "by the requested shape transformation "
                                      f"{self.shape} -> {newshape}.")
-            new_dim = new_dim + d
+                
+                old_cnt *= n
+                new_cnt *= newshape[new_dim]
+                new_dim += 1
+            else:
+                old_cnt *= n
+
+                while new_cnt < old_cnt:
+                    new_cnt *= newshape[new_dim]
+                    new_dim += 1
         
         iaxes = tuple(sorted(iaxes))
         return SparseNormal(v, iaxes)

@@ -354,3 +354,70 @@ def test_moveaxis():
     v__ = v_.moveaxis(-4, 1)
     assert v.shape == v__.shape
     assert v.iaxes == v__.iaxes
+
+
+def test_reshape():
+    v = iid_repeat(iid_repeat(normal(size=(4, 5)), 2, axis=0), 3, axis=0)
+    assert v.shape == (3, 2, 4, 5)
+    assert v.iaxes == (0, 1)
+
+    sh = (3, 2, 20)
+    assert v.reshape(sh).shape == sh
+    assert v.reshape(sh).iaxes == (0, 1)
+
+    with pytest.raises(ValueError):
+        assert v.reshape((3, 2, 21))
+
+    with pytest.raises(ValueError):
+        assert v.reshape((3, 2, 19))
+
+    sh = (3, 8, 5)
+    assert np.reshape(np.ones(v.shape), sh).shape == sh
+    # To check that the shape is valid for a numeric array.
+
+    with pytest.raises(ValueError):
+        assert v.reshape(sh)
+
+    sh = (6, 4, 5)
+    assert np.reshape(np.ones(v.shape), sh).shape == sh
+    with pytest.raises(ValueError):
+        assert v.reshape(sh)
+
+    sh = (2, 3, 2, 2, 5)
+    assert np.reshape(np.ones(v.shape), sh).shape == sh
+    with pytest.raises(ValueError):
+        assert v.reshape(sh)
+
+    sh = (3, 1, 2, 4, 5)
+    assert v.reshape(sh).shape == sh
+    assert v.reshape(sh).iaxes == (0, 2)
+
+    sh = (1, 3, 1, 2, 4, 5)
+    v_ = v.reshape(sh)
+    assert v_.shape == sh
+    assert v_.iaxes == (1, 3)
+
+    sh = (1, 3, 2, 2, 5, 2)
+    assert v_.reshape(sh).shape == sh
+    assert v_.reshape(sh).iaxes == (1, 2)
+
+
+    v_ = iid_repeat(v, 1, axis=-1)
+    assert v_.shape == (3, 2, 4, 5, 1)
+    assert v_.iaxes == (0, 1, 4)
+
+    # The preservation of a 1-sized independence axis.
+    sh = (3, 2, 20, 1)
+    v_ = v_.reshape(sh)
+    assert v_.shape == sh
+    assert v_.iaxes == (0, 1, 3)
+
+    sh = (3, 2, 5, 2, 2, 1)
+    v_ = v_.reshape(sh)
+    assert v_.shape == sh
+    assert v_.iaxes == (0, 1, 5)
+
+    # The removal of iid axes, even trivial, is not allowed
+    sh = (3, 2, 5, 4)
+    with pytest.raises(ValueError):
+        v_ = v_.reshape(sh)
