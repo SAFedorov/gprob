@@ -1,9 +1,11 @@
 import numpy as np
 from functools import reduce
-from gprob.normal_ import Normal
+from gprob.normal_ import Normal, asnormal
 
 
 def random_normal(shape, dtype=np.float64):
+    """Generates a normal variable with random mean and elementary map."""
+
     sz = reduce(lambda x, y: x * y, shape, 1)
 
     if np.issubdtype(dtype, np.complexfloating):
@@ -24,6 +26,29 @@ def random_normal(shape, dtype=np.float64):
     assert a.dtype == dtype
 
     return Normal(a, mu).reshape(shape)
+
+
+def random_det_normal(shape, dtype=np.float64):
+    """Generates a random deterministic array lifted to the rank of a normal 
+    variable with zero fluctuations."""
+
+    sz = reduce(lambda x, y: x * y, shape, 1)
+
+    if np.issubdtype(dtype, np.complexfloating):
+        rdtype = dtype(0).real.dtype
+
+        rmu = (2. * np.random.rand(sz) - 1.).astype(rdtype)
+        imu = (2. * np.random.rand(sz) - 1.).astype(rdtype)
+
+        mu = rmu + 1j * imu
+    else:
+        mu = (2. * np.random.rand(sz) - 1.).astype(dtype)
+
+    v = asnormal(mu)
+    assert v.b.dtype == dtype
+    assert v.a.dtype == dtype
+
+    return v.reshape(shape)
 
 
 def random_correlate(vs):

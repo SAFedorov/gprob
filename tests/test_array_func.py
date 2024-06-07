@@ -18,7 +18,7 @@ from gprob.fft import (fft, fft2, fftn,
                        irfft, irfft2, irfftn,
                        hfft, ihfft)
 
-from utils import random_normal, random_correlate
+from utils import random_normal, random_det_normal, random_correlate
 
 
 def _gts(ndim = None):
@@ -61,6 +61,7 @@ def _test_array_func(f, *args, test_shapes=None, test_dtype=np.float64,
         test_shapes = _gts(test_shapes)
         
     for sh in test_shapes:
+        # The operation on random variables.
         vin = random_normal(sh, test_dtype)
         vout = f(vin, *args, **kwargs)
 
@@ -81,6 +82,19 @@ def _test_array_func(f, *args, test_shapes=None, test_dtype=np.float64,
             aref = npf(arin, *args, **kwargs)
             assert arout.shape == aref.shape
             assert np.allclose(arout, aref, rtol=tol, atol=tol * np.max(np.abs(arin)))
+
+        # The operation on deterministic variables.
+        vin = random_det_normal(sh, test_dtype)
+        vout = f(vin, *args, **kwargs)
+
+        assert vin.emap.a.size == 0
+        assert vin.emap.a.shape[1:] == vin.b.shape
+        assert vout.emap.a.shape[1:] == vout.b.shape
+
+        refmean = npf(vin.b, *args, **kwargs)
+        assert vout.b.shape == refmean.shape
+        assert vout.b.dtype == refmean.dtype
+        assert np.all(vout.b == refmean)
 
 
 def test_sum():
@@ -171,15 +185,19 @@ def test_reshape():
         if len(sh) == 0:
             new_shapes = [1, tuple(), (1,), (1, 1, 1)]
         elif len(sh) == 1:
-            new_shapes = [sh[0], np.array(sh[0]), (1, sh[0]), (1, sh[0], 1)]
+            new_shapes = [sh[0], np.array(sh[0]), (1, sh[0]), 
+                          (1, sh[0], 1), (-1,)]
         elif len(sh) == 2:
-            new_shapes = [sh[0] * sh[1], (sh[0] * sh[1],), (sh[1], 1, sh[0])]
+            new_shapes = [sh[0] * sh[1], (sh[0] * sh[1],), (sh[1], 1, sh[0]),
+                          (-1,), (sh[1], -1)]
         elif len(sh) == 3:
             new_shapes = [(sh[0] * sh[1] * sh[2],), (sh[1], sh[0] * sh[2]),
-                          (sh[0] * sh[1], sh[2])]
+                          (-1, sh[2]), (sh[1], -1), (sh[2], -1), 
+                          (sh[0] * sh[1], sh[2]), (-1,)]
         else:
             sz = reduce(lambda x, y: x * y, sh)
-            new_shapes = [(sz,), prime_factors(sz)]
+            new_shapes = [(sz,), prime_factors(sz), (-1,), 
+                          (*sh, 1), (sh[0], 1, 1, *sh[1:]), (1, *sh)]
 
         for new_sh in new_shapes:
             _test_array_func(reshape, new_sh, test_shapes=[sh])
@@ -313,7 +331,7 @@ def _test_array_func2(f, op1_shape=None, op2_shape=None, *args, **kwargs):
         
     npf = getattr(np, f.__name__)
 
-    # Random variable first
+    # Normal variable first.
 
     vin = random_normal(op1_shape)
     op2 = (2. * np.random.rand(*op2_shape) - 1)
@@ -336,7 +354,7 @@ def _test_array_func2(f, op1_shape=None, op2_shape=None, *args, **kwargs):
         atol = 2 * tol * max(1, np.max(np.abs(aref)))
         assert np.allclose(arout, aref, rtol=tol, atol=atol)
 
-    # Random variable second
+    # Normal variable second.
     
     op1 = (2. * np.random.rand(*op1_shape) - 1)
     vin = random_normal(op2_shape)
@@ -354,7 +372,43 @@ def _test_array_func2(f, op1_shape=None, op2_shape=None, *args, **kwargs):
         assert arout.shape == aref.shape
 
         atol = 2 * tol * max(1, np.max(np.abs(aref)))
-        assert np.allclose(arout, aref, rtol=tol, atol=atol)  
+        assert np.allclose(arout, aref, rtol=tol, atol=atol)
+
+    # Both variables are normal. 
+
+    vin1 = random_normal(op1_shape)
+    vin2 = random_normal(op2_shape)
+    vout = f(*args, vin1, vin2, **kwargs)
+    refmean = npf(*args, vin1.b, vin2.b, **kwargs)
+
+    assert vout.b.shape == refmean.shape
+    assert vout.b.dtype == refmean.dtype
+    assert np.max(vout.b - refmean) < atol
+
+    assert vout.emap.a.dtype == refmean.dtype
+
+    vref = (f(*args, vin1, vin2.b, **kwargs) 
+            + f(*args, vin1.b, (vin2 - vin2.b), **kwargs))
+
+    atol = 2 * tol * max(1, np.max(np.abs(vref.emap.a)))
+
+    assert np.max(vout.emap.a - vref.emap.a) < atol
+
+    # Both variables are deterministic promoted to Normal.
+
+    vin1 = random_det_normal(op1_shape)
+    vin2 = random_det_normal(op2_shape)
+    vout = f(*args, vin1, vin2, **kwargs)
+    refmean = npf(*args, vin1.b, vin2.b, **kwargs)
+
+    atol = 2 * tol * max(1, np.max(np.abs(refmean)))
+
+    assert vout.b.shape == refmean.shape
+    assert vout.b.dtype == refmean.dtype
+    assert np.max(vout.b - refmean) < atol
+
+    assert vout.emap.a.size == 0
+    assert vout.emap.a.dtype == refmean.dtype
 
 
 def test_multiply():
@@ -590,6 +644,11 @@ def _test_concat_func(f, *args, test_shapes=None, vins_list=None, **kwargs):
 
             vins_list += [[vins2[0], vins2[1]], [vins2[1], vins2[0]]]
 
+            # Also adds a cace of deterministic arrays promoted to Normals.
+            vins_list += [[random_det_normal(sh) for _ in range(1)],
+                          [random_det_normal(sh) for _ in range(2)],
+                          [random_det_normal(sh) for _ in range(3)]]
+
     for vins in vins_list:
         vout = f(vins, *args, **kwargs)
 
@@ -604,12 +663,18 @@ def _test_concat_func(f, *args, test_shapes=None, vins_list=None, **kwargs):
         # produces in the same order of the elementary random variables 
         # as emaps.concatenate or emaps.stack.
 
+        assert len(vins_ext[0].elem) == len(vout.emap.elem)
+
         for i in range(len(vout.emap.a)):
             arins = [vin.a[i] for vin in vins_ext]
             arout = vout.emap.a[i]
             aref = npf(arins, *args, **kwargs)
             assert arout.shape == aref.shape
             assert np.all(arout == aref)
+
+    with pytest.raises(ValueError):
+        # Error for empty inputs.
+        f([], *args, **kwargs)
 
 
 def test_stack():

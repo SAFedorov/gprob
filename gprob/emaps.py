@@ -199,10 +199,15 @@ class ElementaryMap:
     
     def cumsum(self, vaxis=None, **kwargs):
         if vaxis is None:
-            a = self.a.reshape((self.a.shape[0], -1))
+            vsz = reduce(mul, self.vshape, 1)
+            a = self.a.reshape((self.a.shape[0], vsz))
             axis = 1
         else:
-            a = np.atleast_2d(self.a)
+            a = self.a
+
+            if a.ndim < 2:
+                a = a.reshape((a.shape[0], 1))
+
             axis, = vax_to_ax([vaxis])
 
         new_a = np.cumsum(a, axis=axis, **kwargs)

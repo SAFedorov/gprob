@@ -173,14 +173,20 @@ class Normal:
         
         other, isnormal = as_numeric_or_normal(other)
         if isnormal:
-            return self @ other.b + self.b @ other
+            b = self.b @ other.b
+            em = self.emap @ other.b
+            em += self.b @ other.emap
+            return Normal(em, b)
         
         return Normal(self.emap @ other, self.b @ other)
 
     def __rmatmul__(self, other):
         other, isnormal = as_numeric_or_normal(other)
         if isnormal:
-            return other @ self.b + other.b @ self
+            b = other.b @ self.b
+            em = other.b @ self.emap
+            em += other.emap @ self.b
+            return Normal(em, b)
         
         return Normal(other @ self.emap, other @ self.b)
 
@@ -250,6 +256,12 @@ class Normal:
     
     def reshape(self, newshape, order="C"):
         b = self.b.reshape(newshape, order=order)
+
+        newshape = b.shape
+        # This replaces possible -1 in newshape with an explicit value,
+        # which is not easy for the emap's method to calculate in the case 
+        # if the normal variable is deterministic, meaning that a.size == 0.
+
         em = self.emap.reshape(newshape, order=order)
         return Normal(em, b)
     
@@ -295,9 +307,12 @@ class Normal:
         op2, isnormal2 = as_numeric_or_normal(op2)
 
         if isnormal2 and isnormal1:
-            t1 = _bilinearfunc(name, op1.b, op2, *args, **kwargs)
-            t2 = _bilinearfunc(name, op1, op2.b, *args, **kwargs)
-            return t1 + t2
+            b = getattr(np, name)(op1.b, op2.b, *args, **kwargs)
+            em = getattr(op1.emap, name)(op2.b, *args, **kwargs)
+
+            kwargs.update(otherfirst=True)
+            em += getattr(op2.emap, name)(op1.b, *args, **kwargs)
+            return Normal(em, b)
 
         if isnormal1 and not isnormal2:
             b = getattr(np, name)(op1.b, op2, *args, **kwargs)
@@ -319,7 +334,10 @@ class Normal:
         op2, isnormal2 = as_numeric_or_normal(op2)
 
         if isnormal2 and isnormal1:
-            return einsum(subs, op1.b, op2) + einsum(subs, op1, op2.b)
+            b = einsum(subs, op1.b, op2.b)
+            em = op1.emap.einsum(subs, op2.b)
+            em += op2.emap.einsum(subs, op1.b, otherfirst=True)
+            return Normal(em, b)
 
         if isnormal1 and not isnormal2:
             b = np.einsum(subs, op1.b, op2)
