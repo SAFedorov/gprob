@@ -27,7 +27,7 @@ def ihfft(x, n=None, axis=-1, norm=None):
 
 def _fftfunc(name, x, n, axis, norm):
     cls = get_highest_class(x)
-    return cls.fftfunc(name, x, n, axis, norm)
+    return cls._fftfunc(name, x, n, axis, norm)
 
 
 def fft2(x, s=None, axes=(-2, -1), norm=None):
@@ -64,4 +64,4 @@ def irfftn(x, s=None, axes=None, norm=None):
 
 def _fftfunc_n(name, x, s, axes, norm):
     cls = get_highest_class(x)
-    return cls.fftfunc_n(name, x, s, axes, norm)
+    return cls._fftfunc_n(name, x, s, axes, norm)

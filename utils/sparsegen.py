@@ -22,15 +22,21 @@ def gen_op_method(name: str):
             return NotImplemented
         
         {vln}
-        iaxes = _validate_iaxes([self, other])
+        iaxes, _ = _validate_iaxes([self, other])
         return SparseNormal(v, iaxes)
     """
     return code
 
-method_names = ["__add__", "__radd__", 
-                "__sub__", "__rsub__", 
-                "__mul__", "__rmul__", 
-                "__truediv__", "__rtruediv__", 
-                "__pow__", "__rpow__"]
 
-print("".join(gen_op_method(name) for name in method_names))
+def gen_all():
+    method_names = ["__add__", "__radd__", 
+                    "__sub__", "__rsub__", 
+                    "__mul__", "__rmul__", 
+                    "__truediv__", "__rtruediv__", 
+                    "__pow__", "__rpow__"]
+
+    return "".join(gen_op_method(name) for name in method_names)
+
+
+if __name__ == "__main__":
+    print(gen_all())

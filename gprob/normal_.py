@@ -276,21 +276,21 @@ class Normal:
         return Normal(em, b)
     
     @staticmethod
-    def concatenate(arrays, axis):
+    def _concatenate(arrays, axis):
         arrays = [asnormal(ar) for ar in arrays]
         b = np.concatenate([x.b for x in arrays], axis=axis)
         em = emaps.concatenate([x.emap for x in arrays], vaxis=axis)
         return Normal(em, b)
     
     @staticmethod
-    def stack(arrays, axis):
+    def _stack(arrays, axis):
         arrays = [asnormal(ar) for ar in arrays]
         b = np.stack([x.b for x in arrays], axis=axis)
         em = emaps.stack([x.emap for x in arrays], vaxis=axis)
         return Normal(em, b)
 
     @staticmethod
-    def bilinearfunc(name, op1, op2, *args, **kwargs):
+    def _bilinearfunc(name, op1, op2, *args, **kwargs):
         op1, isnormal1 = as_numeric_or_normal(op1)
         op2, isnormal2 = as_numeric_or_normal(op2)
 
@@ -314,7 +314,7 @@ class Normal:
         return getattr(np, name)(op1, op2, *args, **kwargs)
 
     @staticmethod
-    def einsum(subs, op1, op2):
+    def _einsum(subs, op1, op2):
         op1, isnormal1 = as_numeric_or_normal(op1)
         op2, isnormal2 = as_numeric_or_normal(op2)
 
@@ -334,7 +334,7 @@ class Normal:
         return np.einsum(subs, op1, op2)
 
     @staticmethod
-    def fftfunc(name, x, n, axis, norm):
+    def _fftfunc(name, x, n, axis, norm):
         x = asnormal(x)
         func = getattr(np.fft, name)
         b = func(x.b, n, axis, norm)
@@ -342,7 +342,7 @@ class Normal:
         return Normal(em, b)
 
     @staticmethod
-    def fftfunc_n(name, x, s, axes, norm):
+    def _fftfunc_n(name, x, s, axes, norm):
         x = asnormal(x)
         func = getattr(np.fft, name)
         b = func(x.b, s, axes, norm)
@@ -787,14 +787,14 @@ def concatenate(arrays, axis=0):
     if len(arrays) == 0:
         raise ValueError("Need at least one array to concatenate.")
     cls = get_highest_class(arrays)
-    return cls.concatenate(arrays, axis)
+    return cls._concatenate(arrays, axis)
 
 
 def stack(arrays, axis=0):
     if len(arrays) == 0:
         raise ValueError("Need at least one array to stack.")
     cls = get_highest_class(arrays)
-    return cls.stack(arrays, axis)
+    return cls._stack(arrays, axis)
 
 
 def _as_array_seq(arrays_or_scalars):
@@ -863,7 +863,7 @@ def dsplit(x, indices_or_sections):
 
 def einsum(subs, op1, op2):
     cls = get_highest_class([op1, op2])
-    return cls.einsum(subs, op1, op2)
+    return cls._einsum(subs, op1, op2)
 
 
 def add(op1, op2):
@@ -912,7 +912,7 @@ def tensordot(op1, op2, axes=2):
 
 def _bilinearfunc(name, op1, op2, *args, **kwargs):
     cls = get_highest_class([op1, op2])
-    return cls.bilinearfunc(name, op1, op2, *args, **kwargs)
+    return cls._bilinearfunc(name, op1, op2, *args, **kwargs)
 
 
 # ---------- linear and linearized unary array ufuncs ----------

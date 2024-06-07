@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.exceptions import AxisError
 
 from .normal_ import (Normal, asnormal, print_normal, as_numeric_or_normal, 
                       broadcast_to)
@@ -10,12 +11,16 @@ from .external import einsubs
 def iid_repeat(x, nrep=1, axis=0):
     """Creates a sparse array of independent identically distributed 
     copies of `x`."""
-    
-    if axis < 0:
-        axis = x.ndim + axis + 1
 
     x = assparsenormal(x)
     x = x.iid_copy()
+
+    if axis < -x.ndim-1 or axis > x.ndim:
+        raise AxisError(f"Axis {axis} is out of bounds "
+                        f"for an array of dimension {x.ndim + 1}.")
+    
+    if axis < 0:
+        axis = x.ndim + axis + 1
 
     iax = sorted([ax + 1 if ax >= axis else ax for ax in x.iaxes] + [axis])
     iax = tuple(iax)
@@ -104,7 +109,7 @@ class SparseNormal:
             return NotImplemented
 
         v = self.v + other.v
-        iaxes = _validate_iaxes([self, other])
+        iaxes, _ = _validate_iaxes([self, other])
         return SparseNormal(v, iaxes)
 
     def __radd__(self, other):
@@ -114,7 +119,7 @@ class SparseNormal:
             return NotImplemented
 
         v = other.v + self.v
-        iaxes = _validate_iaxes([self, other])
+        iaxes, _ = _validate_iaxes([self, other])
         return SparseNormal(v, iaxes)
 
     def __sub__(self, other):
@@ -124,7 +129,7 @@ class SparseNormal:
             return NotImplemented
 
         v = self.v - other.v
-        iaxes = _validate_iaxes([self, other])
+        iaxes, _ = _validate_iaxes([self, other])
         return SparseNormal(v, iaxes)
 
     def __rsub__(self, other):
@@ -134,7 +139,7 @@ class SparseNormal:
             return NotImplemented
 
         v = other.v - self.v
-        iaxes = _validate_iaxes([self, other])
+        iaxes, _ = _validate_iaxes([self, other])
         return SparseNormal(v, iaxes)
 
     def __mul__(self, other):
@@ -144,7 +149,7 @@ class SparseNormal:
             return NotImplemented
 
         v = self.v * other.v
-        iaxes = _validate_iaxes([self, other])
+        iaxes, _ = _validate_iaxes([self, other])
         return SparseNormal(v, iaxes)
 
     def __rmul__(self, other):
@@ -154,7 +159,7 @@ class SparseNormal:
             return NotImplemented
 
         v = other.v * self.v
-        iaxes = _validate_iaxes([self, other])
+        iaxes, _ = _validate_iaxes([self, other])
         return SparseNormal(v, iaxes)
 
     def __truediv__(self, other):
@@ -164,7 +169,7 @@ class SparseNormal:
             return NotImplemented
 
         v = self.v / other.v
-        iaxes = _validate_iaxes([self, other])
+        iaxes, _ = _validate_iaxes([self, other])
         return SparseNormal(v, iaxes)
 
     def __rtruediv__(self, other):
@@ -174,7 +179,7 @@ class SparseNormal:
             return NotImplemented
 
         v = other.v / self.v
-        iaxes = _validate_iaxes([self, other])
+        iaxes, _ = _validate_iaxes([self, other])
         return SparseNormal(v, iaxes)
 
     def __pow__(self, other):
@@ -184,7 +189,7 @@ class SparseNormal:
             return NotImplemented
 
         v = self.v ** other.v
-        iaxes = _validate_iaxes([self, other])
+        iaxes, _ = _validate_iaxes([self, other])
         return SparseNormal(v, iaxes)
 
     def __rpow__(self, other):
@@ -194,7 +199,7 @@ class SparseNormal:
             return NotImplemented
 
         v = other.v ** self.v
-        iaxes = _validate_iaxes([self, other])
+        iaxes, _ = _validate_iaxes([self, other])
         return SparseNormal(v, iaxes)
 
     def __matmul__(self, other):
@@ -452,28 +457,36 @@ class SparseNormal:
         return SparseNormal(self.v.trace(offset, axis1, axis2), iaxes)
     
     @staticmethod
-    def concatenate(arrays, axis):
-         # TODO: account for the case when axis is negative -----------------------------
+    def _concatenate(arrays, axis):
         arrays = [assparsenormal(ar) for ar in arrays]
-        iaxes = _validate_iaxes(arrays)
+        iaxes, ndim = _validate_iaxes(arrays)
+        if axis < 0:
+            axis = ndim + axis
+
         if axis in iaxes:
             raise ValueError("Concatenation along independence axes "
                              "is not allowed.")
 
-        v = Normal.concatenate([x.v for x in arrays], axis=axis)
+        v = Normal._concatenate([x.v for x in arrays], axis=axis)
         return SparseNormal(v, iaxes)
     
     @staticmethod
-    def stack(arrays, axis):
-        # TODO: account for the case when axis is negative -----------------------------
+    def _stack(arrays, axis):
         arrays = [assparsenormal(ar) for ar in arrays]
-        iaxes = _validate_iaxes(arrays)
+        iaxes, ndim = _validate_iaxes(arrays)
+        if axis < 0:
+            axis = ndim - axis
+
         iaxes = tuple(ax + 1 if ax >= axis else ax for ax in iaxes)
-        v = Normal.stack([x.v for x in arrays], axis=axis)
+        v = Normal._stack([x.v for x in arrays], axis=axis)
         return SparseNormal(v, iaxes)
     
     @staticmethod
-    def einsum(subs, op1, op2):
+    def _bilinearfunc(name, op1, op2, *args, **kwargs):
+        raise NotImplementedError
+    
+    @staticmethod
+    def _einsum(subs, op1, op2):
         def out_iaxes(op, insubs, outsubs):
             """Calculates the indices of the independence axes for
             the output operand."""
@@ -494,21 +507,29 @@ class SparseNormal:
         subs = f"{insu1},{insu2}->{outsu}"
 
         if isinstance(op1, SparseNormal) and isinstance(op2, SparseNormal):
-            return (SparseNormal.einsum(subs, op1, op1.v.b)
-                    + SparseNormal.einsum(subs, op1.v.b, op1))
+            return (SparseNormal._einsum(subs, op1, op1.v.b)
+                    + SparseNormal._einsum(subs, op1.v.b, op1))
 
         if isinstance(op1, SparseNormal) and not isinstance(op2, SparseNormal):
             iaxes = out_iaxes(op1, insu1, outsu)
-            v = Normal.einsum(subs, op1.v, op2)
+            v = Normal._einsum(subs, op1.v, op2)
             return SparseNormal(v, iaxes)
 
         if isinstance(op2, SparseNormal) and not isinstance(op1, SparseNormal):
             iaxes = out_iaxes(op2, insu2, outsu)
-            v = Normal.einsum(subs, op1, op2.v)
+            v = Normal._einsum(subs, op1, op2.v)
             return SparseNormal(v, iaxes)
         
         # The default that is not supposed to be reached, usually.
-        return Normal.einsum(subs, op1, op2)
+        return Normal._einsum(subs, op1, op2)
+    
+    @staticmethod
+    def _fftfunc(name, x, n, axis, norm):
+        raise NotImplementedError
+
+    @staticmethod
+    def _fftfunc_n(name, x, s, axes, norm):
+        raise NotImplementedError
 
     # ---------- probability-related methods ----------
 
@@ -565,7 +586,11 @@ class SparseNormal:
 
 def _validate_iaxes(seq):
     """Checks that the independence axes of the sparse normal arrays in `seq`
-    are compatible, and returns those axes for the final broadcasted shape."""
+    are compatible and returns them.
+    
+    Returns:
+        (iaxes, ndim) of the final shape for the broadcasted arrays.
+    """
 
     def reverse_axes(ndim, axes):
         """Converts a sequance of positive axes numbers into a sequence 
@@ -591,9 +616,9 @@ def _validate_iaxes(seq):
     ndim = max(x.ndim for x in seq)
 
     if len(iaxs) == 1:
-        return reverse_axes(ndim, iaxs.pop())
+        return reverse_axes(ndim, iaxs.pop()), ndim
     elif len(iaxs) == 0:
-        return tuple()
+        return tuple(), ndim
     
     # len > 1
     raise ValueError("Only sparse normals with identical independence "
@@ -601,8 +626,8 @@ def _validate_iaxes(seq):
 
 
 def _parse_index_key(x, key):
-    """Calculates the numbers of the output axes for each input axis based 
-    on the key and validates the key."""
+    """Validates the key and calculates the numbers of the output axes 
+    for each input axis."""
 
     if not isinstance(key, tuple):
         key = (key,)

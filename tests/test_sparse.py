@@ -1,6 +1,7 @@
 import pytest
 import numpy as np
 
+import gprob as gp
 from gprob.normal_ import normal
 from gprob.sparse import _parse_index_key, iid_repeat, assparsenormal
 
@@ -82,11 +83,48 @@ def test_iid_repeat():
     assert iid_repeat(v, 4, axis=0).shape == (4, 2, 5, 3, 6)
     assert iid_repeat(v, 4, axis=0).iaxes == (0, 2, 4)
 
+    assert iid_repeat(v, 4, axis=-5).shape == (4, 2, 5, 3, 6)
+    assert iid_repeat(v, 4, axis=-5).iaxes == (0, 2, 4)
+
+    assert iid_repeat(v, 4, axis=1).shape == (2, 4, 5, 3, 6)
+    assert iid_repeat(v, 4, axis=1).iaxes == (1, 2, 4)
+
+    assert iid_repeat(v, 4, axis=-4).shape == (2, 4, 5, 3, 6)
+    assert iid_repeat(v, 4, axis=-4).iaxes == (1, 2, 4)
+
     assert iid_repeat(v, 4, axis=2).shape == (2, 5, 4, 3, 6)
     assert iid_repeat(v, 4, axis=2).iaxes == (1, 2, 4)
 
+    assert iid_repeat(v, 4, axis=-3).shape == (2, 5, 4, 3, 6)
+    assert iid_repeat(v, 4, axis=-3).iaxes == (1, 2, 4)
+
     assert iid_repeat(v, 4, axis=3).shape == (2, 5, 3, 4, 6)
     assert iid_repeat(v, 4, axis=3).iaxes == (1, 3, 4)
+
+    assert iid_repeat(v, 4, axis=-2).shape == (2, 5, 3, 4, 6)
+    assert iid_repeat(v, 4, axis=-2).iaxes == (1, 3, 4)
+
+    assert iid_repeat(v, 4, axis=4).shape == (2, 5, 3, 6, 4)
+    assert iid_repeat(v, 4, axis=4).iaxes == (1, 3, 4)
+
+    assert iid_repeat(v, 4, axis=-1).shape == (2, 5, 3, 6, 4)
+    assert iid_repeat(v, 4, axis=-1).iaxes == (1, 3, 4)
+
+    # Axis out of bound.
+    # raised exception is AxisError, which is a subtype of ValueError
+    with pytest.raises(ValueError):
+        iid_repeat(v, 4, axis=5)
+    with pytest.raises(ValueError):
+        iid_repeat(v, 4, axis=-6)
+    with pytest.raises(ValueError):
+        iid_repeat(v, 4, axis=24)
+
+    with pytest.raises(ValueError):
+        iid_repeat(normal(), 7, axis=1)
+    with pytest.raises(ValueError):
+        iid_repeat(normal(), 7, axis=-2)
+    with pytest.raises(ValueError):
+        iid_repeat(normal(), 7, axis=22)
 
 
 def test_index_key_parsing():
@@ -709,3 +747,72 @@ def test_trace():
     with pytest.raises(ValueError):
         v.trace(axis1=-2, axis2=1)
 
+
+def test_concatenate():
+    tol = 1e-10
+
+    xi = random_normal((8, 2))
+    v = iid_repeat(xi, 7, axis=-1)
+    
+    v1 = v[:3]  # (3, 2, 7)
+    v2 = v[3:]  # (5, 2, 7)
+
+    v_ = gp.concatenate([v1, v2], axis=0)
+    assert v.shape == v_.shape
+    assert v.iaxes == v_.iaxes
+    assert np.max(v.mean() - v_.mean()) < tol
+    assert np.max(v.var() - v_.var()) < tol
+
+    v_ = gp.concatenate([v1, v2], axis=-3)
+    assert v.shape == v_.shape
+    assert v.iaxes == v_.iaxes
+    assert np.max(v.mean() - v_.mean()) < tol
+    assert np.max(v.var() - v_.var()) < tol
+
+    v1 = v[:4]  # (4, 2, 7)
+    v2 = v[4:]  # (4, 2, 7)
+
+    v_ = gp.concatenate([v1, v2], axis=0)
+    assert v.shape == v_.shape
+    assert v.iaxes == v_.iaxes
+    assert np.max(v.mean() - v_.mean()) < tol
+    assert np.max(v.var() - v_.var()) < tol
+
+    v_ = gp.concatenate([v1, v1, v1, v1], axis=1)
+    assert v_.shape == (4, 8, 7)
+    assert v.iaxes == v_.iaxes
+
+    v_ = gp.concatenate([v1, v1, v1, v2, v1, v2], axis=1)
+    assert v_.shape == (4, 12, 7)
+    assert v.iaxes == v_.iaxes
+
+    v_ = gp.concatenate([v1, np.ones((4, 4, 7)), np.ones((4, 1, 7))], axis=1)
+    assert v_.shape == (4, 7, 7)
+    assert v.iaxes == v_.iaxes
+
+    with pytest.raises(ValueError):
+        v_ = gp.concatenate([v1, v2], axis=-1)
+
+    vs = []
+    for _ in range(100):
+        xi = normal(size=(2,))
+        v = iid_repeat(iid_repeat(iid_repeat(xi, 3, axis=0), 4, axis=0), 5, axis=0)
+        # shape (5, 4, 3, 2), iaxes (0, 1, 2)
+
+        vs.append(v)
+
+    v = gp.concatenate(vs, axis=3)
+    assert v.shape == (5, 4, 3, 200)
+    assert v.iaxes == (0, 1, 2)
+
+    v = iid_repeat(normal(size=(1,)), 7)
+
+    with pytest.raises(ValueError):
+        gp.concatenate([v, normal(size=(7, 1))], axis=1)
+        # Concatenation of regular and sparse normal variables is not possible 
+        # because regular variables do not have independence axes.
+
+    # Concatenation with numeric arrays, however, is possible.
+    v_ = gp.concatenate([v, np.ones((7, 1))], axis=1)
+    assert v_.shape == (7, 2)
+    assert v_.iaxes == (0,)
