@@ -407,9 +407,15 @@ def test_reshape():
     assert v.reshape(sh).shape == sh
     assert v.reshape(sh).iaxes == tuple()
 
+    assert v.reshape((-1,)).shape == sh
+    assert v.reshape((-1,)).iaxes == tuple()
+
     sh = (2, 3, 4, 3)
     assert v.reshape(sh).shape == sh
     assert v.reshape(sh).iaxes == tuple()
+
+    assert v.reshape((2, 3, -1, 3)).shape == sh
+    assert v.reshape((2, 3, -1, 3)).iaxes == tuple()
 
     # Zero-sized arrays.
     v = iid_repeat(iid_repeat(normal(size=(2, 3, 0)), 0), 5, axis=-2)
@@ -450,6 +456,9 @@ def test_reshape():
     sh = (3, 2, 20)
     assert v.reshape(sh).shape == sh
     assert v.reshape(sh).iaxes == (0, 1)
+
+    assert v.reshape((3, 2, -1)).shape == sh
+    assert v.reshape((3, 2, -1)).iaxes == (0, 1)
 
     with pytest.raises(ValueError):
         assert v.reshape((3, 2, 21))

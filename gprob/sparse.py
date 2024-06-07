@@ -293,10 +293,9 @@ class SparseNormal:
 
             return SparseNormal(self.v.flatten(order=order), iaxes)
         
-        raise ValueError("Sparse normal variables cannot be flattened unless "
-                         "they have no independence axes, "
-                         "their number of dimensions is <=1 or "
-                         "all dimensions except maybe one have size <=1.")
+        raise ValueError("Sparse normal variables can only be flattened if "
+                         "all their dimensions except maybe one have size <=1, "
+                         "or they have no independence axes.")
     
     def moveaxis(self, source, destination):
         if source < 0:
@@ -334,16 +333,17 @@ class SparseNormal:
 
             return SparseNormal(self.v.ravel(order=order), iaxes)
         
-        raise ValueError("Sparse normal variables cannot be flattened unless "
-                         "they have no independence axes, "
-                         "their number of dimensions is <=1 or "
-                         "all dimensions except maybe one have size <=1.")
+        raise ValueError("Sparse normal variables can only be flattened if "
+                         "all their dimensions except maybe one have size <=1, "
+                         "or they have no independence axes.")
     
     def reshape(self, newshape, order="C"):
 
         v = self.v.reshape(newshape, order)  
         # Reshaping the underlying varibale before the axes check is
         # to yield a meaningful error message if the shapes are inconsistent.
+
+        newshape = v.shape  # To replace '-1' if it was in newshape originally.
 
         if v.size == 0:
             # The transformation of independence axes for zero-size variables 
@@ -373,7 +373,6 @@ class SparseNormal:
                                      f"is not supported. Axis {i} is affected "
                                      "by the requested shape transformation "
                                      f"{self.shape} -> {newshape}.")
-                
                 old_cnt *= n
                 new_cnt *= newshape[new_dim]
                 new_dim += 1
