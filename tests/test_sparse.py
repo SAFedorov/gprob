@@ -1,5 +1,6 @@
 import pytest
 import numpy as np
+from numpy.exceptions import AxisError
 
 import gprob as gp
 from gprob.normal_ import normal
@@ -112,18 +113,18 @@ def test_iid_repeat():
 
     # Axis out of bound.
     # raised exception is AxisError, which is a subtype of ValueError
-    with pytest.raises(ValueError):
+    with pytest.raises(AxisError):
         iid_repeat(v, 4, axis=5)
-    with pytest.raises(ValueError):
+    with pytest.raises(AxisError):
         iid_repeat(v, 4, axis=-6)
-    with pytest.raises(ValueError):
+    with pytest.raises(AxisError):
         iid_repeat(v, 4, axis=24)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(AxisError):
         iid_repeat(normal(), 7, axis=1)
-    with pytest.raises(ValueError):
+    with pytest.raises(AxisError):
         iid_repeat(normal(), 7, axis=-2)
-    with pytest.raises(ValueError):
+    with pytest.raises(AxisError):
         iid_repeat(normal(), 7, axis=22)
 
 
@@ -222,15 +223,33 @@ def test_cumsum():
     v = iid_repeat(iid_repeat(normal(size=(4, 5)), 2, axis=1), 3, axis=1)
     # v.shape is (4, 3, 2, 5), v.iaxes are (1, 2)
 
+    for ax in [0, 3, -1, -4]:
+        vout = v.cumsum(axis=ax)
+        assert vout.shape == v.shape
+        assert vout.iaxes == v.iaxes
+        assert np.all(vout.mean() == np.cumsum(v.mean(), axis=ax))
+
+        vvs = v.v.cumsum(axis=ax)
+        assert np.all(vvs.emap.a == vout.v.emap.a)
+        assert np.all(vvs.emap.elem == vout.v.emap.elem)
+
+    # Independence axes are not allowed.
     with pytest.raises(ValueError):
         v.cumsum(axis=1)
-
     with pytest.raises(ValueError):
         v.cumsum(axis=-2)
 
     # Flattening is not allowed.
     with pytest.raises(ValueError):
         v.cumsum(axis=None)
+
+    # Axes out of bound.
+    with pytest.raises(AxisError):
+        v.cumsum(axis=4)
+    with pytest.raises(AxisError):
+        v.cumsum(axis=44)
+    with pytest.raises(AxisError):
+        v.cumsum(axis=-5)
 
 
 def test_diagonal():
@@ -561,7 +580,61 @@ def test_reshape():
     with pytest.raises(ValueError):
         v.reshape(sh)
     assert vvar.reshape(sh).shape == sh  # But this should work.
-    
+
+
+def test_sum():
+    v = iid_repeat(iid_repeat(normal(size=(4, 5)), 2, axis=1), 3, axis=1)
+    # v.shape is (4, 3, 2, 5), v.iaxes are (1, 2)
+
+    for ax, iax in zip([0, 3, -1, -4, (0,), (0, 3), (-1, -4)],
+                       [(0, 1), (1, 2), (1, 2), (0, 1), (0, 1), (0, 1), (0, 1)]):
+        vout = v.sum(axis=ax)
+        mean_ref = np.sum(v.mean(), axis=ax)
+        assert vout.shape == mean_ref.shape
+        assert vout.iaxes == iax
+        assert np.all(vout.mean() == mean_ref)
+
+        vvs = v.v.sum(axis=ax)
+        assert np.all(vvs.emap.a == vout.v.emap.a)
+        assert np.all(vvs.emap.elem == vout.v.emap.elem)
+
+        vout = v.sum(axis=ax, keepdims=True)
+        mean_ref = np.sum(v.mean(), axis=ax, keepdims=True)
+        assert vout.shape == mean_ref.shape
+        assert vout.iaxes == v.iaxes
+        assert np.all(vout.mean() == mean_ref)
+
+        vvs = v.v.sum(axis=ax, keepdims=True)
+        assert np.all(vvs.emap.a == vout.v.emap.a)
+        assert np.all(vvs.emap.elem == vout.v.emap.elem)
+
+    assert v[:, :, None].sum(axis=2).shape == v.shape
+    assert v[:, :, None].sum(axis=2).iaxes == v.iaxes
+
+    # Independence axes are not allowed.
+    with pytest.raises(ValueError):
+        v.sum(axis=1)
+    with pytest.raises(ValueError):
+        v.sum(axis=2)
+    with pytest.raises(ValueError):
+        v.sum(axis=(0, 2))
+
+    # None is not allowed.
+    with pytest.raises(ValueError):
+        v.sum(axis=None)
+
+    # Axes out of bound.
+    with pytest.raises(AxisError):
+        v.sum(axis=4)
+    with pytest.raises(AxisError):
+        v.sum(axis=44)
+    with pytest.raises(AxisError):
+        v.sum(axis=-5)
+
+    # Duplicated axis.
+    with pytest.raises(ValueError):
+        v.sum(axis=(0, 0))
+
 
 def test_split():
     v = iid_repeat(iid_repeat(normal(size=(4, 6, 5)), 2, axis=1), 3, axis=1)
