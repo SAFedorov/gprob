@@ -15,12 +15,7 @@ def iid_repeat(x, nrep=1, axis=0):
     x = assparsenormal(x)
     x = x.iid_copy()
 
-    if axis < -x.ndim-1 or axis > x.ndim:
-        raise AxisError(f"Axis {axis} is out of bounds "
-                        f"for an array of dimension {x.ndim + 1}.")
-    
-    if axis < 0:
-        axis = x.ndim + axis + 1
+    axis = _normalize_axis(axis, x.ndim + 1)
 
     iax = sorted([ax + 1 if ax >= axis else ax for ax in x.iaxes] + [axis])
     iax = tuple(iax)
@@ -240,16 +235,13 @@ class SparseNormal:
         return self.conjugate()
     
     def cumsum(self, axis):
-        if not np.issubdtype(np.array(axis).dtype, int):
+        if axis is None:
             # For regular arrays, None is the default value. For sparse arrays, 
             # it is not supported because these arrays usually 
             # cannot be flattened.
-
-            raise ValueError("Axis must be an integer.")
+            raise ValueError("None value for the axis is not supported.")
         
-        if axis < 0:
-            axis = self.ndim + axis
-        
+        axis = _normalize_axis(axis, self.ndim)
         if axis in self.iaxes:
             raise ValueError("The computation of cumulative sums along "
                              "independence axes is not supported.")
@@ -257,11 +249,7 @@ class SparseNormal:
         return SparseNormal(self.v.cumsum(axis), self.iaxes)
     
     def diagonal(self, offset=0, axis1=0, axis2=1):
-        if axis1 < 0:
-            axis1 = self.ndim + axis1
-
-        if axis2 < 0:
-            axis2 = self.ndim + axis2
+        [axis1, axis2] = _normalize_axes([axis1, axis2], self.ndim)
 
         if (axis1 in self.iaxes) or (axis2 in self.iaxes):
             raise ValueError("Taking diagonals along independence axes "
@@ -298,11 +286,8 @@ class SparseNormal:
                          "or they have no independence axes.")
     
     def moveaxis(self, source, destination):
-        if source < 0:
-            source = self.ndim + source
-
-        if destination < 0:
-            destination = self.ndim + destination
+        source = _normalize_axis(source, self.ndim)
+        destination = _normalize_axis(destination, self.ndim)
         
         iaxes = []
         for ax in self.iaxes:
@@ -387,8 +372,7 @@ class SparseNormal:
         return SparseNormal(v, iaxes)
     
     def split(self, indices_or_sections, axis=0):
-        if axis < 0:
-            axis = self.ndim + axis
+        axis = _normalize_axis(axis, self.ndim)
 
         if axis in self.iaxes:
             raise ValueError("Splitting along independence axes "
@@ -405,10 +389,7 @@ class SparseNormal:
             # because in the typical case the variable has at least one 
             # independence axis that cannot be contracted.
 
-        if not isinstance(axis, tuple):
-            axis = (axis,)
-
-        sum_axes = [self.ndim + ax if ax < 0 else ax for ax in axis]
+        sum_axes = _normalize_axes(axis, self.ndim)
 
         if any(ax in self.iaxes for ax in sum_axes):
             raise ValueError("The computation of sums along "
@@ -427,18 +408,14 @@ class SparseNormal:
         if axes is None:
             iaxes = [self.ndim - ax - 1 for ax in self.iaxes]
         else:
-            axes_ = [self.ndim + ax if ax < 0 else ax for ax in axes]
+            axes_ = _normalize_axes(axes, self.ndim)
             iaxes = [axes_.index(ax) for ax in self.iaxes]
 
         iaxes = tuple(sorted(iaxes))
         return SparseNormal(self.v.transpose(axes), iaxes)
     
     def trace(self, offset=0, axis1=0, axis2=1):
-        if axis1 < 0:
-            axis1 = self.ndim + axis1
-
-        if axis2 < 0:
-            axis2 = self.ndim + axis2
+        [axis1, axis2] = _normalize_axes([axis1, axis2], self.ndim)
 
         if (axis1 in self.iaxes) or (axis2 in self.iaxes):
             raise ValueError("Traces along independence axes "
@@ -459,9 +436,8 @@ class SparseNormal:
     def _concatenate(arrays, axis):
         arrays = [assparsenormal(ar) for ar in arrays]
         iaxes, ndim = _validate_iaxes(arrays)
-        if axis < 0:
-            axis = ndim + axis
-
+        
+        axis = _normalize_axis(axis, ndim)
         if axis in iaxes:
             raise ValueError("Concatenation along independence axes "
                              "is not allowed.")
@@ -473,8 +449,7 @@ class SparseNormal:
     def _stack(arrays, axis):
         arrays = [assparsenormal(ar) for ar in arrays]
         iaxes, ndim = _validate_iaxes(arrays)
-        if axis < 0:
-            axis = ndim - axis
+        axis = _normalize_axis(axis, ndim + 1)
 
         iaxes = tuple(ax + 1 if ax >= axis else ax for ax in iaxes)
         v = Normal._stack([x.v for x in arrays], axis=axis)
@@ -581,6 +556,59 @@ class SparseNormal:
             inputs.
         """
         raise NotImplementedError  # TODO-----------------------------------------------
+
+
+def _normalize_axis(axis, ndim):
+    """Ensures that the axis index is positive and within the array dimension.
+
+    Returns:
+        Normalized axis index.
+    
+    Raises:
+        AxisError
+            If the axis is out of range.
+    """
+
+    axis = axis.__index__()
+
+    if axis < -ndim or axis > ndim - 1:
+        raise AxisError(f"Axis {axis} is out of bounds "
+                        f"for an array of dimension {ndim}.")
+    if axis < 0:
+        axis = ndim + axis
+
+    return axis
+
+
+def _normalize_axes(axes, ndim):
+    """Ensures that the axes indices are positive, within the array dimension,
+    and without duplicates.
+
+    Returns:
+        Tuple of normalized axes indices.
+    
+    Raises:
+        AxisError
+            If one of the axes is out of range.
+        ValueError
+            If there are duplicates among the axes.
+    """
+
+    # Essentially repeats the code of numpy's normalize_axis_tuple,
+    # which does not seem to be part of the public API.
+
+    if type(axes) not in (tuple, list):
+        try:
+            axes = [axes.__index__()]
+        except TypeError:
+            pass
+
+    axes = tuple([_normalize_axis(ax, ndim) for ax in axes])
+
+    if len(set(axes)) != len(axes):
+        raise ValueError('Axes cannot repeat.')
+    
+    return axes
 
 
 def _validate_iaxes(seq):
