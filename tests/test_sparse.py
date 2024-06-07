@@ -267,6 +267,16 @@ def test_diagonal():
     with pytest.raises(ValueError):
         v.diagonal(axis1=1, axis2=2)
 
+    # Repeated axes.
+    with pytest.raises(ValueError):
+        v.diagonal(axis1=2, axis2=2)
+
+    # Out-of-range axes.
+    with pytest.raises(AxisError):
+        v.diagonal(axis1=2, axis2=4)
+    with pytest.raises(AxisError):
+        v.diagonal(axis1=2, axis2=-5)
+
     v = iid_repeat(iid_repeat(normal(size=(4, 5)), 2, axis=-1), 3, axis=-1)
     # v.shape is (4, 5, 2, 3), v.iaxes are (2, 3)
     assert v.diagonal(axis1=0, axis2=1).shape == (2, 3, 4)
@@ -415,6 +425,13 @@ def test_moveaxis():
     v__ = v_.moveaxis(-4, 1)
     assert v.shape == v__.shape
     assert v.iaxes == v__.iaxes
+
+    with pytest.raises(AxisError):
+        v.moveaxis(3, 5)
+    with pytest.raises(AxisError):
+        v.moveaxis(5, -1)
+    with pytest.raises(AxisError):
+        v.moveaxis(-6, 1)
 
 
 def test_reshape():
@@ -656,6 +673,14 @@ def test_split():
         v.split(2, axis=-3)
     np.split(v.var(), 2, axis=-3)
 
+    # Axis out of bounds.
+    with pytest.raises(AxisError):
+        v.split(1, axis=5)
+    with pytest.raises(AxisError):
+        v.split(1, axis=-42)
+    with pytest.raises(AxisError):
+        v.split(1, axis=-6)
+
     tol = 1e-10
 
     v = iid_repeat(iid_repeat(random_normal((4, 6, 5)), 2, axis=1), 3, axis=1)
@@ -875,6 +900,17 @@ def test_concatenate():
     with pytest.raises(ValueError):
         v_ = gp.concatenate([v1, v2], axis=-1)
 
+    # Axis out of bounds.
+    v1 = v[:4]  # (4, 2, 7)
+    v2 = v[4:]  # (4, 2, 7)
+
+    with pytest.raises(AxisError):
+        gp.concatenate([v1, v2], axis=3)
+    with pytest.raises(AxisError):
+        gp.concatenate([v1, v2], axis=-4)
+    with pytest.raises(AxisError):
+        gp.concatenate([v1, v2], axis=42)
+
     vs = []
     for _ in range(100):
         xi = normal(size=(2,))
@@ -891,10 +927,68 @@ def test_concatenate():
 
     with pytest.raises(ValueError):
         gp.concatenate([v, normal(size=(7, 1))], axis=1)
-        # Concatenation of regular and sparse normal variables is not possible 
+        # Concatenation of regular and sparse normal variables is never possible 
         # because regular variables do not have independence axes.
 
     # Concatenation with numeric arrays, however, is possible.
     v_ = gp.concatenate([v, np.ones((7, 1))], axis=1)
     assert v_.shape == (7, 2)
+    assert v_.iaxes == (0,)
+
+
+def test_stack():
+    tol = 1e-10
+
+    xi = random_normal((8, 2))
+    v = iid_repeat(xi, 7, axis=-1)
+    v = iid_repeat(v, 3, axis=1)
+
+    v1 = v[:4]  # shape (4, 3, 2, 7), iaxes (1, 3) 
+    v2 = v[4:]  # shape (4, 3, 2, 7), iaxes (1, 3)
+
+    for ax, sh, iax in zip([0, 1, 2, -2, 4],
+                           [(2, 4, 3, 2, 7), (4, 2, 3, 2, 7), (4, 3, 2, 2, 7), (4, 3, 2, 2, 7), (4, 3, 2, 7, 2)],
+                           [(2, 4), (2, 4), (1, 4), (1, 4), (1, 3)]):
+        
+        v_ = gp.stack([v1, v2], axis=ax)
+        refmean = np.stack([v1.mean(), v2.mean()], axis=ax)
+        refvar = np.stack([v1.var(), v2.var()], axis=ax)
+        assert v_.shape == sh
+        assert v_.iaxes == iax
+        assert np.max(v_.mean() - refmean) < tol
+        assert np.max(v_.var() - refvar) < tol
+
+    v_ = gp.stack([v1, v1, v1, v1], axis=-5)
+    assert v_.shape == (4, 4, 3, 2, 7)
+    assert v_.iaxes == (2, 4)
+
+    with pytest.raises(AxisError):
+        gp.stack([v1, v2], axis=5)
+    with pytest.raises(AxisError):
+        gp.stack([v1, v2], axis=-6)
+    with pytest.raises(AxisError):
+        gp.stack([v1, v2], axis=42)
+
+    vs = []
+    for _ in range(100):
+        xi = normal(size=(2,))
+        v = iid_repeat(iid_repeat(iid_repeat(xi, 3, axis=0), 4, axis=0), 5, axis=0)
+        # shape (5, 4, 3, 2), iaxes (0, 1, 2)
+
+        vs.append(v)
+
+    v = gp.stack(vs, axis=3)
+    assert v.shape == (5, 4, 3, 100, 2)
+    assert v.iaxes == (0, 1, 2)
+
+    v = iid_repeat(normal(size=(1,)), 7)
+
+    with pytest.raises(ValueError):
+        gp.stack([v, normal(size=(7, 1))], axis=1)
+        # Stacking of regular and sparse normal variables is never possible 
+        # because regular variables do not have independence axes.
+
+    # Concatenation with numeric arrays, however, is possible.
+    v_ = gp.stack([v, np.ones((7, 1))], axis=1)
+    assert v_.shape == (7, 2, 1)
     assert v_.iaxes == (0,)
