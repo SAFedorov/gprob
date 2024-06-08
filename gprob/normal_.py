@@ -65,7 +65,7 @@ class Normal:
         if self._is_lower_than(other):
             return NotImplemented  # The operation must be handled by `other`.
 
-        other, isnormal = as_numeric_or_normal(other)
+        other, isnormal = _as_numeric_or_normal(other)
         if isnormal:
             return Normal(self.emap + other.emap, self.b + other.b)
 
@@ -80,7 +80,7 @@ class Normal:
         if self._is_lower_than(other):
             return NotImplemented  # The operation must be handled by `other`.
         
-        other, isnormal = as_numeric_or_normal(other)
+        other, isnormal = _as_numeric_or_normal(other)
         if isnormal:
             return Normal(self.emap + (-other.emap), self.b - other.b)
         
@@ -95,7 +95,7 @@ class Normal:
         if self._is_lower_than(other):
             return NotImplemented  # The operation must be handled by `other`.
         
-        other, isnormal = as_numeric_or_normal(other)
+        other, isnormal = _as_numeric_or_normal(other)
 
         if isnormal:
             # Linearized product  x * y = <x><y> + <y>dx + <x>dy,
@@ -114,7 +114,7 @@ class Normal:
         if self._is_lower_than(other):
             return NotImplemented  # The operation must be handled by `other`.
         
-        other, isnormal = as_numeric_or_normal(other)
+        other, isnormal = _as_numeric_or_normal(other)
 
         if isnormal:
             # Linearized fraction  x/y = <x>/<y> + dx/<y> - dy<x>/<y>^2,
@@ -130,7 +130,7 @@ class Normal:
         # Linearized fraction  x/y = <x>/<y> - dy<x>/<y>^2,
         # for  x = <x>  and  y = <y> + dy.
 
-        other, isnormal = as_numeric_or_normal(other)
+        other, isnormal = _as_numeric_or_normal(other)
         if isnormal:
             return other / self
         
@@ -142,7 +142,7 @@ class Normal:
         if self._is_lower_than(other):
             return NotImplemented  # The operation must be handled by `other`.
         
-        other, isnormal = as_numeric_or_normal(other)
+        other, isnormal = _as_numeric_or_normal(other)
 
         if isnormal:
             # x^y = <x>^<y> + dx <y> <x>^(<y>-1) + dy ln(<x>) <x>^<y>
@@ -159,7 +159,7 @@ class Normal:
     def __rpow__(self, other):
         # x^y = <x>^<y> + dy ln(<x>) <x>^<y>
 
-        other, isnormal = as_numeric_or_normal(other)
+        other, isnormal = _as_numeric_or_normal(other)
         if isnormal:
             return other ** self
 
@@ -171,7 +171,7 @@ class Normal:
         if self._is_lower_than(other):
             return NotImplemented  # The operation must be handled by `other`.
         
-        other, isnormal = as_numeric_or_normal(other)
+        other, isnormal = _as_numeric_or_normal(other)
         if isnormal:
             b = self.b @ other.b
             em = self.emap @ other.b
@@ -181,7 +181,7 @@ class Normal:
         return Normal(self.emap @ other, self.b @ other)
 
     def __rmatmul__(self, other):
-        other, isnormal = as_numeric_or_normal(other)
+        other, isnormal = _as_numeric_or_normal(other)
         if isnormal:
             b = other.b @ self.b
             em = other.b @ self.emap
@@ -303,8 +303,8 @@ class Normal:
 
     @staticmethod
     def _bilinearfunc(name, op1, op2, *args, **kwargs):
-        op1, isnormal1 = as_numeric_or_normal(op1)
-        op2, isnormal2 = as_numeric_or_normal(op2)
+        op1, isnormal1 = _as_numeric_or_normal(op1)
+        op2, isnormal2 = _as_numeric_or_normal(op2)
 
         if isnormal2 and isnormal1:
             b = getattr(np, name)(op1.b, op2.b, *args, **kwargs)
@@ -330,8 +330,8 @@ class Normal:
 
     @staticmethod
     def _einsum(subs, op1, op2):
-        op1, isnormal1 = as_numeric_or_normal(op1)
-        op2, isnormal2 = as_numeric_or_normal(op2)
+        op1, isnormal1 = _as_numeric_or_normal(op1)
+        op2, isnormal2 = _as_numeric_or_normal(op2)
 
         if isnormal2 and isnormal1:
             b = einsum(subs, op1.b, op2.b)
@@ -580,7 +580,7 @@ def print_normal(x, extra_attrs=tuple()):
 NUMERIC_ARRAY_KINDS = {"b", "i", "u", "f", "c"}
 
 
-def as_numeric_or_normal(x):
+def _as_numeric_or_normal(x):
     """Prepares the operand `x` for an arithmetic operation by converting 
     it to either a numeric array or a normal variable.
     
@@ -943,7 +943,7 @@ def linearized_unary(jmpf):
     f = getattr(np, fnm)
 
     def flin(x):
-        x, isnormal = as_numeric_or_normal(x)
+        x, isnormal = _as_numeric_or_normal(x)
 
         if not isnormal:
             return f(x)

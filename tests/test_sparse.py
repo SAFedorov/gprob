@@ -992,3 +992,115 @@ def test_stack():
     v_ = gp.stack([v, np.ones((7, 1))], axis=1)
     assert v_.shape == (7, 2, 1)
     assert v_.iaxes == (0,)
+
+
+def test_matmul():
+    # Some trivial cases first.
+
+    v = assparsenormal(1)
+    with pytest.raises(ValueError):
+        v @ [1, 2]
+    
+    v = assparsenormal([1, 2, 3])
+    w = v @ [1, 1, 1]
+    assert w.shape == tuple()
+    assert w.iaxes == tuple()
+
+    w = [1, 1, 1] @ v
+    assert w.shape == tuple()
+    assert w.iaxes == tuple()
+
+    # When at least one variable is a proper sparse normal.
+
+    with pytest.raises(ValueError):
+        iid_repeat(normal(), 3) @ [1, 1, 1]
+    with pytest.raises(ValueError):
+         [1, 1, 1] @ iid_repeat(normal(), 3)
+
+    v = iid_repeat(normal(size=(3,)), 7)  # shape (7, 3), iaxes (0,)
+
+    # Simple cases, no broadcasting.
+    w = v @ np.ones((3,))
+    assert w.shape == (7,)
+    assert w.iaxes == (0,)
+
+    w = v @ np.ones((3, 5))
+    assert w.shape == (7, 5)
+    assert w.iaxes == (0,)
+
+    w = np.ones((3,)) @ v.T
+    assert w.shape == (7,)
+    assert w.iaxes == (0,)
+
+    w = np.ones((6, 3)) @ v.T
+    assert w.shape == (6, 7)
+    assert w.iaxes == (1,)
+
+    # Broadcasting when the numerical operand has larger dimension.
+    w = v @ np.ones((4, 3, 5))
+    assert w.shape == (4, 7, 5)
+    assert w.iaxes == (1,)
+
+    w = v @ np.ones((2, 3, 1, 5, 4, 3, 5))
+    assert w.shape == (2, 3, 1, 5, 4, 7, 5)
+    assert w.iaxes == (5,)
+
+    w = np.ones((4, 6, 3)) @ v.T
+    assert w.shape == (4, 6, 7)
+    assert w.iaxes == (2,)
+
+    w = np.ones((2, 3, 1, 5, 4, 6, 3)) @ v.T
+    assert w.shape == (2, 3, 1, 5, 4, 6, 7)
+    assert w.iaxes == (6,)
+
+    # Contraction over independence axes is not allowed.
+    with pytest.raises(ValueError):
+        np.ones((5, 7)) @ v
+    with pytest.raises(ValueError):
+        v.T @ np.ones((7, 5))
+
+    # Scalars are not allowed.
+    with pytest.raises(ValueError):
+        v @ 1
+    with pytest.raises(ValueError):
+        1 @ v
+
+    # A larger-dimensional variable.
+    # Including broadcasting when the random operand has larger dimension.
+
+    v = iid_repeat(iid_repeat(normal(size=(3, 5)), 7, axis=1), 4)  
+    # shape (4, 3, 7, 5), iaxes (0, 2)
+
+    w = v @ np.ones((5,))
+    assert w.shape == (4, 3, 7,)
+    assert w.iaxes == (0, 2)
+
+    w = v @ np.ones((5, 8))
+    assert w.shape == (4, 3, 7, 8)
+    assert w.iaxes == (0, 2)
+
+    w = v @ np.ones((4, 3, 5, 8))
+    assert w.shape == (4, 3, 7, 8)
+    assert w.iaxes == (0, 2)
+
+    w = v @ np.ones((2, 4, 3, 5, 8))
+    assert w.shape == (2, 4, 3, 7, 8)
+    assert w.iaxes == (1, 3)
+
+    v = v.transpose((0, 1, 3, 2))  # shape (4, 3, 5, 7), iaxes (0, 3)
+    
+    w = np.ones((5,)) @ v
+    assert w.shape == (4, 3, 7)
+    assert w.iaxes == (0, 2)
+
+    w = np.ones((8, 5)) @ v
+    assert w.shape == (4, 3, 8, 7)
+    assert w.iaxes == (0, 3)
+
+    w = np.ones((4, 3, 8, 5)) @ v
+    assert w.shape == (4, 3, 8, 7)
+    assert w.iaxes == (0, 3)
+
+    w = np.ones((2, 4, 3, 8, 5)) @ v
+    assert w.shape == (2, 4, 3, 8, 7)
+    assert w.iaxes == (1, 4)

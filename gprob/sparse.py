@@ -1,8 +1,7 @@
 import numpy as np
 from numpy.exceptions import AxisError
 
-from .normal_ import (Normal, asnormal, print_normal, as_numeric_or_normal, 
-                      broadcast_to)
+from .normal_ import Normal, asnormal, print_normal, broadcast_to
 from .external import einsubs
 
 
@@ -198,33 +197,89 @@ class SparseNormal:
         return SparseNormal(v, iaxes)
 
     def __matmul__(self, other):
-        other, isnormal = as_numeric_or_normal(other)
+        if self.ndim == 0:
+            raise ValueError("Matrix multiplication requires at least one "
+                             "dimension, while the operand 1 has 0.")
+        else:
+            op_axis = self.ndim - 1
 
-        # TODO: add priority check
-        # self._validate_iaxes(other)
+        if op_axis in self.iaxes:
+            raise ValueError("Matrix multiplication affecting independence "
+                             "axes is not supported. "
+                             f"Axis {op_axis} of operand 1 is affected.")
+        
+        other = assparsenormal(other)
 
-        if self.ndim - 1 in self.iaxes:
-            raise NotImplementedError("Matrix multiplication along "
-                                      "independence axes is not implemented.")
-            
-        return SparseNormal(self.v @ other, self.iaxes)
+        if self.ndim == 1:
+            iaxes = tuple()  # == self.iaxes, otherwise
+                             # ValueError would have been thrown. 
+        elif other.ndim <= max(self.ndim, 2):
+            iaxes = self.iaxes
+        else:
+            # There are dimensions added by broadcasting.
+            d = other.ndim - self.ndim
+            iaxes = tuple([ax + d for ax in self.iaxes])
+
+        # Calculates the contribution from the deterministic part of `other`.
+        v = self.v @ other.mean()
+        w = SparseNormal(v, iaxes)
+        
+        if not _is_deterministic(other):
+            # Adds the linearized contribution from the random part of `other`.
+            # As `other`` is a sparse normal, the consistency of
+            # independence axes is ensured by the addition operation.
+            w += self.mean() @ (other - other.mean())
+
+        return w
 
     def __rmatmul__(self, other):
-        other, isnormal = as_numeric_or_normal(other)
+        if self.ndim == 0:
+            raise ValueError("Matrix multiplication requires at least one "
+                             "dimension, while the operand 2 has 0.")
+        elif self.ndim == 1:
+            op_axis = 0
+        else:
+            op_axis = self.ndim - 2
 
-        # TODO: add priority check ----------------------------------------------------------------------------
-        ax = 0 if self.ndim == 1 else self.ndim-2
-        if ax in self.iaxes:
-            raise NotImplementedError("Matrix multiplication along "
-                                      "independence axes is not implemented.")
+        if op_axis in self.iaxes:
+            raise ValueError("Matrix multiplication affecting independence "
+                             "axes is not supported. "
+                             f"Axis {op_axis} of operand 2 is affected.")
+        
+        other = assparsenormal(other)
 
-        return SparseNormal(other @ self.v, self.iaxes)
+        if other.ndim == 1:
+            iaxes = tuple([ax - 1 if ax == op_axis + 1 else ax
+                           for ax in self.iaxes])
+        elif other.ndim >= 2 and other.ndim <= self.ndim - 1:
+            iaxes = self.iaxes
+        else:
+            d = other.ndim - self.ndim
+            iaxes = tuple([ax + d for ax in self.iaxes])
+
+        # Calculates the contribution from the deterministic part of `other`.
+        v = other.mean() @ self.v
+        w = SparseNormal(v, iaxes)
+        
+        if not _is_deterministic(other):
+            # Adds the linearized contribution from the random part of `other`.
+            # As `other`` is a sparse normal, the consistency of
+            # independence axes is ensured by the addition operation.
+            w += (other - other.mean()) @ self.mean()
+
+        return w
     
     def __getitem__(self, key):
         out_ax = _parse_index_key(self, key)
         out_iax = (out_ax[in_ax] for in_ax in self.iaxes)
-        iaxes = tuple(ax for ax in out_iax if ax is not None)
+
+        iaxes = tuple([ax for ax in out_iax if ax is not None])
+        # List comprehensions are faster than generators with tuples.
+
         return SparseNormal(self.v[key], iaxes)
+    
+    def __setitem__(self, key, value):
+        raise NotImplementedError
         
     # ---------- array methods ----------
 
@@ -398,8 +453,9 @@ class SparseNormal:
         if keepdims:
             iaxes = self.iaxes
         else:
-            iaxes = tuple(iax - [sax < iax for sax in sum_axes].count(True) 
-                          for iax in self.iaxes) 
+            iaxes = tuple([iax - [sax < iax for sax in sum_axes].count(True) 
+                           for iax in self.iaxes])
+                    # List comprehensions are faster than generators. 
 
         v = self.v.sum(axis=axis, keepdims=keepdims)
         return SparseNormal(v, iaxes)
@@ -451,7 +507,9 @@ class SparseNormal:
         iaxes, ndim = _validate_iaxes(arrays)
         axis = _normalize_axis(axis, ndim + 1)
 
-        iaxes = tuple(ax + 1 if ax >= axis else ax for ax in iaxes)
+        iaxes = tuple([ax + 1 if ax >= axis else ax for ax in iaxes])
+        # List comprehensions are faster than generators with tuples.
+
         v = Normal._stack([x.v for x in arrays], axis=axis)
         return SparseNormal(v, iaxes)
     
@@ -470,11 +528,12 @@ class SparseNormal:
                     raise ValueError("Contraction over an independence"
                                      f" axis ({i}).")
             
-            iaxes = tuple(outsubs.index(c) for i, c in enumerate(insubs) 
-                          if i in op.iaxes)
+            iaxes = tuple([outsubs.index(c) for i, c in enumerate(insubs) 
+                           if i in op.iaxes])
             return iaxes
         
         # TODO: convert to sparse normal or numerical operands
+        # TODO: add a check that the indices of all independence axes appear in both operands
 
         # Converts the subscripts to an explicit form.
         (insu1, insu2), outsu = einsubs.parse(subs, (op1.shape, op2.shape))
@@ -558,6 +617,12 @@ class SparseNormal:
         raise NotImplementedError  # TODO-----------------------------------------------
 
 
+def _is_deterministic(x):
+    """True if the sparse normal `x` is a promoted numeric constant, 
+    False if it is not."""
+    return len(x.v.emap.elem) == 0
+
+
 def _normalize_axis(axis, ndim):
     """Ensures that the axis index is positive and within the array dimension.
 
@@ -630,10 +695,10 @@ def _validate_iaxes(seq):
         >>> reverse_axes(3, (0,))
         (-2,)
         """
-        return tuple(ndim - ax for ax in axes)
+        return tuple([ndim - ax for ax in axes])
 
     iaxs = set(reverse_axes(x.ndim, x.iaxes) for x in seq 
-               if len(x.v.emap.elem) !=0)
+               if not _is_deterministic(x))
     # Reversing is to account for broadcasting - the independence 
     # axes numbers counted from the beginning of the array may not be 
     # the same for broadcastable arrys. When counted from the end, 
