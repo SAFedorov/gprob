@@ -1104,3 +1104,31 @@ def test_matmul():
     w = np.ones((2, 4, 3, 8, 5)) @ v
     assert w.shape == (2, 4, 3, 8, 7)
     assert w.iaxes == (1, 4)
+
+    # An example with two random variables.
+
+    tol = 1e-10
+    
+    v1 = iid_repeat(iid_repeat(random_normal((3, 5)), 7), 4)
+    # shape (4, 7, 3, 5), iaxes (0, 1)
+
+    v2 = iid_repeat(iid_repeat(random_normal((5, 1)), 7), 4)
+    # shape (4, 7, 5, 1), iaxes (0, 1)
+
+    v2.v += v1.v[0, 0, 0, 0]  # for establishing correlation.
+
+    w = v1 @ v2
+    assert w.shape == (4, 7, 3, 1)
+    assert w.iaxes == (0, 1)
+
+    v1m = v1.mean()
+    v2m = v2.mean()
+    wref = v1m @ v2m + (v1 - v1m) @ v2m + v1m @ (v2 - v2m)
+
+    assert w.shape == wref.shape
+    assert np.max(w.mean() - wref.mean()) < tol
+    assert np.max(w.var() - wref.var()) < tol
+
+    v3 = iid_repeat(normal(size=(7, 5, 1)), 4)
+    with pytest.raises(ValueError):
+        v1 @ v3
