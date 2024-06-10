@@ -104,8 +104,8 @@ class SparseNormal:
             return NotImplemented
 
         v = self.v + other.v
-        iaxes = _validate_iaxes([self, other])
-        return SparseNormal(v, iaxes)
+        isiax = _validate_iaxes([self, other])
+        return SparseNormal(v, isiax)
 
     def __radd__(self, other):
         try:
@@ -114,8 +114,8 @@ class SparseNormal:
             return NotImplemented
 
         v = other.v + self.v
-        iaxes = _validate_iaxes([self, other])
-        return SparseNormal(v, iaxes)
+        isiax = _validate_iaxes([self, other])
+        return SparseNormal(v, isiax)
 
     def __sub__(self, other):
         try:
@@ -124,8 +124,8 @@ class SparseNormal:
             return NotImplemented
 
         v = self.v - other.v
-        iaxes = _validate_iaxes([self, other])
-        return SparseNormal(v, iaxes)
+        isiax = _validate_iaxes([self, other])
+        return SparseNormal(v, isiax)
 
     def __rsub__(self, other):
         try:
@@ -134,8 +134,8 @@ class SparseNormal:
             return NotImplemented
 
         v = other.v - self.v
-        iaxes = _validate_iaxes([self, other])
-        return SparseNormal(v, iaxes)
+        isiax = _validate_iaxes([self, other])
+        return SparseNormal(v, isiax)
 
     def __mul__(self, other):
         try:
@@ -144,8 +144,8 @@ class SparseNormal:
             return NotImplemented
 
         v = self.v * other.v
-        iaxes = _validate_iaxes([self, other])
-        return SparseNormal(v, iaxes)
+        isiax = _validate_iaxes([self, other])
+        return SparseNormal(v, isiax)
 
     def __rmul__(self, other):
         try:
@@ -154,8 +154,8 @@ class SparseNormal:
             return NotImplemented
 
         v = other.v * self.v
-        iaxes = _validate_iaxes([self, other])
-        return SparseNormal(v, iaxes)
+        isiax = _validate_iaxes([self, other])
+        return SparseNormal(v, isiax)
 
     def __truediv__(self, other):
         try:
@@ -164,8 +164,8 @@ class SparseNormal:
             return NotImplemented
 
         v = self.v / other.v
-        iaxes = _validate_iaxes([self, other])
-        return SparseNormal(v, iaxes)
+        isiax = _validate_iaxes([self, other])
+        return SparseNormal(v, isiax)
 
     def __rtruediv__(self, other):
         try:
@@ -174,8 +174,8 @@ class SparseNormal:
             return NotImplemented
 
         v = other.v / self.v
-        iaxes = _validate_iaxes([self, other])
-        return SparseNormal(v, iaxes)
+        isiax = _validate_iaxes([self, other])
+        return SparseNormal(v, isiax)
 
     def __pow__(self, other):
         try:
@@ -184,8 +184,8 @@ class SparseNormal:
             return NotImplemented
 
         v = self.v ** other.v
-        iaxes = _validate_iaxes([self, other])
-        return SparseNormal(v, iaxes)
+        isiax = _validate_iaxes([self, other])
+        return SparseNormal(v, isiax)
 
     def __rpow__(self, other):
         try:
@@ -194,8 +194,8 @@ class SparseNormal:
             return NotImplemented
 
         v = other.v ** self.v
-        iaxes = _validate_iaxes([self, other])
-        return SparseNormal(v, iaxes)
+        isiax = _validate_iaxes([self, other])
+        return SparseNormal(v, isiax)
 
     def __matmul__(self, other):
         if self.ndim == 0:
