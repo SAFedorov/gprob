@@ -591,8 +591,9 @@ class SparseNormal:
                 if op._isiax[i] and c not in outsubs:
                     raise ValueError("Contraction over an independence"
                                      f" axis ({i}).")
-            
-            return tuple([op._isiax[outsubs.index(c)] for c in insubs])
+                
+            isiax = op._isiax + (False,)  # Augments with a default.  
+            return tuple([op._isiax[outsubs.find(c)] for c in insubs])
         
         # TODO: convert to sparse normal or numerical operands
         # TODO: add a check that the indices of all independence axes appear in both operands
