@@ -513,13 +513,36 @@ class SparseNormal:
         v = Normal._stack([x.v for x in arrays], axis=axis)
         return SparseNormal(v, iaxes)
     
-    # TODO: 
-    
+    # TODO: separate the individual functions - --------------------------------------
+
     @staticmethod
-    def _dot(op1, op2):
+    def _bilinearfunc(name, op1, op2, *args, **kwargs):
         op1 = assparsenormal(op1)
         op2 = assparsenormal(op2)
 
+        mn = f"_{name}_get_axes"
+
+        op1, op2, op_axis1, op_axis2, iaxes1, iaxes2 = getattr(SparseNormal, mn)(op1, op2, *args, **kwargs)
+        _validate_iaxes_bilinear(op1, op2, op_axis1, op_axis2)
+
+        if not _is_deterministic(op1):
+            v = Normal._bilinearfunc(name, op1.v, op2.v.mean(), *args, **kwargs)
+            w = SparseNormal(v, iaxes1)
+
+            if not _is_deterministic(op2):
+                w += SparseNormal._dot(op1.mean(), (op2 - op2.mean()))
+
+        elif not _is_deterministic(op2):
+            v = Normal._bilinearfunc(name, op1.v.mean(), op2.v, *args, **kwargs)
+            w = SparseNormal(v, iaxes2)
+
+        else:
+            w = getattr(np, name)(op1.v.mean(), op2.v.mean())
+
+        return w
+    
+    @staticmethod
+    def _dot_get_axes(op1, op2):
         if op1.ndim == 0:
             op_axis1 = -1
         elif op1.ndim == 1:
@@ -534,91 +557,77 @@ class SparseNormal:
         else:
             op_axis2 = op2.ndim - 2
 
-        _validate_iaxes_bilinear(op1, op2, op_axis1, op_axis2)
+        iaxes1 = op1.iaxes
 
-        if not _is_deterministic(op1):
-            v = Normal._dot(op1.v, op2.v.mean())
-            iaxes = op1.iaxes
-            w = SparseNormal(v, iaxes)
+        d = max(op1.ndim - 1, 0)
+        iaxes2 = tuple([ax + d if ax != op2.ndim-1 else ax + d - 1 
+                        for ax in op2.iaxes])
 
-            if not _is_deterministic(op2):
-                w += SparseNormal._dot(op1.mean(), (op2 - op2.mean()))
-
-        elif not _is_deterministic(op2):
-            v = Normal._dot(op1.v.mean(), op2.v)
-
-            d = max(op1.ndim - 1, 0)
-            iaxes = tuple([ax + d if ax != op2.ndim-1 else ax + d - 1 
-                           for ax in op2.iaxes])
-            
-            w = SparseNormal(v, iaxes)
-
-        else:
-            w = np.dot(op1.v.mean(), op2.v.mean())
-
-        return w
+        return op1, op2, op_axis1, op_axis2, iaxes1, iaxes2
 
     @staticmethod
-    def _inner(op1, op2):
-        op1 = assparsenormal(op1)
-        op2 = assparsenormal(op2)
-
+    def _inner_get_axes(op1, op2):
         op_axis1 = op1.ndim - 1
         op_axis2 = op2.ndim - 1
-        _validate_iaxes_bilinear(op1, op2, op_axis1, op_axis2)
-
-        if not _is_deterministic(op1):
-            v = Normal._inner(op1.v, op2.v.mean())
-            iaxes = op1.iaxes
-            w = SparseNormal(v, iaxes)
-
-            if not _is_deterministic(op2):
-                w += SparseNormal._inner(op1.mean(), (op2 - op2.mean()))
         
-        elif not _is_deterministic(op2):
-            v = Normal._inner(op1.v.mean(), op2.v)
-            iaxes = tuple([ax + op1.ndim - 1 for ax in op2.iaxes])
-            w = SparseNormal(v, iaxes)
+        iaxes1 = op1.iaxes
+        iaxes2 = tuple([ax + op1.ndim - 1 for ax in op2.iaxes])
 
-        else:
-            w = np.inner(op1.v.mean(), op2.v.mean())
-
-        return w
+        return op1, op2, op_axis1, op_axis2, iaxes1, iaxes2
 
     @staticmethod
-    def _outer(op1, op2):
-        op1 = assparsenormal(op1)
-        op2 = assparsenormal(op2)
-
+    def _outer_get_axes(op1, op2):
         op1 = op1.ravel()
         op2 = op2.ravel()
+
+        op_axis1 = None
+        op_axis2 = None
 
         iaxes1 = (0,) if op1.iaxes else tuple()
         iaxes2 = (1,) if op2.iaxes else tuple()
 
-        if not _is_deterministic(op1):
-            v = Normal._outer(op1.v, op2.v.mean())
-            w = SparseNormal(v, iaxes1)
+        return op1, op2, op_axis1, op_axis2, iaxes1, iaxes2
 
-            if not _is_deterministic(op2):
-                w += SparseNormal._outer(op1.mean(), (op2 - op2.mean()))
+    @staticmethod
+    def _kron_get_axes(op1, op2):
+        ndim = max(op1.ndim, op2.ndim)
+
+        op_axis1 = None
+        op_axis2 = None
         
-        elif not _is_deterministic(op2):
-            v = Normal._outer(op1.v.mean(), op2.v)
-            w = SparseNormal(v, iaxes2)
+        d1 = ndim - op1.ndim
+        d2 = ndim - op2.ndim
 
+        iaxes1 = tuple([ax + d1 for ax in op1.iaxes])
+        iaxes2 = tuple([ax + d2 for ax in op1.iaxes])
+
+        return op1, op2, op_axis1, op_axis2, iaxes1, iaxes2
+
+    @staticmethod
+    def _tensordot_get_axes(op1, op2, axes=2):
+        try:
+            iter(axes)
+        except Exception:
+            op_axis1 = list(range(op1.ndim - axes, op1.ndim))
+            op_axis2 = list(range(0, axes))
         else:
-            w = np.inner(op1.v.mean(), op2.v.mean())
+            op_axis1, op_axis2 = axes
+        # This is the same how numpy.tensordot handles the axes.
+        # TODO: reuse this code from emaps module ------------------------------------------------
 
-        return w
+        iaxes1 = list(op1.iaxes)
+        for ax in op_axis1:
+            for i, iax in enumerate(iaxes1):
+                if iax > ax:
+                    iaxes1[i] -= 1
 
-    @staticmethod
-    def _kron(op1, op2):
-        pass
+        iaxes2 = [ax + op1.ndim - len(op_axis1) for ax in op2.iaxes]
+        for ax in op_axis2:
+            for i, iax in enumerate(iaxes2):
+                if iax > ax:
+                    iaxes2[i] -= 1
 
-    @staticmethod
-    def _tensordot(op1, op2):
-        pass
+        return op1, op2, op_axis1, op_axis2, iaxes1, iaxes2
     
     @staticmethod
     def _einsum(subs, op1, op2):
@@ -892,12 +901,18 @@ def _parse_index_key(x, key):
 
 
 def _validate_iaxes_bilinear(op1, op2, op_axis1, op_axis2):
-    if op_axis1 in op1.iaxes:
+    if not isinstance(op_axis1, tuple):
+        op_axis1 = (op_axis1,)
+
+    if not isinstance(op_axis2, tuple):
+        op_axis2 = (op_axis2,)
+
+    if any([ax in op1.iaxes for ax in op_axis1]):
         raise ValueError("Bilinear operations affecting "
                          "independence axes are not supported. "
-                         f"Axis {op_axis1} of operand 1 is affected.")
+                         f"Axes {op_axis1} of operand 1 are affected.")
     
-    if op_axis2 in op2.iaxes:
+    if any([ax in op2.iaxes for ax in op_axis2]):
         raise ValueError("Bilinear operations affecting "
                          "independence axes are not supported. "
-                         f"Axis {op_axis2} of operand 2 is affected.")
+                         f"Axes {op_axis2} of operand 2 are affected.")
