@@ -850,12 +850,12 @@ def _validate_iaxes_bilinear(op1, op2, op_axis1, op_axis2):
     if not isinstance(op_axis2, tuple):
         op_axis2 = (op_axis2,)
 
-    if any([op1._isiax[ax] for ax in op_axis1]):
+    if any([op1._isiax[ax] for ax in op_axis1 if ax is not None]):
         raise ValueError("Bilinear operations affecting "
                          "independence axes are not supported. "
                          f"Axes {op_axis1} of operand 1 are affected.")
     
-    if any([op2._isiax[ax] for ax in op_axis2]):
+    if any([op2._isiax[ax] for ax in op_axis2 if ax is not None]):
         raise ValueError("Bilinear operations affecting "
                          "independence axes are not supported. "
                          f"Axes {op_axis2} of operand 2 are affected.")

@@ -1224,6 +1224,58 @@ def test_einsum():
     v_mm = gp.matmul(v, x).transpose((-2, 1, 0, -1))
     assert_equal(v_ei, v_mm)
 
-    # TODO:
     # Tests agains inner.
+
+    xi = random_normal((3, 2))
+    v = iid_repeat(xi, 5, axis=1)  # shape (3, 5, 2), iaxes (1,)
+
+    x = np.random.rand(4, 3, 8, 2)  # 4D
+
+    v_ei = gp.einsum("ij, j -> i", v[1], x[0, 0, 0])
+    v_in = gp.inner(v[1], x[0, 0, 0])
+    assert_equal(v_ei, v_in)
+
+    v_ei = gp.einsum("kij, lj -> kil", v, x[0, 0])
+    v_in = gp.inner(v, x[0, 0])
+    assert_equal(v_ei, v_in)
+
+    v_ei = gp.einsum("ij, klmj -> iklm", v[1], x)
+    v_in = gp.inner(v[1], x)
+    assert_equal(v_ei, v_in)
+
+    v_ei = gp.einsum("klmj, ij -> klmi", x, v[1])
+    v_in = gp.inner(x, v[1])
+    assert_equal(v_ei, v_in)
+
+    v_ei = gp.einsum("...j, ij", x, v[1])
+    v_in = gp.inner(x, v[1])
+    assert_equal(v_ei, v_in)
+
     # Tests against outer.
+
+    v = iid_repeat(normal(0.5, 0.1), 5)
+    x = np.random.rand(4)
+
+    v_ei = gp.einsum("i, j -> ij", x, v)
+    v_ou = gp.outer(x, v)
+    assert_equal(v_ei, v_ou)
+
+    v_ei = gp.einsum("i, j", x, v)  # Implicit output indices.
+    v_ou = gp.outer(x, v)
+    assert_equal(v_ei, v_ou)
+
+    v_ei = gp.einsum("i, j -> ij", v, x)
+    v_ou = gp.outer(v, x)
+    assert_equal(v_ei, v_ou)
+
+    xi = random_normal((1,))
+    v = iid_repeat(xi, 5, axis=1)  # shape (1, 5), iaxes (1,)
+    x = np.random.rand(1, 3)  # 4D
+
+    v_ei = gp.einsum("ij, kl -> jl", v, x)
+    v_ou = gp.outer(v, x)
+    assert_equal(v_ei, v_ou)
+
+    v_ei = gp.einsum("kl, ij -> lj", x, v)
+    v_ou = gp.outer(x, v)
+    assert_equal(v_ei, v_ou)
