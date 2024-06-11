@@ -490,7 +490,7 @@ class SparseNormal:
             w = SparseNormal(v, isiax1)
 
             if not _is_deterministic(op2):
-                w += SparseNormal._dot(op1.mean(), (op2 - op2.mean()))
+                w += SparseNormal._bilinearfunc(op1.mean(), (op2 - op2.mean()))
 
         elif not _is_deterministic(op2):
             v = Normal._bilinearfunc(name, op1.v.mean(), op2.v, *args, **kwargs)
@@ -593,31 +593,33 @@ class SparseNormal:
                                      f" axis ({i}).")
                 
             isiax = op._isiax + (False,)  # Augments with a default.  
-            return tuple([op._isiax[outsubs.find(c)] for c in insubs])
+            return tuple([isiax[insubs.find(c)] for c in outsubs])
         
-        # TODO: convert to sparse normal or numerical operands
-        # TODO: add a check that the indices of all independence axes appear in both operands
+        op1 = assparsenormal(op1)
+        op2 = assparsenormal(op2)
 
         # Converts the subscripts to an explicit form.
         (insu1, insu2), outsu = einsubs.parse(subs, (op1.shape, op2.shape))
         subs = f"{insu1},{insu2}->{outsu}"
 
-        if isinstance(op1, SparseNormal) and isinstance(op2, SparseNormal):
-            return (SparseNormal._einsum(subs, op1, op1.v.b)
-                    + SparseNormal._einsum(subs, op1.v.b, op1))
+        isiax1 = out_iaxes(op1, insu1, outsu)
+        isiax2 = out_iaxes(op2, insu2, outsu)
 
-        if isinstance(op1, SparseNormal) and not isinstance(op2, SparseNormal):
-            isiax = out_iaxes(op1, insu1, outsu)
-            v = Normal._einsum(subs, op1.v, op2)
-            return SparseNormal(v, isiax)
+        if not _is_deterministic(op1):
+            v = Normal._einsum(subs, op1.v, op2.v.mean())
+            w = SparseNormal(v, isiax1)
 
-        if isinstance(op2, SparseNormal) and not isinstance(op1, SparseNormal):
-            isiax = out_iaxes(op2, insu2, outsu)
-            v = Normal._einsum(subs, op1, op2.v)
-            return SparseNormal(v, isiax)
-        
-        # The default that is not supposed to be reached, usually.
-        return Normal._einsum(subs, op1, op2)
+            if not _is_deterministic(op2):
+                w += SparseNormal._einsum(op1.mean(), (op2 - op2.mean()))
+
+        elif not _is_deterministic(op2):
+            v = Normal._einsum(subs, op1.v.mean(), op2.v)
+            w = SparseNormal(v, isiax2)
+
+        else:
+            w = np.einsum(op1.v.mean(), op2.v.mean())
+
+        return w
     
     @staticmethod
     def _fftfunc(name, x, n, axis, norm):

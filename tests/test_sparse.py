@@ -559,38 +559,38 @@ def test_reshape():
 
     sh = (5, 3, 4, 2, 3)
     vvar = v.var()
-    assert np.max(v.reshape(sh).var() - vvar.reshape(sh)) < tol
-    assert np.max(v.reshape(sh, order="F").var() 
-                  - vvar.reshape(sh, order="F")) < tol
+    assert np.max(np.abs(v.reshape(sh).var() - vvar.reshape(sh))) < tol
+    assert np.max(np.abs(v.reshape(sh, order="F").var() 
+                         - vvar.reshape(sh, order="F"))) < tol
     
     # A sanity check that changing the order is not doing nothing.
-    assert np.max(v.reshape(sh, order="F").var() 
-                  - vvar.reshape(sh, order="C")) > tol
+    assert np.max(np.abs(v.reshape(sh, order="F").var() 
+                         - vvar.reshape(sh, order="C"))) > tol
     
     v = iid_repeat(random_normal((8, 9)), 5, axis=-1)  # Last axis.
 
     sh = (3, 4, 2, 3, 5)
     vvar = v.var()
-    assert np.max(v.reshape(sh).var() - vvar.reshape(sh)) < tol
-    assert np.max(v.reshape(sh, order="F").var() 
-                  - vvar.reshape(sh, order="F")) < tol
+    assert np.max(np.abs(v.reshape(sh).var() - vvar.reshape(sh))) < tol
+    assert np.max(np.abs(v.reshape(sh, order="F").var() 
+                  - vvar.reshape(sh, order="F"))) < tol
     
     # A sanity check that changing the order is not doing nothing.
-    assert np.max(v.reshape(sh, order="F").var() 
-                  - vvar.reshape(sh, order="C")) > tol
+    assert np.max(np.abs(v.reshape(sh, order="F").var() 
+                         - vvar.reshape(sh, order="C"))) > tol
     
 
     v = iid_repeat(random_normal((8, 9)), 5, axis=1)  # Middle axis.
 
     sh = (2, 4, 5, 3, 3)
     vvar = v.var()
-    assert np.max(v.reshape(sh).var() - vvar.reshape(sh)) < tol
-    assert np.max(v.reshape(sh, order="F").var() 
-                  - vvar.reshape(sh, order="F")) < tol
+    assert np.max(np.abs(v.reshape(sh).var() - vvar.reshape(sh))) < tol
+    assert np.max(np.abs(v.reshape(sh, order="F").var() 
+                         - vvar.reshape(sh, order="F"))) < tol
     
     # A sanity check that changing the order is not doing nothing.
-    assert np.max(v.reshape(sh, order="F").var() 
-                  - vvar.reshape(sh, order="C")) > tol
+    assert np.max(np.abs(v.reshape(sh, order="F").var() 
+                  - vvar.reshape(sh, order="C"))) > tol
     
     # A shape that affects the iaxis.
     sh = (3, 4, 5, 2, 3)
@@ -694,19 +694,19 @@ def test_split():
     vvars_ref = np.split(v.var(), 3, axis=-2)
     for vv, vvr in zip(vvars, vvars_ref):
         assert vv.shape == vvr.shape
-        assert np.max(vv - vvr) < tol
+        assert np.max(np.abs(vv - vvr)) < tol
 
     vvars = [vs.var() for vs in v.split([2, 3], axis=0)]
     vvars_ref = np.split(v.var(), [2, 3], axis=0)
     for vv, vvr in zip(vvars, vvars_ref):
         assert vv.shape == vvr.shape
-        assert np.max(vv - vvr) < tol
+        assert np.max(np.abs(vv - vvr)) < tol
 
     vvars = [vs.var() for vs in v.split([2, 4], axis=4)]
     vvars_ref = np.split(v.var(), [2, 4], axis=4)
     for vv, vvr in zip(vvars, vvars_ref):
         assert vv.shape == vvr.shape
-        assert np.max(vv - vvr) < tol
+        assert np.max(np.abs(vv - vvr)) < tol
 
 
 def test_transpose():
@@ -735,11 +735,11 @@ def test_transpose():
     vvar1 = v.transpose().var()
     vvar2 = v.var().transpose()
     assert vvar1.shape == vvar2.shape
-    assert np.max(vvar1 - vvar2) < tol
+    assert np.max(np.abs(vvar1 - vvar2)) < tol
 
     vvar1 = v.T.var()
     assert vvar1.shape == vvar2.shape
-    assert np.max(vvar1 - vvar2) < tol
+    assert np.max(np.abs(vvar1 - vvar2)) < tol
     
     # A multi-dimensional variable.
     v = iid_repeat(iid_repeat(random_normal((4, 6, 5)), 2, axis=1), 3, axis=1)
@@ -752,40 +752,40 @@ def test_transpose():
     vvar1 = v.transpose(ax).var()
     vvar2 = v.var().transpose(ax)
     assert vvar1.shape == vvar2.shape
-    assert np.max(vvar1 - vvar2) < tol
+    assert np.max(np.abs(vvar1 - vvar2)) < tol
     assert v.transpose(ax).iaxes == (1, 4)
 
     ax = (-1, 2, 3, 0, 1)
     vvar1 = v.transpose(ax).var()
     vvar2 = v.var().transpose(ax)
     assert vvar1.shape == vvar2.shape
-    assert np.max(vvar1 - vvar2) < tol
+    assert np.max(np.abs(vvar1 - vvar2)) < tol
     assert v.transpose(ax).iaxes == (1, 4)
 
     ax = (-1, 3, 2, 0, 1)
     vvar1 = v.transpose(ax).var()
     vvar2 = v.var().transpose(ax)
     assert vvar1.shape == vvar2.shape
-    assert np.max(vvar1 - vvar2) < tol
+    assert np.max(np.abs(vvar1 - vvar2)) < tol
     assert v.transpose(ax).iaxes == (2, 4)
 
     ax = (1, -2, 2, -1, 0)
     vvar1 = v.transpose(ax).var()
     vvar2 = v.var().transpose(ax)
     assert vvar1.shape == vvar2.shape
-    assert np.max(vvar1 - vvar2) < tol
+    assert np.max(np.abs(vvar1 - vvar2)) < tol
     assert v.transpose(ax).iaxes == (0, 2)
 
     ax = None
     vvar1 = v.transpose(ax).var()
     vvar2 = v.var().transpose(ax)
     assert vvar1.shape == vvar2.shape
-    assert np.max(vvar1 - vvar2) < tol
+    assert np.max(np.abs(vvar1 - vvar2)) < tol
     assert v.transpose(ax).iaxes == (2, 3)
 
     vvar1 = v.T.var()
     assert vvar1.shape == vvar2.shape
-    assert np.max(vvar1 - vvar2) < tol
+    assert np.max(np.abs(vvar1 - vvar2)) < tol
     assert v.transpose(ax).iaxes == (2, 3)
 
     v = iid_repeat(iid_repeat(random_normal((4, 5)), 2, axis=1), 3, axis=3)
@@ -795,21 +795,21 @@ def test_transpose():
     vvar1 = v.transpose(ax).var()
     vvar2 = v.var().transpose(ax)
     assert vvar1.shape == vvar2.shape
-    assert np.max(vvar1 - vvar2) < tol
+    assert np.max(np.abs(vvar1 - vvar2)) < tol
     assert v.transpose(ax).iaxes == (1, 3)
 
     ax = (1, 0, -1, -2)
     vvar1 = v.transpose(ax).var()
     vvar2 = v.var().transpose(ax)
     assert vvar1.shape == vvar2.shape
-    assert np.max(vvar1 - vvar2) < tol
+    assert np.max(np.abs(vvar1 - vvar2)) < tol
     assert v.transpose(ax).iaxes == (0, 2)
 
     ax = (1, 0, -2, 3)
     vvar1 = v.transpose(ax).var()
     vvar2 = v.var().transpose(ax)
     assert vvar1.shape == vvar2.shape
-    assert np.max(vvar1 - vvar2) < tol
+    assert np.max(np.abs(vvar1 - vvar2)) < tol
     assert v.transpose(ax).iaxes == (0, 3)
 
 
@@ -867,14 +867,14 @@ def test_concatenate():
     v_ = gp.concatenate([v1, v2], axis=0)
     assert v.shape == v_.shape
     assert v.iaxes == v_.iaxes
-    assert np.max(v.mean() - v_.mean()) < tol
-    assert np.max(v.var() - v_.var()) < tol
+    assert np.max(np.abs(v.mean() - v_.mean())) < tol
+    assert np.max(np.abs(v.var() - v_.var())) < tol
 
     v_ = gp.concatenate([v1, v2], axis=-3)
     assert v.shape == v_.shape
     assert v.iaxes == v_.iaxes
-    assert np.max(v.mean() - v_.mean()) < tol
-    assert np.max(v.var() - v_.var()) < tol
+    assert np.max(np.abs(v.mean() - v_.mean())) < tol
+    assert np.max(np.abs(v.var() - v_.var())) < tol
 
     v1 = v[:4]  # (4, 2, 7)
     v2 = v[4:]  # (4, 2, 7)
@@ -882,8 +882,8 @@ def test_concatenate():
     v_ = gp.concatenate([v1, v2], axis=0)
     assert v.shape == v_.shape
     assert v.iaxes == v_.iaxes
-    assert np.max(v.mean() - v_.mean()) < tol
-    assert np.max(v.var() - v_.var()) < tol
+    assert np.max(np.abs(v.mean() - v_.mean())) < tol
+    assert np.max(np.abs(v.var() - v_.var())) < tol
 
     v_ = gp.concatenate([v1, v1, v1, v1], axis=1)
     assert v_.shape == (4, 8, 7)
@@ -955,8 +955,8 @@ def test_stack():
         refvar = np.stack([v1.var(), v2.var()], axis=ax)
         assert v_.shape == sh
         assert v_.iaxes == iax
-        assert np.max(v_.mean() - refmean) < tol
-        assert np.max(v_.var() - refvar) < tol
+        assert np.max(np.abs(v_.mean() - refmean)) < tol
+        assert np.max(np.abs(v_.var() - refvar)) < tol
 
     v_ = gp.stack([v1, v1, v1, v1], axis=-5)
     assert v_.shape == (4, 4, 3, 2, 7)
@@ -1126,9 +1126,104 @@ def test_matmul():
     wref = v1m @ v2m + (v1 - v1m) @ v2m + v1m @ (v2 - v2m)
 
     assert w.shape == wref.shape
-    assert np.max(w.mean() - wref.mean()) < tol
-    assert np.max(w.var() - wref.var()) < tol
+    assert np.max(np.abs(w.mean() - wref.mean())) < tol
+    assert np.max(np.abs(w.var() - wref.var())) < tol
 
     v3 = iid_repeat(normal(size=(7, 5, 1)), 4)
     with pytest.raises(ValueError):
         v1 @ v3
+
+
+def test_einsum():
+    tol = 1e-10
+
+    def assert_equal(v1, v2):
+        assert v1.shape == v2.shape
+        assert v1.iaxes == v2.iaxes
+        assert np.max(np.abs(v1.v.emap.a - v2.v.emap.a)) < tol
+        assert v1.v.emap.elem == v2.v.emap.elem
+        assert np.max(np.abs(v1.mean() - v2.mean())) < tol
+
+    # Tests against matrix multiplication.
+
+    xi = random_normal((3, 2))
+    v = iid_repeat(xi, 5, axis=1)  # shape (3, 5, 2), iaxes (1,)
+    
+    x = np.random.rand(2)  # 1D
+
+    v_ei = gp.einsum("rij, j -> ri", v, x)
+    v_mm = gp.matmul(v, x)
+    assert_equal(v_ei, v_mm)
+
+    v_ei = gp.einsum("ij, j -> i", v[0], x)
+    v_mm = gp.matmul(v[0], x)
+    assert_equal(v_ei, v_mm)
+
+    v_ei = gp.einsum("j, rji -> ri", x, v.transpose((0, 2, 1)))
+    v_mm = gp.matmul(x, v.transpose((0, 2, 1)))
+    assert_equal(v_ei, v_mm)
+
+    v_ei = gp.einsum("j, rj... -> ...r", x.T, v.transpose((0, 2, 1)))
+    v_mm = gp.matmul(x.T, v.transpose((0, 2, 1)))
+    assert_equal(v_ei.T, v_mm)
+
+    v_ei = gp.einsum("j, ...ji -> i...", x, v.transpose((0, 2, 1))[1, ...])
+    v_mm = gp.matmul(x.T, v.transpose((0, 2, 1))[1, ...])
+    assert_equal(v_ei.T, v_mm)
+
+    x = np.random.rand(2, 8)  # 2D
+
+    v_ei = gp.einsum("rij, jk -> rik", v, x)
+    v_mm = gp.matmul(v, x)
+    assert_equal(v_ei, v_mm)
+
+    v_ei = gp.einsum("ij, jk -> ik", v[0], x)
+    v_mm = gp.matmul(v[0], x)
+    assert_equal(v_ei, v_mm)
+
+    # Swapping the order 1.
+    v_ei = gp.einsum("jk, rij -> rik", x, v)
+    v_mm = gp.matmul(v, x)
+    assert_equal(v_ei, v_mm)
+
+    # Swapping the order 2.
+    v_ei = gp.einsum("kj, rji -> rki", x.T, v.transpose((0, 2, 1)))
+    v_mm = gp.matmul(x.T, v.transpose((0, 2, 1)))
+    assert_equal(v_ei, v_mm)
+
+    # With an ellipsis.
+    v_ei = gp.einsum("...j, jk -> ...k", v, x)
+    v_mm = gp.matmul(v, x)
+    assert_equal(v_ei, v_mm)
+
+    # Implicit output.
+    v_ei = gp.einsum("...j, jk", v, x)
+    v_mm = gp.matmul(v, x)
+    assert_equal(v_ei, v_mm)
+
+    # Attempts contracting over an independence axis.
+    x = np.random.rand(5, 8)
+    gp.einsum("rji, jk -> rik", v.mean(), x)  # No error because of the shapes.
+    with pytest.raises(ValueError):
+        gp.einsum("rji, jk -> rik", v, x)
+    
+    gp.einsum("j, jk -> k", v.mean()[1, :, 1], x)
+    with pytest.raises(ValueError):
+        gp.einsum("j, jk -> k", v[1, :, 1], x)
+
+    xi = random_normal((3, 2))
+    v = iid_repeat(xi, 5, axis=1)  # shape (3, 5, 2), iaxes (1,)
+
+    x = np.random.rand(4, 3, 2, 8)  # 4D
+
+    v_ei = gp.einsum("ijk, liko -> lijo", v, x)
+    v_mm = gp.matmul(v, x)
+    assert_equal(v_ei, v_mm)
+
+    v_ei = gp.einsum("liko, ijk -> jilo", x, v)
+    v_mm = gp.matmul(v, x).transpose((-2, 1, 0, -1))
+    assert_equal(v_ei, v_mm)
+
+    # TODO:
+    # Tests agains inner.
+    # Tests against outer.
