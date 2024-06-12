@@ -22,8 +22,8 @@ def gen_op_method(name: str):
             return NotImplemented
         
         {vln}
-        isiax = _validate_iaxes([self, other])
-        return SparseNormal(v, isiax)
+        iaxid = _validate_iaxes([self, other])
+        return SparseNormal(v, iaxid)
     """
     return code
 

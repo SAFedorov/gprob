@@ -813,6 +813,66 @@ def test_transpose():
     assert v.transpose(ax).iaxes == (0, 3)
 
 
+def test_iaxes_compatibility():
+
+    # The numbers of independence axes are different.
+    v1 = iid_repeat(iid_repeat(normal(), 3), 3)
+    v2 = iid_repeat(normal(), 3)
+    with pytest.raises(ValueError) as num_e:
+        v1 - v2
+
+    # The locations of the independence axes are different.
+    v1 = iid_repeat(normal(size=(3,)), 3)
+    v2 = iid_repeat(normal(size=(3,)), 3, axis=1)
+    with pytest.raises(ValueError) as loc_e:
+        v1 - v2
+    
+    # After the transposition, however, it should work.
+    assert (v1 - v2.T).shape == (3, 3)
+    assert (v1 - v2.T).iaxes == (0,)
+
+    # Exchanging the order of the independence axes, even of the same size, 
+    # should make the transposed and the original variables incompatible 
+    # in arithmetic operations.
+
+    v1 = iid_repeat(iid_repeat(normal(), 3), 3)
+    v2 = iid_repeat(iid_repeat(normal(), 3), 3)
+
+    assert (v1 - v2).shape == (3, 3)
+    assert (v1 - v2).iaxes == (0, 1)
+    
+    v1.mean() + v1.mean().T  # Does not raise an error.
+    with pytest.raises(ValueError):
+        v1 + v1.T
+
+    v2 = iid_repeat(iid_repeat(normal(), 3), 3)
+    assert (v1 + v2).shape == (3, 3)
+    assert (v1.mean() + v2.mean().T).shape == (3, 3)
+    with pytest.raises(ValueError) as ord_e:
+        v1 + v2.T
+
+    # Also, if both are transposed, there should not be any error.
+    assert (v1.T - v2.T).shape == (3, 3)
+    assert (v1.T - v2.T).iaxes == (0, 1)
+
+    v = iid_repeat(iid_repeat(random_normal((4, 5)), 3, axis=1), 3, axis=3)
+    # v.shape is (4, 3, 5, 3), v.iaxes are (1, 3)
+
+    v.mean() + v.mean().transpose((0, -1, 2, 1))  # Does not raise an error.
+    with pytest.raises(ValueError):
+        v + v.transpose((0, -1, 2, 1))
+
+    v.mean() + v.moveaxis(-1, 1).moveaxis(2, 3).mean()
+    with pytest.raises(ValueError):
+        v + v.moveaxis(-1, 1).moveaxis(2, 3)
+
+    # Finally, check that the three types of iaxes incompatibility,
+    # number, location, and order, produce different error messages.
+    assert num_e.value.args[0] != loc_e.value.args[0]
+    assert loc_e.value.args[0] != ord_e.value.args[0]
+    assert ord_e.value.args[0] != num_e.value.args[0]
+
+
 def test_trace():
     v = iid_repeat(iid_repeat(normal(size=(4, 5)), 2, axis=0), 3, axis=0)
     # v.shape is (3, 2, 4, 5), v.iaxes are (0, 1)

@@ -13,7 +13,9 @@ def iid_repeat(x, nrep=1, axis=0):
     x = x.iid_copy()
     
     axis = _normalize_axis(axis, x.ndim + 1)
-    isiax = x._isiax[:axis] + (True,) + x._isiax[axis:]
+
+    n = len(x._iaxid) - x._iaxid.count(None) + 1
+    iaxid = x._iaxid[:axis] + (n,) + x._iaxid[axis:]
     v = x.v
 
     # Index that adds a new axis.
@@ -24,7 +26,7 @@ def iid_repeat(x, nrep=1, axis=0):
     new_shape = v.shape[:axis] + (nrep,) + v.shape[axis:]
     v = broadcast_to(v[idx], new_shape)
 
-    return SparseNormal(v, isiax)
+    return SparseNormal(v, iaxid)
 
 
 def assparsenormal(x):
@@ -40,19 +42,20 @@ def assparsenormal(x):
                         f"> {SparseNormal._normal_priority_}).")
     
     v = asnormal(x)
-    return SparseNormal(v, (False,) * v.ndim)
+    return SparseNormal(v, (None,) * v.ndim)
 
 
 class SparseNormal:
     """Array of block-independent normal random variables."""
 
-    __slots__ = ("v", "_isiax")
+    __slots__ = ("v", "_iaxid")
     __array_ufunc__ = None
     _normal_priority_ = 10
     
-    def __init__(self, v, isiax):
+    def __init__(self, v, iaxid):
         self.v = v
-        self._isiax = isiax
+        self._iaxid = iaxid  # The integer ids of the independence axes, 
+                             # with None's for regular axes.
 
     @property
     def size(self):
@@ -68,11 +71,11 @@ class SparseNormal:
     
     @property
     def real(self):
-        return SparseNormal(self.v.real, self._isiax)
+        return SparseNormal(self.v.real, self._iaxid)
     
     @property
     def imag(self):
-        return SparseNormal(self.v.imag, self._isiax)
+        return SparseNormal(self.v.imag, self._iaxid)
     
     @property
     def T(self):
@@ -86,7 +89,7 @@ class SparseNormal:
     def iaxes(self):
         """Ordered sequence of axes along which the array elements 
         are independent from each other."""
-        return tuple([i for i, b in enumerate(self._isiax) if b])
+        return tuple([i for i, b in enumerate(self._iaxid) if b])
     
     def __repr__(self):
         return print_normal(self, extra_attrs=("iaxes",))
@@ -95,7 +98,7 @@ class SparseNormal:
         return len(self.v)
     
     def __neg__(self):
-        return SparseNormal(-self.v, self._isiax)
+        return SparseNormal(-self.v, self._iaxid)
 
     def __add__(self, other):
         try:
@@ -104,8 +107,8 @@ class SparseNormal:
             return NotImplemented
 
         v = self.v + other.v
-        isiax = _validate_iaxes([self, other])
-        return SparseNormal(v, isiax)
+        iaxid = _validate_iaxes([self, other])
+        return SparseNormal(v, iaxid)
 
     def __radd__(self, other):
         try:
@@ -114,8 +117,8 @@ class SparseNormal:
             return NotImplemented
 
         v = other.v + self.v
-        isiax = _validate_iaxes([self, other])
-        return SparseNormal(v, isiax)
+        iaxid = _validate_iaxes([self, other])
+        return SparseNormal(v, iaxid)
 
     def __sub__(self, other):
         try:
@@ -124,8 +127,8 @@ class SparseNormal:
             return NotImplemented
 
         v = self.v - other.v
-        isiax = _validate_iaxes([self, other])
-        return SparseNormal(v, isiax)
+        iaxid = _validate_iaxes([self, other])
+        return SparseNormal(v, iaxid)
 
     def __rsub__(self, other):
         try:
@@ -134,8 +137,8 @@ class SparseNormal:
             return NotImplemented
 
         v = other.v - self.v
-        isiax = _validate_iaxes([self, other])
-        return SparseNormal(v, isiax)
+        iaxid = _validate_iaxes([self, other])
+        return SparseNormal(v, iaxid)
 
     def __mul__(self, other):
         try:
@@ -144,8 +147,8 @@ class SparseNormal:
             return NotImplemented
 
         v = self.v * other.v
-        isiax = _validate_iaxes([self, other])
-        return SparseNormal(v, isiax)
+        iaxid = _validate_iaxes([self, other])
+        return SparseNormal(v, iaxid)
 
     def __rmul__(self, other):
         try:
@@ -154,8 +157,8 @@ class SparseNormal:
             return NotImplemented
 
         v = other.v * self.v
-        isiax = _validate_iaxes([self, other])
-        return SparseNormal(v, isiax)
+        iaxid = _validate_iaxes([self, other])
+        return SparseNormal(v, iaxid)
 
     def __truediv__(self, other):
         try:
@@ -164,8 +167,8 @@ class SparseNormal:
             return NotImplemented
 
         v = self.v / other.v
-        isiax = _validate_iaxes([self, other])
-        return SparseNormal(v, isiax)
+        iaxid = _validate_iaxes([self, other])
+        return SparseNormal(v, iaxid)
 
     def __rtruediv__(self, other):
         try:
@@ -174,8 +177,8 @@ class SparseNormal:
             return NotImplemented
 
         v = other.v / self.v
-        isiax = _validate_iaxes([self, other])
-        return SparseNormal(v, isiax)
+        iaxid = _validate_iaxes([self, other])
+        return SparseNormal(v, iaxid)
 
     def __pow__(self, other):
         try:
@@ -184,8 +187,8 @@ class SparseNormal:
             return NotImplemented
 
         v = self.v ** other.v
-        isiax = _validate_iaxes([self, other])
-        return SparseNormal(v, isiax)
+        iaxid = _validate_iaxes([self, other])
+        return SparseNormal(v, iaxid)
 
     def __rpow__(self, other):
         try:
@@ -194,8 +197,8 @@ class SparseNormal:
             return NotImplemented
 
         v = other.v ** self.v
-        isiax = _validate_iaxes([self, other])
-        return SparseNormal(v, isiax)
+        iaxid = _validate_iaxes([self, other])
+        return SparseNormal(v, iaxid)
 
     def __matmul__(self, other):
         if self.ndim == 0:
@@ -204,7 +207,7 @@ class SparseNormal:
         else:
             op_axis = self.ndim - 1
 
-        if self._isiax[op_axis]:
+        if self._iaxid[op_axis]:
             raise ValueError("Matrix multiplication affecting independence "
                              "axes is not supported. "
                              f"Axis {op_axis} of operand 1 is affected.")
@@ -212,18 +215,18 @@ class SparseNormal:
         other = assparsenormal(other)
 
         if self.ndim == 1:
-            isiax = (False,)  # == self._isiax, otherwise
-                              # ValueError would have been thrown. 
+            iaxid = (None,)  # == self._iaxid, otherwise
+                             # ValueError would have been thrown. 
         elif other.ndim <= max(self.ndim, 2):
-            isiax = self._isiax
+            iaxid = self._iaxid
         else:
             # There are dimensions added by broadcasting.
             d = other.ndim - self.ndim
-            isiax = (False,) * d + self._isiax
+            iaxid = (None,) * d + self._iaxid
 
         # Calculates the contribution from the deterministic part of `other`.
         v = self.v @ other.mean()
-        w = SparseNormal(v, isiax)
+        w = SparseNormal(v, iaxid)
         
         if not _is_deterministic(other):
             # Adds the linearized contribution from the random part of `other`.
@@ -242,7 +245,7 @@ class SparseNormal:
         else:
             op_axis = self.ndim - 2
 
-        if self._isiax[op_axis]:
+        if self._iaxid[op_axis]:
             raise ValueError("Matrix multiplication affecting independence "
                              "axes is not supported. "
                              f"Axis {op_axis} of operand 2 is affected.")
@@ -250,17 +253,17 @@ class SparseNormal:
         other = assparsenormal(other)
 
         if other.ndim == 1:
-            isiax = tuple([b for i, b in enumerate(self._isiax) 
+            iaxid = tuple([b for i, b in enumerate(self._iaxid) 
                            if i != op_axis])
         elif other.ndim >= 2 and other.ndim <= self.ndim - 1:
-            isiax = self._isiax
+            iaxid = self._iaxid
         else:
             d = other.ndim - self.ndim
-            isiax = (False,) * d + self._isiax
+            iaxid = (None,) * d + self._iaxid
 
         # Calculates the contribution from the deterministic part of `other`.
         v = other.mean() @ self.v
-        w = SparseNormal(v, isiax)
+        w = SparseNormal(v, iaxid)
         
         if not _is_deterministic(other):
             # Adds the linearized contribution from the random part of `other`.
@@ -272,9 +275,9 @@ class SparseNormal:
     
     def __getitem__(self, key):
         out_ax = _parse_index_key(self, key)
-        isiax = tuple([self._isiax[ax] if ax is not None else False 
+        iaxid = tuple([self._iaxid[ax] if ax is not None else False 
                        for ax in out_ax])
-        return SparseNormal(self.v[key], isiax)
+        return SparseNormal(self.v[key], iaxid)
     
     def __setitem__(self, key, value):
         raise NotImplementedError
@@ -282,7 +285,7 @@ class SparseNormal:
     # ---------- array methods ----------
 
     def conjugate(self):
-        return SparseNormal(self.v.conjugate(), self._isiax)
+        return SparseNormal(self.v.conjugate(), self._iaxid)
     
     def conj(self):
         return self.conjugate()
@@ -295,33 +298,33 @@ class SparseNormal:
             raise ValueError("None value for the axis is not supported.")
         
         axis = _normalize_axis(axis, self.ndim)
-        if self._isiax[axis]:
+        if self._iaxid[axis]:
             raise ValueError("The computation of cumulative sums along "
                              "independence axes is not supported.")
 
-        return SparseNormal(self.v.cumsum(axis), self._isiax)
+        return SparseNormal(self.v.cumsum(axis), self._iaxid)
     
     def diagonal(self, offset=0, axis1=0, axis2=1):
         [axis1, axis2] = _normalize_axes([axis1, axis2], self.ndim)
 
-        if self._isiax[axis1] or self._isiax[axis2]:
+        if self._iaxid[axis1] or self._iaxid[axis2]:
             raise ValueError("Taking diagonals along independence axes "
                              "is not supported.")
         s = {axis1, axis2}
-        isiax = (tuple([b for i, b in enumerate(self._isiax) if i not in s]) 
-                 + (False,))
-        return SparseNormal(self.v.diagonal(offset, axis1, axis2), isiax)
+        iaxid = (tuple([idx for i, idx in enumerate(self._iaxid) if i not in s]) 
+                 + (None,))
+        return SparseNormal(self.v.diagonal(offset, axis1, axis2), iaxid)
 
     def flatten(self, order="C"):
-        if not any(self._isiax) or self.ndim <= 1:
-            return SparseNormal(self.v.flatten(order=order), self._isiax)
+        if not any(self._iaxid) or self.ndim <= 1:
+            return SparseNormal(self.v.flatten(order=order), self._iaxid)
         
         # Checks if all dimensions except maybe one are <= 1.
         max_sz = max(self.shape)
         max_dim = self.shape.index(max_sz)
         if all(x <= 1 for i, x in enumerate(self.shape) if i != max_dim):
-            isiax = (self._isiax[max_dim],)
-            return SparseNormal(self.v.flatten(order=order), isiax)
+            iaxid = (self._iaxid[max_dim],)
+            return SparseNormal(self.v.flatten(order=order), iaxid)
         
         raise ValueError("Sparse normal variables can only be flattened if "
                          "all their dimensions except maybe one have size <=1, "
@@ -331,22 +334,22 @@ class SparseNormal:
         source = _normalize_axis(source, self.ndim)
         destination = _normalize_axis(destination, self.ndim)
         
-        isiax = list(self._isiax)
-        isiax.insert(destination, isiax.pop(source))
-        isiax = tuple(isiax)
+        iaxid = list(self._iaxid)
+        iaxid.insert(destination, iaxid.pop(source))
+        iaxid = tuple(iaxid)
 
-        return SparseNormal(self.v.moveaxis(source, destination), isiax)
+        return SparseNormal(self.v.moveaxis(source, destination), iaxid)
     
     def ravel(self, order="C"):
-        if not any(self._isiax) or self.ndim <= 1:
-            return SparseNormal(self.v.ravel(order=order), self._isiax)
+        if not any(self._iaxid) or self.ndim <= 1:
+            return SparseNormal(self.v.ravel(order=order), self._iaxid)
         
         # Checks if all dimensions except maybe one are <= 1.
         max_sz = max(self.shape)
         max_dim = self.shape.index(max_sz)
         if all(x <= 1 for i, x in enumerate(self.shape) if i != max_dim):
-            isiax = (self._isiax[max_dim],)
-            return SparseNormal(self.v.ravel(order=order), isiax)
+            iaxid = (self._iaxid[max_dim],)
+            return SparseNormal(self.v.ravel(order=order), iaxid)
         
         raise ValueError("Sparse normal variables can only be flattened if "
                          "all their dimensions except maybe one have size <=1, "
@@ -364,16 +367,16 @@ class SparseNormal:
             # The transformation of independence axes for zero-size variables 
             # cannot be determined unambiguously, so we always assume that 
             # the transformed variable has no independence axes.
-            return SparseNormal(v, (False,) * v.ndim)
+            return SparseNormal(v, (None,) * v.ndim)
 
         new_dim = 0
 
         new_cnt = 1
         old_cnt = 1
 
-        isiax = [False] * v.ndim
+        iaxid = [False] * v.ndim
         for i, n in enumerate(self.shape):
-            if self._isiax[i]:
+            if self._iaxid[i]:
                 if n != 1:
                     # Skips all trivial dimensions first.
                     while new_dim < len(newshape) and newshape[new_dim] == 1:
@@ -382,7 +385,7 @@ class SparseNormal:
                 if (new_dim < len(newshape) and newshape[new_dim] == n 
                     and new_cnt == old_cnt):
                     
-                    isiax[new_dim] = True
+                    iaxid[new_dim] = True
                 else:
                     raise ValueError("Reshaping that affects independence axes "
                                      f"is not supported. Axis {i} is affected "
@@ -398,18 +401,18 @@ class SparseNormal:
                     new_cnt *= newshape[new_dim]
                     new_dim += 1
         
-        isiax = tuple(isiax)
-        return SparseNormal(v, isiax)
+        iaxid = tuple(iaxid)
+        return SparseNormal(v, iaxid)
     
     def split(self, indices_or_sections, axis=0):
         axis = _normalize_axis(axis, self.ndim)
 
-        if self._isiax[axis]:
+        if self._iaxid[axis]:
             raise ValueError("Splitting along independence axes "
                              "is not supported.")
         
         vpieces = self.v.split(indices_or_sections, axis)
-        return [SparseNormal(v, self._isiax) for v in vpieces]
+        return [SparseNormal(v, self._iaxid) for v in vpieces]
     
     def sum(self, axis, keepdims=False):
         if not isinstance(axis, int) and not isinstance(axis, tuple):
@@ -421,57 +424,57 @@ class SparseNormal:
 
         sum_axes = _normalize_axes(axis, self.ndim)
 
-        if any(self._isiax[ax] for ax in sum_axes):
+        if any(self._iaxid[ax] for ax in sum_axes):
             raise ValueError("The computation of sums along "
                              "independence axes is not supported.")
         
         if keepdims:
-            isiax = self._isiax
+            iaxid = self._iaxid
         else:
-            isiax = [b for i, b in enumerate(self._isiax) if i not in sum_axes]
+            iaxid = [b for i, b in enumerate(self._iaxid) if i not in sum_axes]
 
         v = self.v.sum(axis=axis, keepdims=keepdims)
-        return SparseNormal(v, isiax)
+        return SparseNormal(v, iaxid)
 
     def transpose(self, axes=None):
         if axes is None:
-            isiax = self._isiax[::-1]
+            iaxid = self._iaxid[::-1]
         else:
-            isiax = tuple([self._isiax[ax] for ax in axes])
+            iaxid = tuple([self._iaxid[ax] for ax in axes])
 
-        return SparseNormal(self.v.transpose(axes), isiax)
+        return SparseNormal(self.v.transpose(axes), iaxid)
     
     def trace(self, offset=0, axis1=0, axis2=1):
         [axis1, axis2] = _normalize_axes([axis1, axis2], self.ndim)
 
-        if self._isiax[axis1] or self._isiax[axis2]:
+        if self._iaxid[axis1] or self._iaxid[axis2]:
             raise ValueError("Traces along independence axes "
                              "are not supported.")
         s = {axis1, axis2}
-        isiax = tuple([b for i, b in enumerate(self._isiax) if i not in s])
-        return SparseNormal(self.v.trace(offset, axis1, axis2), isiax)
+        iaxid = tuple([b for i, b in enumerate(self._iaxid) if i not in s])
+        return SparseNormal(self.v.trace(offset, axis1, axis2), iaxid)
     
     @staticmethod
     def _concatenate(arrays, axis):
         arrays = [assparsenormal(ar) for ar in arrays]
-        isiax = _validate_iaxes(arrays)
-        axis = _normalize_axis(axis, len(isiax))
+        iaxid = _validate_iaxes(arrays)
+        axis = _normalize_axis(axis, len(iaxid))
         
-        if isiax[axis]:
+        if iaxid[axis]:
             raise ValueError("Concatenation along independence axes "
                              "is not allowed.")
 
         v = Normal._concatenate([x.v for x in arrays], axis=axis)
-        return SparseNormal(v, isiax)
+        return SparseNormal(v, iaxid)
     
     @staticmethod
     def _stack(arrays, axis):
         arrays = [assparsenormal(ar) for ar in arrays]
-        isiax = _validate_iaxes(arrays)
-        isiax = isiax[:axis] + (False,) + isiax[axis:]
+        iaxid = _validate_iaxes(arrays)
+        iaxid = iaxid[:axis] + (None,) + iaxid[axis:]
 
         v = Normal._stack([x.v for x in arrays], axis=axis)
-        return SparseNormal(v, isiax)
+        return SparseNormal(v, iaxid)
     
     # TODO: separate the individual functions - --------------------------------------
 
@@ -482,19 +485,19 @@ class SparseNormal:
 
         mn = f"_{name}_get_axes"
 
-        op1, op2, op_axis1, op_axis2, isiax1, isiax2 = getattr(SparseNormal, mn)(op1, op2, *args, **kwargs)
+        op1, op2, op_axis1, op_axis2, iaxid1, iaxid2 = getattr(SparseNormal, mn)(op1, op2, *args, **kwargs)
         _validate_iaxes_bilinear(op1, op2, op_axis1, op_axis2)
 
         if not _is_deterministic(op1):
             v = Normal._bilinearfunc(name, op1.v, op2.v.mean(), *args, **kwargs)
-            w = SparseNormal(v, isiax1)
+            w = SparseNormal(v, iaxid1)
 
             if not _is_deterministic(op2):
                 w += SparseNormal._bilinearfunc(op1.mean(), (op2 - op2.mean()))
 
         elif not _is_deterministic(op2):
             v = Normal._bilinearfunc(name, op1.v.mean(), op2.v, *args, **kwargs)
-            w = SparseNormal(v, isiax2)
+            w = SparseNormal(v, iaxid2)
 
         else:
             w = getattr(np, name)(op1.v.mean(), op2.v.mean())
@@ -517,23 +520,23 @@ class SparseNormal:
         else:
             op_axis2 = op2.ndim - 2
 
-        isiax1 = op1._isiax
+        iaxid1 = op1._iaxid
 
-        isiax2 = list(op2._isiax)
-        isiax2.pop(op2.ndim-1)
-        isiax2 = (False,) * max(op1.ndim - 1, 0) + tuple(isiax2)
+        iaxid2 = list(op2._iaxid)
+        iaxid2.pop(op2.ndim-1)
+        iaxid2 = (None,) * max(op1.ndim - 1, 0) + tuple(iaxid2)
 
-        return op1, op2, op_axis1, op_axis2, isiax1, isiax2
+        return op1, op2, op_axis1, op_axis2, iaxid1, iaxid2
 
     @staticmethod
     def _inner_get_axes(op1, op2):
         op_axis1 = op1.ndim - 1
         op_axis2 = op2.ndim - 1
         
-        isiax1 = op1._isiax[:-1]
-        isiax2 = (False,) * (op1.ndim - 1) + op2._isiax[:-1]
+        iaxid1 = op1._iaxid[:-1]
+        iaxid2 = (None,) * (op1.ndim - 1) + op2._iaxid[:-1]
 
-        return op1, op2, op_axis1, op_axis2, isiax1, isiax2
+        return op1, op2, op_axis1, op_axis2, iaxid1, iaxid2
 
     @staticmethod
     def _outer_get_axes(op1, op2):
@@ -543,10 +546,10 @@ class SparseNormal:
         op_axis1 = None
         op_axis2 = None
 
-        isiax1 = (True, False) if any(op1._isiax) else (False, False)
-        isiax2 = (False, True) if any(op2._isiax) else (False, False)
+        iaxid1 = (True, False) if any(op1._iaxid) else (False, False)
+        iaxid2 = (False, True) if any(op2._iaxid) else (False, False)
 
-        return op1, op2, op_axis1, op_axis2, isiax1, isiax2
+        return op1, op2, op_axis1, op_axis2, iaxid1, iaxid2
 
     @staticmethod
     def _kron_get_axes(op1, op2):
@@ -558,10 +561,10 @@ class SparseNormal:
         d1 = ndim - op1.ndim
         d2 = ndim - op2.ndim
 
-        isiax1 = (False,) * d1 + op1._isiax
-        isiax2 = (False,) * d2 + op2._isiax
+        iaxid1 = (None,) * d1 + op1._iaxid
+        iaxid2 = (None,) * d2 + op2._iaxid
 
-        return op1, op2, op_axis1, op_axis2, isiax1, isiax2
+        return op1, op2, op_axis1, op_axis2, iaxid1, iaxid2
 
     @staticmethod
     def _tensordot_get_axes(op1, op2, axes=2):
@@ -575,11 +578,11 @@ class SparseNormal:
         # This is the same how numpy.tensordot handles the axes.
         # TODO: reuse this code from emaps module ------------------------------------------------
 
-        isiax1 = tuple([b for i, b in enumerate(op1._isiax) if i not in op_ax1])
-        isiax2 = tuple([b for i, b in enumerate(op2._isiax) if i not in op_ax2])
-        isiax2 = (False,) * len(isiax1) + isiax2
+        iaxid1 = tuple([b for i, b in enumerate(op1._iaxid) if i not in op_ax1])
+        iaxid2 = tuple([b for i, b in enumerate(op2._iaxid) if i not in op_ax2])
+        iaxid2 = (None,) * len(iaxid1) + iaxid2
 
-        return op1, op2, op_ax1, op_ax2, isiax1, isiax2
+        return op1, op2, op_ax1, op_ax2, iaxid1, iaxid2
     
     @staticmethod
     def _einsum(subs, op1, op2):
@@ -588,12 +591,12 @@ class SparseNormal:
             the output operand."""
             
             for i, c in enumerate(insubs):
-                if op._isiax[i] and c not in outsubs:
+                if op._iaxid[i] and c not in outsubs:
                     raise ValueError("Contraction over an independence"
                                      f" axis ({i}).")
                 
-            isiax = op._isiax + (False,)  # Augments with a default.  
-            return tuple([isiax[insubs.find(c)] for c in outsubs])
+            iaxid = op._iaxid + (None,)  # Augments with a default.  
+            return tuple([iaxid[insubs.find(c)] for c in outsubs])
         
         op1 = assparsenormal(op1)
         op2 = assparsenormal(op2)
@@ -602,19 +605,19 @@ class SparseNormal:
         (insu1, insu2), outsu = einsubs.parse(subs, (op1.shape, op2.shape))
         subs = f"{insu1},{insu2}->{outsu}"
 
-        isiax1 = out_iaxes(op1, insu1, outsu)
-        isiax2 = out_iaxes(op2, insu2, outsu)
+        iaxid1 = out_iaxes(op1, insu1, outsu)
+        iaxid2 = out_iaxes(op2, insu2, outsu)
 
         if not _is_deterministic(op1):
             v = Normal._einsum(subs, op1.v, op2.v.mean())
-            w = SparseNormal(v, isiax1)
+            w = SparseNormal(v, iaxid1)
 
             if not _is_deterministic(op2):
                 w += SparseNormal._einsum(op1.mean(), (op2 - op2.mean()))
 
         elif not _is_deterministic(op2):
             v = Normal._einsum(subs, op1.v.mean(), op2.v)
-            w = SparseNormal(v, isiax2)
+            w = SparseNormal(v, iaxid2)
 
         else:
             w = np.einsum(op1.v.mean(), op2.v.mean())
@@ -634,7 +637,7 @@ class SparseNormal:
     # TODO: add a test that the doc strings are in sync with those of Normal --------------------
 
     def iid_copy(self):
-        return SparseNormal(self.v.iid_copy(), self._isiax)
+        return SparseNormal(self.v.iid_copy(), self._iaxid)
 
     def condition(self, observations, mask=None):  # TODO-----------------------------
         raise NotImplementedError
@@ -746,31 +749,68 @@ def _validate_iaxes(seq):
     are compatible and returns them.
     
     Returns:
-        (iaxes, ndim) of the final shape for the broadcasted arrays.
+        `iaxid` of the final shape for the broadcasted arrays.
     """
 
     ndim = max(x.ndim for x in seq)
-    iaxs = set((False,) * (ndim - x.ndim) + x._isiax 
-                for x in seq if not _is_deterministic(x))
+    iaxids = set((None,) * (ndim - x.ndim) + x._iaxid 
+                 for x in seq if not _is_deterministic(x))
     # Reversing is to account for broadcasting - the independence 
     # axes numbers counted from the beginning of the array may not be 
     # the same for broadcastable arrys. When counted from the end, 
     # the axes numbers must always be the same as broadcasting 
     # cannot add new independence axes. 
 
-    if len(iaxs) == 1:
-        return iaxs.pop()
-    elif len(iaxs) == 0:
-        return (False,) * ndim
+    if len(iaxids) == 1:
+        return iaxids.pop()
+    elif len(iaxids) == 0:
+        return (None,) * ndim
     
-    # len > 1
-    raise ValueError("Only sparse normals with identical independence "
-                     "axes can be combined in operations.")
+    # len > 1, which means that not all independence axes are identical. 
+    # Next determine if the problem is the number, location, or order
+    # of the axes, and show an appropriate error.
+
+    msg = ("Combining sparse normal variables requires them to have "
+           "the same numbers of independence axes at the same "
+           "positions in the shape and in the same order.")
+    max_disp = 10  # Maximum number of values to display.
+
+    ns = set((len(ids) - ids.count(None)) for ids in iaxids)
+    if len(ns) > 1:
+        if len(ns) < max_disp:
+            valstr = (": " + ", ".join(str(n) for n in ns))
+        else:
+            valstr = ""
+
+        raise ValueError("Incompatible numbers of the independence axes "
+                         f"of the operands{valstr}.\n{msg}")
+
+    get_iax_numbers = lambda ids: tuple([i for i, b in enumerate(ids) if b])
+    locs = set(get_iax_numbers(ids) for ids in iaxids)
+    if len(locs) > 1:
+        if len(ns) < max_disp:
+            valstr = (": " + ", ".join(str(loc) for loc in locs))
+        else:
+            valstr = ""
+        
+        raise ValueError("Incompatible locations of the independence axes "
+                         f"of the operands{valstr}.\n{msg}")
+
+    orders = set(tuple([ax for ax in ids if ax is not None]) for ids in iaxids)
+    assert len(orders) > 1
+
+    if len(ns) < max_disp:
+        valstr = (": " + ", ".join(str(order) for order in orders))
+    else:
+        valstr = ""
+
+    raise ValueError("Incompatible orders of the independence axes "
+                     f"of the operands{valstr}.\n{msg}")
 
 
 def _parse_index_key(x, key):
-    """Validates the key and calculates the numbers of the output axes 
-    for each input axis."""
+    """Validates the key and calculates the number of the input axis 
+    contributing to the given output axis."""
 
     if not isinstance(key, tuple):
         key = (key,)
@@ -830,7 +870,7 @@ def _parse_index_key(x, key):
         raise IndexError(f"Too many indices: the array is {x.ndim}-dimensional,"
                          f" but {used_dim} indices were given.")
     
-    for i, b in enumerate(x._isiax):
+    for i, b in enumerate(x._iaxid):
         if i not in out_axs:
             oi = -1
         else:
@@ -850,12 +890,12 @@ def _validate_iaxes_bilinear(op1, op2, op_axis1, op_axis2):
     if not isinstance(op_axis2, tuple):
         op_axis2 = (op_axis2,)
 
-    if any([op1._isiax[ax] for ax in op_axis1 if ax is not None]):
+    if any([op1._iaxid[ax] for ax in op_axis1 if ax is not None]):
         raise ValueError("Bilinear operations affecting "
                          "independence axes are not supported. "
                          f"Axes {op_axis1} of operand 1 are affected.")
     
-    if any([op2._isiax[ax] for ax in op_axis2 if ax is not None]):
+    if any([op2._iaxid[ax] for ax in op_axis2 if ax is not None]):
         raise ValueError("Bilinear operations affecting "
                          "independence axes are not supported. "
                          f"Axes {op_axis2} of operand 2 are affected.")
