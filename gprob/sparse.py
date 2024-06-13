@@ -651,6 +651,7 @@ class SparseNormal:
         return self.v.var()
 
     def cov(self):
+        # TODO: update the doc string ----------------------------------------------------------
         """Covariance. 
         
         For a vector variable `x` returns the matrix `C = <(x-<x>)(x-<x>)^H>`, 
@@ -661,14 +662,63 @@ class SparseNormal:
         `C[ijk... lmn...] = <(x[ijk..] - <x>) (x[lmn..] - <x>)*>`, 
         where the indices `ijk...` and `lmn...` run over the components of `x`,
         and `*` is complex conjugation.
+
+        diagonal(cov(x), axis1=x.iaxes[0], axis2=(x.ndim + x.iaxes[0]))
         """
-        raise NotImplementedError  # TODO-----------------------------------------------
+
+        symb = [einsubs.get_symbol(i) for i in range(2 * self.ndim + 1)]
+        elem_symb = symb[0]
+        out_symb = symb[1:]
+
+        in_symb1 = out_symb[:self.ndim]
+        in_symb2 = out_symb[self.ndim:]
+
+        for i in self.iaxes:
+            out_symb.remove(in_symb2[i])
+            out_symb.remove(in_symb1[i])
+            out_symb.append(in_symb1[i])
+
+            in_symb2[i] = in_symb1[i]
+        
+        # Adds the symbol for the summation over the latent variables.
+        in_symb1.insert(0, elem_symb)
+        in_symb2.insert(0, elem_symb)
+
+        subs = f"{"".join(in_symb1)},{"".join(in_symb2)}->{"".join(out_symb)}"
+        a = self.v.emap.a
+        return np.einsum(subs, a, a.conj())
+
     
     def sample(self, n=None):
         """Samples the random variable `n` times."""
         # n=None returns scalar output
 
-        raise NotImplementedError  # TODO-----------------------------------------------
+        # TODO: document the output shape ----------------------------------------------
+        
+        if n is None:
+            nsh = tuple()
+        else:
+            nsh = (n,)
+
+        iaxsh = [m for m, b in zip(self.shape, self._iaxid) if b]
+        r = np.random.normal(size=(*nsh, *iaxsh, a.shape[0]))
+
+        symb = [einsubs.get_symbol(i) for i in range(self.ndim + 1 + len(nsh))]
+        
+        elem_symb = symb[0]
+        out_symb = symb[1:]
+
+        in_symb1 = out_symb[:len(nsh)]
+        in_symb2 = symb[len(nsh):]
+
+        in_symb1.extend(in_symb2[i] for i in self.iaxes)
+        in_symb1.append(elem_symb)
+        
+        in_symb2.insert(0, elem_symb)
+
+        subs = f"{"".join(in_symb1)},{"".join(in_symb2)}->{"".join(out_symb)}"
+        a = self.v.emap.a
+        return np.einsum(subs, r, a) + self.mean()
         
 
     def logp(self, x):
