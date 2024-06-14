@@ -3,6 +3,7 @@ from numpy.exceptions import AxisError
 
 from .normal_ import Normal, asnormal, print_normal, broadcast_to
 from .external import einsubs
+from . import emaps
 
 
 def iid_repeat(x, nrep=1, axis=0):
@@ -485,8 +486,8 @@ class SparseNormal:
 
         mn = f"_{name}_get_axes"
 
-        op1, op2, op_axis1, op_axis2, iaxid1, iaxid2 = getattr(SparseNormal, mn)(op1, op2, *args, **kwargs)
-        _validate_iaxes_bilinear(op1, op2, op_axis1, op_axis2)
+        op1, op2, op_axes1, op_axes2, iaxid1, iaxid2 = getattr(SparseNormal, mn)(op1, op2, *args, **kwargs)
+        _validate_iaxes_bilinear(op1, op2, op_axes1, op_axes2)
 
         if not _is_deterministic(op1):
             v = Normal._bilinearfunc(name, op1.v, op2.v.mean(), *args, **kwargs)
@@ -543,20 +544,20 @@ class SparseNormal:
         op1 = op1.ravel()
         op2 = op2.ravel()
 
-        op_axis1 = None
-        op_axis2 = None
+        op_axes1 = tuple()
+        op_axes2 = tuple()
 
         iaxid1 = (True, False) if any(op1._iaxid) else (False, False)
         iaxid2 = (False, True) if any(op2._iaxid) else (False, False)
 
-        return op1, op2, op_axis1, op_axis2, iaxid1, iaxid2
+        return op1, op2, op_axes1, op_axes2, iaxid1, iaxid2
 
     @staticmethod
     def _kron_get_axes(op1, op2):
         ndim = max(op1.ndim, op2.ndim)
 
-        op_axis1 = None
-        op_axis2 = None
+        op_axes1 = tuple()
+        op_axes2 = tuple()
         
         d1 = ndim - op1.ndim
         d2 = ndim - op2.ndim
@@ -564,7 +565,7 @@ class SparseNormal:
         iaxid1 = (None,) * d1 + op1._iaxid
         iaxid2 = (None,) * d2 + op2._iaxid
 
-        return op1, op2, op_axis1, op_axis2, iaxid1, iaxid2
+        return op1, op2, op_axes1, op_axes2, iaxid1, iaxid2
 
     @staticmethod
     def _tensordot_get_axes(op1, op2, axes=2):
@@ -700,6 +701,8 @@ class SparseNormal:
         else:
             nsh = (n,)
 
+        a = self.v.emap.a
+
         iaxsh = [m for m, b in zip(self.shape, self._iaxid) if b]
         r = np.random.normal(size=(*nsh, *iaxsh, a.shape[0]))
 
@@ -709,15 +712,14 @@ class SparseNormal:
         out_symb = symb[1:]
 
         in_symb1 = out_symb[:len(nsh)]
-        in_symb2 = symb[len(nsh):]
+        in_symb2 = out_symb[len(nsh):]
 
         in_symb1.extend(in_symb2[i] for i in self.iaxes)
         in_symb1.append(elem_symb)
-        
+
         in_symb2.insert(0, elem_symb)
 
         subs = f"{"".join(in_symb1)},{"".join(in_symb2)}->{"".join(out_symb)}"
-        a = self.v.emap.a
         return np.einsum(subs, r, a) + self.mean()
         
 
@@ -933,19 +935,73 @@ def _parse_index_key(x, key):
     return out_axs
 
 
-def _validate_iaxes_bilinear(op1, op2, op_axis1, op_axis2):
-    if not isinstance(op_axis1, tuple):
-        op_axis1 = (op_axis1,)
+def _validate_iaxes_bilinear(op1, op2, op_axes1, op_axes2):
+    if not isinstance(op_axes1, tuple):
+        op_axes1 = (op_axes1,)
 
-    if not isinstance(op_axis2, tuple):
-        op_axis2 = (op_axis2,)
+    if not isinstance(op_axes2, tuple):
+        op_axes2 = (op_axes2,)
 
-    if any([op1._iaxid[ax] for ax in op_axis1 if ax is not None]):
+    if any([op1._iaxid[ax] for ax in op_axes1]):
         raise ValueError("Bilinear operations affecting "
                          "independence axes are not supported. "
-                         f"Axes {op_axis1} of operand 1 are affected.")
+                         f"Axes {op_axes1} of operand 1 are affected.")
     
-    if any([op2._iaxid[ax] for ax in op_axis2 if ax is not None]):
+    if any([op2._iaxid[ax] for ax in op_axes2]):
         raise ValueError("Bilinear operations affecting "
                          "independence axes are not supported. "
-                         f"Axes {op_axis2} of operand 2 are affected.")
+                         f"Axes {op_axes2} of operand 2 are affected.")
+    
+
+def cov(*args):
+    args = [assparsenormal(arg) for arg in args]
+
+    if len(args) == 1:
+        return args[0].cov()
+
+    # For the case len(args) == 2.
+    x, y = args
+
+    if _is_deterministic(x) or _is_deterministic(y):
+        # If either x or y is deterministic, their independence axes are not
+        # checked, but a zero result is returned anyway. 
+
+        dt = np.result_type(x.v.a, y.v.a)
+        return np.zeros(x.shape + y.shape, dtype=dt)
+
+    iax_ord_x = [i for i in x._iaxid if i is not None]
+    iax_ord_y = [i for i in y._iaxid if i is not None]
+
+    if len(iax_ord_x) != len(iax_ord_y):
+        raise ValueError("The numbers of the independence axes "
+                         "must coincide for the two operands. "
+                         f"Now operand 1 has {len(iax_ord_x)} axes, "
+                         f"while operand 2 has {len(iax_ord_y)}.")
+    
+    if iax_ord_x != iax_ord_y:
+        raise ValueError("The orders of the independence axes "
+                         "must coincide for the two operands. "
+                         f"Now operand 1 has the order {iax_ord_x}, "
+                         f"while operand 2 has the order {iax_ord_y}.")
+
+    symb = [einsubs.get_symbol(i) for i in range(x.ndim + y.ndim + 1)]
+    elem_symb = symb[0]
+    out_symb = symb[1:]
+
+    in_symb1 = out_symb[:x.ndim]
+    in_symb2 = out_symb[x.ndim:]
+
+    for i, j in zip(x.iaxes, y.iaxes):
+        out_symb.remove(in_symb2[j])
+        out_symb.remove(in_symb1[i])
+        out_symb.append(in_symb1[i])
+
+        in_symb2[j] = in_symb1[i]
+    
+    # Adds the symbol for the summation over the latent variables.
+    in_symb1.insert(0, elem_symb)
+    in_symb2.insert(0, elem_symb)
+    
+    subs = f"{"".join(in_symb1)},{"".join(in_symb2)}->{"".join(out_symb)}"
+    ax, ay = [em.a for em in emaps.complete([x.v.emap, y.v.emap])]
+    return np.einsum(subs, ax, ay.conj())

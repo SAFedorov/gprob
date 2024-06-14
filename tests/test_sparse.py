@@ -219,6 +219,101 @@ def test_broadcasting():
     assert (v1 ** v2).iaxes == (1,)
 
 
+def test_cov():
+    tol = 1e-10
+
+    nv = random_normal((2, 3))
+    v = iid_repeat(iid_repeat(nv, 4, axis=1), 5, axis=-1)
+    # shape (2, 4, 3, 5), iaxes (1, 3)
+
+    r1 = np.random.rand(1, 4, 1, 1)
+    r2 = np.random.rand(1, 1, 1, 5)
+
+    v1 = r1 * r2 * v
+
+    # A dense Normal variable with the same statistics.
+    v2 = gp.stack([nv.iid_copy() for _ in range(4)], axis=1)
+    v2 = gp.stack([v2.iid_copy() for _ in range(5)], axis=-1)
+
+    v2 = r1 * r2 * v2
+
+    c1 = v1.cov()
+    c2 = v2.cov()
+    c2 = np.diagonal(c2, axis1=1, axis2=5)
+    c2 = np.diagonal(c2, axis1=2, axis2=5)
+    assert c2.shape == c1.shape
+    assert np.max(np.abs(c1 - c2)) < tol
+    
+    # Covariance betveen two variables.
+
+    n = 20
+    v1 = iid_repeat(normal(), n)
+    v2 = iid_repeat(normal(), n)
+    v = v1 + v2
+
+    r1 = 2 * np.random.rand(n) - 1
+    r2 = 2 * np.random.rand(n) - 1
+
+    c1 = 2 * gp.sparse.cov(v * r1, v1 * r2)
+    c2 = (v * r1 + v1 * r2).var() - (r1 ** 2) * v.var() - (r2 ** 2) * v1.var()
+    assert c1.shape == c2.shape
+    assert np.max(np.abs(c1 - c2)) < tol
+
+    v1_ = normal(size=(n,))
+    v2_ = normal(size=(n,))
+    v_ = v1_ + v2_
+
+    c1_ = np.diagonal(2 * gp.normal_.cov(v_ * r1, v1_ * r2))
+    assert c1.shape == c1_.shape
+    assert np.max(np.abs(c1 - c1_)) < tol
+
+    v = iid_repeat(iid_repeat(normal(), 4), 4)
+    with pytest.raises(ValueError):
+        gp.sparse.cov(v, v.T)
+    with pytest.raises(ValueError):
+        gp.sparse.cov(v, iid_repeat(normal((4,)), 4))
+
+    # Deterministic constants should work.
+    c = gp.sparse.cov(v, 1)
+    assert c.shape == v.shape
+    assert np.max(np.abs(c - np.zeros(v.shape))) < tol
+
+    r = np.random.rand(2, 3)
+    c = gp.sparse.cov(v, r)
+    assert c.shape == v.shape + r.shape
+    assert np.max(np.abs(c - np.zeros(v.shape + r.shape))) < tol
+
+    c = gp.sparse.cov(r, v)  # Changing the order.
+    assert c.shape == r.shape + v.shape
+    assert np.max(np.abs(c - np.zeros(r.shape + v.shape))) < tol
+
+
+def test_sample():
+    v = assparsenormal(1)
+    assert v.sample().shape == v.shape
+    assert v.sample(1).shape == (1,) + v.shape
+
+    v1 = iid_repeat(iid_repeat(random_normal((2, 3)), 4, axis=1), 5, axis=-1)
+    v2 = iid_repeat(iid_repeat(random_normal((2, 3)), 4, axis=1), 5, axis=-1)
+    v = 0.5 * v1 - v2
+    # shape (2, 4, 3, 5), iaxes (1, 3)
+
+    assert v.sample().shape == v.shape
+    assert v.sample(1).shape == (1,) + v.shape
+
+    ns = 10000
+    s = v.sample(ns)
+    assert len(s) == ns
+
+    m = np.sum(s, axis=0) / ns
+    vv = np.sum(s ** 2, axis=0) / ns
+
+    tol = 0.03
+    assert m.shape == v.mean().shape
+    assert np.mean(np.abs(m - v.mean())) / np.max(np.abs(v.mean())) < tol
+    assert np.mean((vv - v.var())**2) / np.max(v.var()**2) < tol
+
+
 def test_cumsum():
     v = iid_repeat(iid_repeat(normal(size=(4, 5)), 2, axis=1), 3, axis=1)
     # v.shape is (4, 3, 2, 5), v.iaxes are (1, 2)
