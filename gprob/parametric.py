@@ -3,7 +3,7 @@ import numpy as np
 import jax
 from jax import numpy as jnp
 
-from .normal_ import Normal
+from .normal_ import Normal, validate_logp_samples
 from .emaps import complete, ElementaryMap
 from .func import logp, dlogp, fisher
 
@@ -171,13 +171,10 @@ class ParametricNormal:
         a = self.a(p)
 
         x = np.asanyarray(x)
-        if m.ndim > 1:
-            # Flattens the sample values.
+        validate_logp_samples(m, x)
 
-            if x.ndim == m.ndim:
-                x = x.reshape((x.size,))
-            else:
-                x = x.reshape((x.shape[0], -1))
+        # Flattens the sample values.
+        x = x.reshape(x.shape[0: (x.ndim - m.ndim)] + (m.size,))
 
         m = m.ravel()
         a = a.reshape((a.shape[0], -1))
@@ -187,6 +184,8 @@ class ParametricNormal:
             x = np.hstack([x.real, x.imag])
             m = np.hstack([m.real, m.imag])
             a = np.hstack([a.real, a.imag])
+        elif np.iscomplexobj(x):
+            x = x.astype(x.real.dtype)  # Casts to real with throwing a warning.
         
         cov = a.T @ a 
         return logp(x, m, cov)

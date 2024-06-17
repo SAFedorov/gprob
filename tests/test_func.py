@@ -250,7 +250,10 @@ def test_logp_batch():
     assert logp(0, m, cov) == nc
     assert (logp([0], m, cov) == np.array([nc])).all()
     assert (logp([0, 0], m, cov) == np.array([nc, nc])).all()
-    assert (logp([[0], [0]], m, cov) == np.array([nc, nc])).all()
+    
+    with pytest.raises(ValueError): 
+        logp([[0], [0]], m, cov)
+    
     assert logp(2, m, cov) == -4/2 + nc
     assert (logp([0, 1.1], m, cov) == [nc, -1.1**2/2 + nc]).all()
 

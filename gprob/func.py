@@ -122,9 +122,9 @@ def logp(x, m, cov):
         x: The sample(s) at which the likelihood is evaluated. Should be a 
             scalar or an array with the shape (ns,), (n,) or (ns, n), where ns 
             is the number of samples and n is the dimension of the distribution.
-        m: The mean vector of the distribution. A scalar or an (n,) array.
-        cov: The covariance matrix of the distribution, a scalar or a (n, n) 
-            2d array.
+        m: The mean of the distribution. A scalar or a (n,) - shaped array.
+        cov: The covariance of the distribution, a scalar or a (n, n) -
+            shaped 2d array.
         
     Returns:
         The value of logp, or an array of values for each of the input samples.
@@ -132,19 +132,26 @@ def logp(x, m, cov):
 
     x = np.asanyarray(x)
     m = np.asanyarray(m)
-
-    dd = 1 if m.ndim == 0 else len(m)  # distribution dimension
-
-    if dd == 1:
-        sd = 1 if x.ndim <= 1 else x.shape[-1]  # sample dimension
+    
+    # Determines the sample size.
+    if x.ndim == m.ndim:
+        ssz = x.size
+    elif x.ndim == m.ndim + 1:
+        ssz = 1 if x.ndim == 1 else x.shape[-1]
     else:
-        sd = 1 if x.ndim == 0 else x.shape[-1]
+        raise ValueError(f"The sample array must have {m.ndim} or {m.ndim+1} "
+                         f"dimensions to be compatible with the {m.ndim}-"
+                         f"dimensional mean, while now it has {x.ndim} "
+                         "dimensions.")
     
-    if sd != dd:
-        raise ValueError(f"The dimension of the sample vector ({sd}) does not "
-                         f"match the dimension of the distribution ({dd}).")
+    if ssz != m.size:
+        raise ValueError(f"The size of the sample vector ({ssz}) does not "
+                         f"match the size of the distribution ({m.size}).")
     
-    if dd == 1:
+    if m.size == 1:
+        x = x.reshape(x.shape[:x.ndim - m.ndim])
+        m = m.item()
+        cov = cov.item()
         return logp_sc(x, m, cov)
     
     try:

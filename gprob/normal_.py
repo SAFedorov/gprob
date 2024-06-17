@@ -5,8 +5,7 @@ from numpy.linalg import LinAlgError
 
 from . import emaps
 from .emaps import ElementaryMap
-
-from .func import logp, condition
+from . import func
 
 
 class Normal:
@@ -461,7 +460,7 @@ class Normal:
                 mask = np.stack([mask, mask], axis=-2)
                 mask = mask.reshape(-1, mask.shape[-1])
 
-        new_b, new_a = condition(m, a, mc, ac, mask)
+        new_b, new_a = func.condition(m, a, mc, ac, mask)
 
         if self.iscomplex:
             # Converting back to complex.
@@ -527,13 +526,10 @@ class Normal:
         """
         
         x = np.asanyarray(x)
-        if self.ndim > 1:
-            # Flattens the sample values.
+        validate_logp_samples(self, x)
 
-            if x.ndim == self.ndim:
-                x = x.reshape((x.size,))
-            else:
-                x = x.reshape((x.shape[0], -1))
+        # Flattens the sample values.
+        x = x.reshape(x.shape[0: (x.ndim - self.ndim)] + (self.size,))
 
         m = self.b.ravel()
         a = self.emap.a2d
@@ -542,9 +538,11 @@ class Normal:
             x = np.hstack([x.real, x.imag])
             m = np.hstack([m.real, m.imag])
             a = np.hstack([a.real, a.imag])
+        elif np.iscomplexobj(x):
+            x = x.astype(x.real.dtype)  # Casts to real with throwing a warning.
         
         cov = a.T @ a 
-        return logp(x, m, cov)
+        return func.logp(x, m, cov)
 
 
 def print_normal(x, extra_attrs=tuple()):
@@ -575,6 +573,17 @@ def print_normal(x, extra_attrs=tuple()):
         lines.extend(" " * len(h) + l for l in addln[1:])
     
     return "\n".join([f"{csn}(", *lines, ")"])
+
+
+def validate_logp_samples(v, x):
+    if x.shape != v.shape and x.shape[1:] != v.shape:
+        if x.ndim > v.ndim:
+            s = f"The the shape of the array of samples {x.shape}"
+        else:
+            s = f"The the sample shape {x.shape}"
+
+        raise ValueError(f"{s} is not consistent "
+                            f"with the variable shape {v.shape}.")
 
 
 NUMERIC_ARRAY_KINDS = {"b", "i", "u", "f", "c"}
@@ -630,7 +639,7 @@ def normal(mu=0., sigmasq=1., size=None):
     """Creates a new normal random variable.
     
     Args:
-        mu: Scalar or array mean value.
+        mu: Scalar mean value or an array of mean values.
         sigmasq: Scalar variance or matrix covariance.
         size (optional): Integer or sequence of integers specifying the shape 
             of the variable. Only has an effect with scalar mean and variance. 

@@ -1,6 +1,8 @@
 import pytest
 import numpy as np
-from gprob import (exp, exp2, log, log2, log10, sqrt, cbrt, sin, cos, 
+from numpy.exceptions import ComplexWarning
+from gprob import (normal,
+                   exp, exp2, log, log2, log10, sqrt, cbrt, sin, cos, 
                    tan, arcsin, arccos, arctan, sinh, cosh, tanh, 
                    arcsinh, arccosh, arctanh, conjugate, conj)
 from gprob import pnormal
@@ -76,6 +78,11 @@ def test_parametric_methods():
         x = np.random.rand(3, 1)
 
         call_methods(vp, p0, x)
+
+    vp = pnormal(lambda p, v: p[0] * v + p[1], normal())
+    p0 = [1., 2.]
+    with pytest.warns(ComplexWarning):
+        vp.logp(p0, 1+0.j)
 
 
 @pytest.mark.skipif(not have_jax, reason="jax is not installed")

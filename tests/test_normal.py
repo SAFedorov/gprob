@@ -2,6 +2,7 @@ import pytest
 import numpy as np
 from scipy.stats import multivariate_normal as mvn
 from numpy.linalg import LinAlgError
+from numpy.exceptions import ComplexWarning
 from gprob.normal_ import (normal, hstack, vstack, Normal, broadcast_to,
                            asnormal, safer_cholesky, cov, cov)
 from utils import random_normal, random_correlate
@@ -233,7 +234,25 @@ def test_properties():
 
     v = random_normal((3, 4))
     for pn in prop_names:
-        assert getattr(v, pn) == getattr(v.b, pn)
+        assert getattr(v, pn) == getattr(v.mean(), pn)
+
+    # Checks the complex flag.
+
+    v = normal(1, 2.)
+    assert v.iscomplex == False
+
+    v = normal(1 + 2j, 2.)
+    assert v.iscomplex == True
+
+    v = normal(1, 2.) + 1j * normal(size=(2, 2))
+    assert v.iscomplex == True
+
+    # either a or b need to be complex, not both
+    v.b = v.b.real
+    assert v.iscomplex == True
+
+    v.emap.a = v.emap.a.real
+    assert v.iscomplex == False
 
 
 def test_repr():
@@ -253,17 +272,25 @@ def test_logp():
     
     # Scalar variables
     xi = normal()
+    assert xi.logp(0).shape == tuple()
     assert xi.logp(0) == nc
     assert xi.logp(1.1) == -1.1**2/2 + nc
 
+    assert xi.logp([0]).shape == (1,)
+    assert xi.logp([0]) == nc
+
     xi = normal(0.9, 3.3)
+    assert xi.logp(2).shape == tuple()
     assert xi.logp(2) == (-(2-0.9)**2/(2 * 3.3) 
                           + np.log(1/np.sqrt(2 * np.pi * 3.3)))
 
     # Vector variables
     xi = normal(0.9, 3.3, size=2)
+    assert xi.logp([2, 1]).shape == tuple()
     assert xi.logp([2, 1]) == (-(2-0.9)**2/(2 * 3.3)-(1-0.9)**2/(2 * 3.3) 
                                + 2 * np.log(1/np.sqrt(2 * np.pi * 3.3)))
+    
+    assert xi.logp(np.random.rand(3, 2)).shape == (3,)
 
     xi = normal(0.9, 3.3, size=2)
     with pytest.raises(ValueError):
@@ -272,6 +299,8 @@ def test_logp():
         xi.logp([0, 0, 0])
     with pytest.raises(ValueError):
         xi.logp([[0], [0]])
+    with pytest.raises(ValueError):
+        xi.logp([[[0, 2], [0, 2]]])  # Too many dimensions.
 
     # A higher-dimensional variable.
     sh = (3, 5)
@@ -295,11 +324,17 @@ def test_logp():
     assert (0 * normal()).logp(0.) > float("-inf")
     assert (0 * normal()).logp(0.1) == float("-inf")
 
+    assert (0 * normal()).logp(0.).shape == tuple()
+    assert (0 * normal()).logp([0., 0.1]).shape == (2,)
+
     # Deterministic variables.
     xi = hstack([normal(), 1])
     assert xi.logp([0, 1.1]) == float("-inf")
     assert xi.logp([0, 1.]) == nc
     assert xi.logp([10.2, 1.]) == -(10.2)**2/(2) + nc
+
+    assert xi.logp([0, 1.]).shape == tuple()
+    assert xi.logp([[0, 1.1], [0, 1.]]).shape == (2,)
     
     # Degenerate covariance matrix. 
     xi1 = normal()
@@ -308,13 +343,16 @@ def test_logp():
     assert xi12.logp([1.2, 0]) == -(1.2)**2/(2) + nc
     assert xi12.logp([1.2, 0.1]) == float("-inf")
 
-    # Higher-dimensional example.
+    # A higher-dimensional example.
     xi1 = normal([[0.1, 0.2], [0.3, 0.4]], 2)
     xi2 = normal([0.1, 0.2, 0.3, 0.4], 2)
     assert np.abs(xi1.logp(np.ones((2, 2))) - xi2.logp(np.ones((4,)))) < tol
     assert np.abs(xi1.logp([np.ones((2, 2)), 0.5 * np.ones((2, 2))]) 
                   - xi2.logp([np.ones((4,)), 0.5 * np.ones((4,))])).max() < tol
     
+    assert xi1.logp(np.ones((2, 2))).shape == tuple()
+    assert xi1.logp(np.ones((1, 2, 2))).shape == (1,)
+
     # More degenerate cases.
 
     tol_ = 1e-7
@@ -381,6 +419,24 @@ def test_complex_logp():
         return -dx.conj() @ pci @ dx + np.real(dx @ rmat.T @ pci @ dx) - norm
 
     tol = 1e-8
+
+    xi = normal() + 1j * normal()
+    xi2 = normal(size=2)
+    assert np.abs(xi.logp(0.1 - 1j * 0.2) - xi2.logp([0.1, -0.2])) < tol
+    assert xi.logp(0.1 - 1j * 0.2).shape == tuple()
+    assert xi.logp([0.1 - 1j * 0.2]).shape == (1,)
+
+    with pytest.warns(ComplexWarning):
+        normal().logp(1+0.j)
+    with pytest.warns(ComplexWarning):
+        normal().logp([1+0.j])
+
+    xi = normal(size=2) + 1j * normal(size=2)
+    xi2 = normal(size=4)
+    sa = [0.1 - 1j * 0.2, 0.3 + 1j * 0.6]
+    assert np.abs(xi.logp(sa) - xi2.logp([0.1, -0.2, 0.3, 0.6])) < tol
+    assert xi.logp(sa).shape == tuple()
+    assert xi.logp([sa]).shape == (1,)
 
     sh = (6,)
     xi = random_normal(sh, dtype=np.complex128)
