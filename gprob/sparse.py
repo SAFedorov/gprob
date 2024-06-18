@@ -1,7 +1,10 @@
 import numpy as np
 from numpy.exceptions import AxisError
+from functools import reduce
+from operator import mul
 
-from .normal_ import Normal, asnormal, print_normal, broadcast_to
+from .normal_ import (Normal, asnormal, print_normal, broadcast_to, 
+                      validate_logp_samples)
 from .external import einsubs
 from . import emaps
 
@@ -655,16 +658,18 @@ class SparseNormal:
         # TODO: update the doc string ----------------------------------------------------------
         """Covariance. 
         
-        For a vector variable `x` returns the matrix `C = <(x-<x>)(x-<x>)^H>`, 
-        where `H` is conjugate transpose.
-
-        For a general array `x` returns the array `C` with twice the number of 
-        dimensions of `x` and the components
+        While the covariance `C` for a dense variable have twice the number of 
+        dimensions of the variable,
         `C[ijk... lmn...] = <(x[ijk..] - <x>) (x[lmn..] - <x>)*>`, 
-        where the indices `ijk...` and `lmn...` run over the components of `x`,
-        and `*` is complex conjugation.
+        where the indices `ijk...` and `lmn...` run over the components 
+        of the variable, and `*` is complex conjugation,
+        the covariance for a sparse variable only contains the diagonals of
+        the independence axes, which are appended to the end of the array.
+        For one independence axis, this amounts to taking the diagonal as
+        
+        `np.diagonal(C, axis1=x.iaxes[0], axis2=(x.ndim + x.iaxes[0]))`,
 
-        diagonal(cov(x), axis1=x.iaxes[0], axis2=(x.ndim + x.iaxes[0]))
+        where `C` is the dense covariance.
         """
 
         symb = [einsubs.get_symbol(i) for i in range(2 * self.ndim + 1)]
@@ -734,7 +739,63 @@ class SparseNormal:
             a single number for single sample inputs, and an array for sequence 
             inputs.
         """
-        raise NotImplementedError  # TODO-----------------------------------------------
+
+        delta_x = x - self.mean()
+        validate_logp_samples(self, delta_x)
+
+        if self.iscomplex:
+            delta_x = np.hstack([delta_x.real, delta_x.imag])
+            self = SparseNormal._stack([self.real, self.imag])
+        elif np.iscomplexobj(delta_x):
+            # Casts to real with a warning.
+            delta_x = delta_x.astype(delta_x.real.dtype)
+
+        niax = len(self._iaxid) - self._iaxid.count(None)
+        
+        if self.ndim == niax:
+            # Scalar dense subspace.
+
+            sigmasq = np.einsum("i..., i... -> ...", self.v.a, self.v.a)
+            llk = -0.5 * (delta_x**2 / sigmasq + np.log(2 * np.pi * sigmasq))
+            return np.sum(llk, axis=tuple(range(-self.ndim, 0)))
+        
+        # In the remaining, the dimensionality of the dense subspace is >= 1.
+
+        batch_ndim = x.ndim - self.ndim
+
+        # Moves the sparse axes to the beginning and the batch axis to the end.
+        sparse_ax = [i + batch_ndim for i, b in enumerate(self._iaxid) if b]
+        dense_ax = [i + batch_ndim for i, b in enumerate(self._iaxid) if not b]
+
+        if batch_ndim:
+            dense_ax.append(0)
+
+        delta_x = delta_x.transpose(tuple(sparse_ax + dense_ax))
+
+        # Covariance with the sparse axes first.
+        cov = self.cov()
+        t = tuple(range(cov.ndim))        
+        cov = cov.transpose(t[cov.ndim - niax:] + t[:cov.ndim - niax])
+
+        # Flattens the dense subspace.
+        dense_sh = [n for n, i in zip(self.shape, self._iaxid) if not i]
+        dense_sz = reduce(mul, dense_sh, 1)
+
+        cov = cov.reshape(cov.shape[:niax] + (dense_sz, dense_sz))
+
+        new_x_sh = delta_x.shape[:niax] + (dense_sz,) + (len(x),) * batch_ndim
+        delta_x = delta_x.reshape(new_x_sh)
+
+        ltr = np.linalg.cholesky(cov)
+        z = np.linalg.solve(ltr, delta_x)
+        
+        sparse_sz = self.size // dense_sz
+        rank = cov.shape[-1] * sparse_sz  # The rank is full.
+        log_sqrt_det = np.sum(np.log(np.diagonal(ltr, axis1=-1, axis2=-2)))
+        norm = 0.5 * np.log(2 * np.pi) * rank + log_sqrt_det
+
+        idx = "".join([einsubs.get_symbol(i) for i in range(niax + 1)])
+        return -0.5 * np.einsum(f"{idx}..., {idx}... -> ...", z, z) - norm
 
 
 def _is_deterministic(x):

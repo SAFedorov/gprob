@@ -1,6 +1,8 @@
 import pytest
+import itertools
 import numpy as np
 from numpy.exceptions import AxisError
+from numpy.exceptions import ComplexWarning
 
 import gprob as gp
 from gprob.normal_ import normal
@@ -345,6 +347,153 @@ def test_cumsum():
         v.cumsum(axis=44)
     with pytest.raises(AxisError):
         v.cumsum(axis=-5)
+
+
+def test_logp():
+    tol = 1e-10
+
+    def check_sparse_vs_normal(snv, nv, x):
+        x = np.asanyarray(x)
+        logp2 = nv.logp(x)
+        tol_ = tol * nv.size
+
+        # Checks all permutations of axes.
+        for ax in itertools.permutations(tuple(range(-nv.ndim, 0))):
+            snv_ = snv.transpose(ax)
+            x_ = x.transpose((0,) * (x.ndim - nv.ndim) + ax)
+
+            logp1 = snv_.logp(x_)
+            assert logp1.shape == logp2.shape
+            assert np.max(np.abs(1 - logp1/logp2)) < tol_
+
+    # Trivial cases first - no independence axes.
+
+    nv = normal(0.2, 3.4)
+    snv = assparsenormal(nv)
+    check_sparse_vs_normal(snv, nv, 1.9)
+    check_sparse_vs_normal(snv, nv, [0.5, 1.9, -4.1])
+
+    nv = random_normal((3,))
+    snv = assparsenormal(nv)
+    x = 2 * np.random.rand(2, 3) - 1
+    check_sparse_vs_normal(snv, nv, x[0])
+    check_sparse_vs_normal(snv, nv, x)
+
+    nv = random_normal((3, 2))
+    snv = assparsenormal(nv)
+    x = 2 * np.random.rand(4, 3, 2) - 1
+    check_sparse_vs_normal(snv, nv, x[0])
+    check_sparse_vs_normal(snv, nv, x)
+
+    # One independence axis.
+
+    # Scalar dense subspace.
+    sz = 4
+    rs = 2 * np.random.rand(sz) - 1
+    ro = 2 * np.random.rand(sz) - 1
+    nv = gp.stack([o + s * normal() for o, s in zip(ro, rs)])
+    snv = ro + rs * iid_repeat(normal(), sz)
+    x = 2 * np.random.rand(3, sz) - 1
+    check_sparse_vs_normal(snv, nv, x[0])
+    check_sparse_vs_normal(snv, nv, x)
+
+    # 1D dense subspace.
+    sparse_sz = 4
+    dense_sz = 3
+    rs = 2 * np.random.rand(sparse_sz, dense_sz) - 1
+    ro = 2 * np.random.rand(sparse_sz, dense_sz) - 1
+    rv = random_normal((dense_sz,))
+    nv = gp.stack([o + s * rv.iid_copy() for o, s in zip(ro, rs)])
+    snv = ro + rs * iid_repeat(rv, sparse_sz)
+    x = 2 * np.random.rand(2, sparse_sz, dense_sz) - 1
+    check_sparse_vs_normal(snv, nv, x[0])
+    check_sparse_vs_normal(snv, nv, x)
+
+    # 1D dense subspace, swap axes.
+    sparse_sz = 4
+    dense_sz = 3
+    nv = gp.stack([o + s * rv.iid_copy() for o, s in zip(ro, rs)], axis=1)
+    snv = ro.T + rs.T * iid_repeat(rv, sparse_sz, axis=1)
+    x = 2 * np.random.rand(2, dense_sz, sparse_sz) - 1
+    check_sparse_vs_normal(snv, nv, x[0])
+    check_sparse_vs_normal(snv, nv, x)
+
+    # 2D dense subspace.
+    sparse_sz = 4
+    dense_sz = (3, 5)
+    rs = 2 * np.random.rand(sparse_sz, *dense_sz) - 1
+    ro = 2 * np.random.rand(sparse_sz, *dense_sz) - 1
+    rv = random_normal(dense_sz)
+    nv = gp.stack([o + s * rv.iid_copy() for o, s in zip(ro, rs)])
+    snv = ro + rs * iid_repeat(rv, sparse_sz)
+    x = 2 * np.random.rand(2, sparse_sz, *dense_sz) - 1
+    check_sparse_vs_normal(snv, nv, x[0])
+    check_sparse_vs_normal(snv, nv, x)
+
+    # Two independence axes.
+
+    # Scalar dense subspace.
+    rs = 2 * np.random.rand(3, 4) - 1
+    ro = 2 * np.random.rand(3, 4) - 1
+    nv = ro + rs * normal(size=(3, 4))
+    snv = ro + rs * iid_repeat(iid_repeat(normal(), 4), 3)
+    x = 2 * np.random.rand(2, 3, 4) - 1
+    check_sparse_vs_normal(snv, nv, x[0])
+    check_sparse_vs_normal(snv, nv, x)
+
+    # 1D dense subspace.
+    rs = 2 * np.random.rand(3, 4, 5) - 1
+    ro = 2 * np.random.rand(3, 4, 5) - 1
+    rv = random_normal((5,))
+    nv = gp.stack([rv.iid_copy() for _ in range(4)])
+    nv = gp.stack([nv.iid_copy() for _ in range(3)])    
+    nv = ro + rs * nv
+    snv = ro + rs * iid_repeat(iid_repeat(rv, 4), 3)
+    x = 2 * np.random.rand(2, 3, 4, 5) - 1
+    check_sparse_vs_normal(snv, nv, x[0])
+    check_sparse_vs_normal(snv, nv, x)
+
+    # 2D dense subspace.
+    rs = 2 * np.random.rand(3, 4, 5, 2) - 1
+    ro = 2 * np.random.rand(3, 4, 5, 2) - 1
+    rv = random_normal((5, 2))
+    nv = gp.stack([rv.iid_copy() for _ in range(4)])
+    nv = gp.stack([nv.iid_copy() for _ in range(3)])    
+    nv = ro + rs * nv
+    snv = ro + rs * iid_repeat(iid_repeat(rv, 4), 3)
+    x = 2 * np.random.rand(2, 3, 4, 5, 2) - 1
+    check_sparse_vs_normal(snv, nv, x[0])
+    check_sparse_vs_normal(snv, nv, x)
+
+    # Three independence axes.
+
+    # Scalar dense subspace.
+    rs = 2 * np.random.rand(3, 4, 5) - 1
+    ro = 2 * np.random.rand(3, 4, 5) - 1
+    nv = ro + rs * normal(size=(3, 4, 5))
+    snv = ro + rs * iid_repeat(iid_repeat(iid_repeat(normal(), 5), 4), 3)
+    x = 2 * np.random.rand(2, 3, 4, 5) - 1
+    check_sparse_vs_normal(snv, nv, x[0])
+    check_sparse_vs_normal(snv, nv, x)
+
+    # 1D dense subspace.
+    rs = 2 * np.random.rand(3, 4, 5, 2) - 1
+    ro = 2 * np.random.rand(3, 4, 5, 2) - 1
+    rv = random_normal((2,))
+    nv = gp.stack([rv.iid_copy() for _ in range(5)])
+    nv = gp.stack([nv.iid_copy() for _ in range(4)])
+    nv = gp.stack([nv.iid_copy() for _ in range(3)])    
+    nv = ro + rs * nv
+    snv = ro + rs * iid_repeat(iid_repeat(iid_repeat(rv, 5), 4), 3)
+    x = 2 * np.random.rand(2, 3, 4, 5, 2) - 1
+    check_sparse_vs_normal(snv, nv, x[0])
+    check_sparse_vs_normal(snv, nv, x)
+
+    with pytest.warns(ComplexWarning):
+        iid_repeat(normal(), 1).logp([1+0.j])
+
+    with pytest.raises(ValueError):
+        iid_repeat(normal(), 1).logp([[[1]]])  # Too high dimension of x.
 
 
 def test_diagonal():
