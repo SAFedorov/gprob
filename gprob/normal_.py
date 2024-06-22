@@ -415,16 +415,18 @@ class Normal:
         else:
             obs = [asnormal(observations)]
 
-        vr = []
-        for x in obs + [self]:
-            if x.iscomplex:
-                # Doubles the dimension preserving the triangular structure.
-                x = stack([x.real, x.imag], axis=-1)
+        if self.iscomplex:
+            # Doubles the dimension preserving the triangular structure.
+            self_r = stack([self.real, self.imag], axis=-1)
+        else:
+            self_r = self
 
-            vr.append(x)
-
-        self_r = vr.pop()
-        obs_r = vr
+        obs_r = []
+        for c in obs:
+            if c.iscomplex:
+                obs_r.extend([c.real, c.imag])
+            else:
+                obs_r.append(c)
 
         if mask is None:
             cond = concatenate([c.ravel() for c in obs_r])

@@ -452,7 +452,7 @@ def concatenate(emaps, vaxis=0):
 
         return ElementaryMap(cat_a, union_elem)
     
-    # The rest is an optimization for the case of two operands.
+    # The rest is an optimization for the general case of two operands.
     op1, op2 = emaps
 
     # Indices along the variable dimension.
@@ -503,7 +503,7 @@ def stack(emaps, vaxis=0):
 
         return ElementaryMap(cat_a, union_elem)
     
-    # The rest is an optimization for the case of two operands.
+    # The rest is an optimization for the general case of two operands.
     op1, op2 = emaps
     j1, j2 = 0, 1
 

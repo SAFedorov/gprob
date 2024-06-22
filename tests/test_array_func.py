@@ -1,4 +1,5 @@
 from functools import reduce
+import copy
 import numpy as np
 import pytest
 
@@ -664,7 +665,15 @@ def _test_concat_func(f, *args, test_shapes=None, vins_list=None, **kwargs):
             # A case to check the optimization branch for two operands, 
             # where the elementary variables are the same.
             vin = random_normal(sh, dtype=np.complex64)
+            assert vin.real.emap.elem is vin.imag.emap.elem
             vins_list += [[vin.real, vin.imag], [vin.imag, vin.imag]]
+
+            # A strange case where the variables have identical lists 
+            # of elementary variables, which are not the same object.
+            vin_imag_c = copy.deepcopy(vin.imag)
+            assert vin.real.emap.elem is not vin_imag_c.emap.elem
+            assert vin.real.emap.elem == vin_imag_c.emap.elem
+            vins_list += [[vin.real, vin_imag_c]]
 
     # Tests the function for all input lists.
     for vins in vins_list:
