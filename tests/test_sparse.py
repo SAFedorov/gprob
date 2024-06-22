@@ -13,6 +13,13 @@ from utils import random_normal
 np.random.seed(0)
 
 
+def dense_to_sparse_cov(cov, iaxes):
+    ndim = cov.ndim // 2
+    for i, ax in enumerate(iaxes):
+        cov = np.diagonal(cov, axis1=ax - i, axis2=ax + ndim - 2*i)
+    return cov
+
+
 def test_iid_repeat():
     # A numeric constant.
     number = 1
@@ -315,6 +322,316 @@ def test_sample():
     assert np.mean(np.abs(m - v.mean())) / np.max(np.abs(v.mean())) < tol
     assert np.mean((vv - v.var())**2) / np.max(v.var()**2) < tol
 
+
+def test_condition():
+    tol = 1e-8
+
+    def check_sparse_vs_normal(snv, nv):
+        assert snv.shape == nv.shape
+        assert np.max(np.abs(snv.mean() - nv.mean())) < tol
+        assert np.max(np.abs(snv.cov() - 
+                             dense_to_sparse_cov(nv.cov(), snv.iaxes))) < tol
+        
+    def check_permutations(snv_list, nv_list):
+        # Checks sparse vs normal for all the permutations of the axes of 
+        # the variable being conditioned.
+
+        # 4d variables minimum.
+        # minimum 5 items in the lists.
+
+        nv = sum(nv_list)
+        snv = sum(snv_list)
+
+        # Transpositions of the variable.
+        for ax in itertools.permutations(tuple(range(nv.ndim))):
+            # Real-real.
+            nv_ = nv.transpose(ax)
+            snv_ = snv.transpose(ax)
+            nvc = nv_.condition(nv_list[0] - 1.2 * nv_list[3])
+            snvc = snv_.condition(snv_list[0] - 1.2 * snv_list[3])
+            check_sparse_vs_normal(snvc, nvc)
+            del snvc, nvc
+
+            # Real-complex.
+            nv_ = nv.transpose(ax)
+            snv_ = snv.transpose(ax)
+            nvc = nv_.condition(nv_list[0] + 0.4j * nv_list[1] 
+                                + (0.3 + 2j) * nv_list[3])
+            snvc = snv_.condition(snv_list[0] + 0.4j * snv_list[1]
+                                  + (0.3 + 2j) * snv_list[3])
+            check_sparse_vs_normal(snvc, nvc)
+            del snvc, nvc
+
+            # Complex-complex.
+            nv_ = (nv + 2j * nv_list[1]).transpose(ax)
+            snv_ = (snv + 2j * snv_list[1]).transpose(ax)
+            nvc = nv_.condition(nv_list[0] + 0.4j * nv_list[1] 
+                                + (0.3 + 2j) * nv_list[3])
+            snvc = snv_.condition(snv_list[0] + 0.4j * snv_list[1]
+                                  + (0.3 + 2j) * snv_list[3])
+            check_sparse_vs_normal(snvc, nvc)
+            del snvc, nvc
+
+            # Complex-complex, with a transposed condition.
+            nv_ = (nv + 2j * nv_list[1]).transpose(ax)
+            snv_ = (snv + 2j * snv_list[1]).transpose(ax)
+            nvc = nv_.condition({(nv_list[0] + 0.4j * nv_list[1] 
+                                  + (0.3 + 2j) * nv_list[3]) : 0,
+                                 nv_list[4][..., 1].transpose((2, 0, 1)) : 0.1})
+            snvc = snv_.condition({(snv_list[0] + 0.4j * snv_list[1]
+                                    + (0.3 + 2j) * snv_list[3]) : 0,
+                                   snv_list[4][..., 1].transpose((2, 0, 1)) : 0.1})
+            check_sparse_vs_normal(snvc, nvc)
+            del snvc, nvc
+
+    # 0 independence axes. -----------------------------------------------------
+
+    # A scalar variable.
+    nv1 = normal(-2, 10.3)
+    nv2 = normal(0.2, 3.4)
+    snv1 = assparsenormal(nv1)
+    snv2 = assparsenormal(nv2)
+
+    nvc = (nv1 + nv2).condition(nv1 - 0.3 * nv2)
+    snvc = (snv1 + snv2).condition(snv1 - 0.3 * snv2)
+    check_sparse_vs_normal(snvc, nvc)
+    del snvc, nvc
+
+    # Trivial condition.
+    nvc = (nv1 + nv2).condition(normal())
+    snvc = (snv1 + snv2).condition(normal())
+    check_sparse_vs_normal(snvc, nvc)
+    del snvc, nvc
+
+    nvc = (nv1 + nv2).condition({nv1 - 0.3 * nv2 : 0.5})
+    snvc = (snv1 + snv2).condition({snv1 - 0.3 * snv2 : 0.5})
+    check_sparse_vs_normal(snvc, nvc)
+    del snvc, nvc
+
+    # Multiple conditions.
+    nv1 = normal(-2, 10.3)
+    nv2 = normal(0.2, 3.4)
+    snv1 = assparsenormal(nv1)
+    snv2 = assparsenormal(nv2)
+
+    nvc = (nv1 + nv2).condition({nv1 - 0.3 * nv2 : 0.5, nv1 + 0.3 * nv2 : 0.1})
+    snvc = (snv1 + snv2).condition({snv1 - 0.3 * snv2 : 0.5, 
+                                    snv1 + 0.3 * snv2 : 0.1})
+    check_sparse_vs_normal(snvc, nvc)
+    del snvc, nvc
+
+    # A multi-dimensional variable.
+    nv1 = normal(-2, 10.3, size=(2, 2, 2, 2, 2)).trace(axis1=-1, axis2=-2)
+    nv2 = normal(0.2, 3.4, size=(1, 2, 2, 2, 2)).trace(axis1=-1, axis2=-2)
+    snv1 = assparsenormal(nv1)
+    snv2 = assparsenormal(nv2)
+
+    nvc = (nv1 + nv2).condition(nv1 - 0.3 * nv2)
+    snvc = (snv1 + snv2).condition(snv1 - 0.3 * snv2)
+    check_sparse_vs_normal(snvc, nvc)
+    del snvc, nvc
+
+    x = np.random.rand(2, 2, 2)
+    nvc = (nv1 + nv2).condition({nv1 - 0.3 * nv2 : x})
+    snvc = (snv1 + snv2).condition({snv1 - 0.3 * snv2 : x})
+    check_sparse_vs_normal(snvc, nvc)
+    del snvc, nvc
+
+    # 1 independence axis. -----------------------------------------------------
+
+    # Scalar dense subspace.
+    sz = 4
+    nv_list = []
+    snv_list = []
+
+    for _ in range(3):
+        rs = 2 * np.random.rand(sz) - 1
+        ro = 2 * np.random.rand(sz) - 1
+        rv = normal(-0.3, 2.3)
+        nv_list.append(gp.stack([o + s * rv.iid_copy() for o, s in zip(ro, rs)]))
+        snv_list.append(ro + rs * iid_repeat(rv, sz))
+
+    nvc = sum(nv_list).condition(nv_list[0] + 0.4 * nv_list[1])
+    snvc = sum(snv_list).condition(snv_list[0] + 0.4 * snv_list[1])
+    check_sparse_vs_normal(snvc, nvc)
+    del snvc, nvc
+
+    # Vector dense subspace.
+    sz = 4
+    nv_list = []
+    snv_list = []
+
+    for _ in range(5):
+        rs = 2 * np.random.rand(sz, 2) - 1
+        ro = 2 * np.random.rand(sz, 2) - 1
+        rv = random_normal((2,))
+        nv_list.append(gp.stack([o + s * rv.iid_copy() for o, s in zip(ro, rs)]))
+        snv_list.append(ro + rs * iid_repeat(rv, sz))
+
+    nv = sum(nv_list)
+    snv = sum(snv_list)
+
+    nvc = nv.condition(nv_list[0] + 0.4 * nv_list[1])
+    snvc = snv.condition(snv_list[0] + 0.4 * snv_list[1])
+    check_sparse_vs_normal(snvc, nvc)
+    del snvc, nvc
+
+    # Two conditions.
+    nvc = nv.condition({nv_list[0] + 0.2 * nv_list[-1]: 1, 
+                        nv_list[2] - 0.2 * nv_list[-1]: -0.3})
+    snvc = snv.condition({snv_list[0] + 0.2 * snv_list[-1]: 1, 
+                          snv_list[2] - 0.2 * snv_list[-1]: -0.3})
+    check_sparse_vs_normal(snvc, nvc)
+    del snvc, nvc
+
+    # Two conditions, out of which one is transposed.
+    nvc = nv.condition({nv_list[0] + 0.2 * nv_list[-1]: 1, 
+                        (nv_list[2] - 0.2 * nv_list[-1]).T: -0.3})
+    snvc = snv.condition({snv_list[0] + 0.2 * snv_list[-1]: 1, 
+                          (snv_list[2] - 0.2 * snv_list[-1]).T: -0.3})
+    check_sparse_vs_normal(snvc, nvc)
+    del snvc, nvc
+
+    # Two conditions, out of which one is transposed, 
+    # and the other is of different shape.
+    nvc = nv.condition({nv_list[0][:, 0] + 0.2 * nv_list[-1][:, 0]: 1, 
+                        (nv_list[2] - 0.2 * nv_list[-1]).T: -0.3})
+    snvc = snv.condition({snv_list[0][:, 0] + 0.2 * snv_list[-1][:, 0]: 1, 
+                          (snv_list[2] - 0.2 * snv_list[-1]).T: -0.3})
+    check_sparse_vs_normal(snvc, nvc)
+    del snvc, nvc
+
+    # Two conditions, out of which one is transposed, 
+    # plus the variable itself is transposed.
+    nvc = nv.T.condition({nv_list[0] + 0.2 * nv_list[-1]: 1, 
+                          (nv_list[2] - 0.2 * nv_list[-1]).T: -0.3})
+    snvc = snv.T.condition({snv_list[0] + 0.2 * snv_list[-1]: 1, 
+                            (snv_list[2] - 0.2 * snv_list[-1]).T: -0.3})
+    check_sparse_vs_normal(snvc, nvc)
+    del snvc, nvc
+
+    # Adds one complex condition.
+    nvc = nv.T.condition({nv_list[0][:, 0] + 0.2 * nv_list[4][:, 0]: 1, 
+                          (nv_list[2] - 0.2 * nv_list[4]).T: -0.3,
+                          (nv_list[1] - 2j * nv_list[3] 
+                           + (1 + 0.5j) * nv_list[4]): 1})
+    snvc = snv.T.condition({snv_list[0][:, 0] + 0.2 * snv_list[4][:, 0]: 1, 
+                            (snv_list[2] - 0.2 * snv_list[4]).T: -0.3,
+                            (snv_list[1] - 2j * snv_list[3] 
+                             + (1 + 0.5j) * snv_list[4]): 1})
+    check_sparse_vs_normal(snvc, nvc)
+    del snvc, nvc
+
+    # 3-dimensional dense subspace.
+    sz = 6
+    nv_list = []
+    snv_list = []
+
+    for _ in range(5):
+        rs = 2 * np.random.rand(sz, 2, 3, 4) - 1
+        ro = 2 * np.random.rand(sz, 2, 3, 4) - 1
+        rv = random_normal((2, 3, 4))
+        nv_list.append(gp.stack([o + s * rv.iid_copy() for o, s in zip(ro, rs)]))
+        snv_list.append(ro + rs * iid_repeat(rv, sz))
+
+    nv = sum(nv_list)
+    snv = sum(snv_list)
+
+    nvc = nv.condition(nv_list[0] + 0.4 * nv_list[1])
+    snvc = snv.condition(snv_list[0] + 0.4 * snv_list[1])
+    check_sparse_vs_normal(snvc, nvc)
+    del snvc, nvc
+
+    # Several conditions of different shapes.
+    nvc = nv.condition({nv_list[0] + 0.2 * nv_list[-1]: 1, 
+                        nv_list[2][:, 1] - 0.2 * nv_list[4][:, 1]: -0.3,
+                        nv_list[2][:, 1, 0] - 2.2 * nv_list[3][:, 1, 0]: 0})
+    snvc = snv.condition({snv_list[0] + 0.2 * snv_list[-1]: 1, 
+                          snv_list[2][:, 1] - 0.2 * snv_list[-1][:, 1]: -0.3,
+                          snv_list[2][:, 1, 0] - 2.2 * snv_list[3][:, 1, 0]: 0})
+    check_sparse_vs_normal(snvc, nvc)
+    del snvc, nvc
+
+    # The varaible is complex.
+    nv = sum(nv_list) + 5j * nv_list[1]
+    snv = sum(snv_list) + 5j * snv_list[1]
+
+    nvc = nv.condition(nv_list[0] + 0.4 * nv_list[1])
+    snvc = snv.condition(snv_list[0] + 0.4 * snv_list[1])
+    check_sparse_vs_normal(snvc, nvc)
+    del snvc, nvc
+
+    nvc = nv.condition(nv_list[0] + 0.4j * nv_list[1] 
+                       + (0.8 - 2.3j) * nv_list[2])
+    snvc = snv.condition(snv_list[0] + 0.4j * snv_list[1]
+                         + (0.8 - 2.3j) * snv_list[2])
+    check_sparse_vs_normal(snvc, nvc)
+    del snvc, nvc
+
+    check_permutations(snv_list, nv_list)
+
+    # 2 independence axes. -----------------------------------------------------
+
+    sz1 = 5
+    sz2 = 6
+    nv_list = []
+    snv_list = []
+
+    for _ in range(5):
+        rs = 2 * np.random.rand(sz1, sz2) - 1
+        ro = 2 * np.random.rand(sz1, sz2) - 1
+        nv_list.append(ro + rs * normal(size=(sz1, sz2)))
+        snv_list.append(ro + rs * iid_repeat(iid_repeat(normal(), sz2), sz1))
+
+    nv = sum(nv_list)
+    snv = sum(snv_list)
+
+    nvc = nv.condition(nv_list[0] + 0.4 * nv_list[1])
+    snvc = snv.condition(snv_list[0] + 0.4 * snv_list[1])
+    check_sparse_vs_normal(snvc, nvc)
+    del snvc, nvc
+
+    # One condition transposed.
+    nvc = nv.condition({(nv_list[0] + 0.4 * nv_list[1]): - 0.1,
+                        (nv_list[1] - 0.4 * nv_list[2]).T: - 0.1})
+    snvc = snv.condition({(snv_list[0] + 0.4 * snv_list[1]): - 0.1,
+                          (snv_list[1] - 0.4 * snv_list[2]).T: - 0.1})
+    check_sparse_vs_normal(snvc, nvc)
+    del snvc, nvc
+
+    # Higher-dimensional dense subspace.
+    nv_list = []
+    snv_list = []
+
+    for _ in range(5):
+        rs = 2 * np.random.rand(3, 4, 5, 2) - 1
+        ro = 2 * np.random.rand(3, 4, 5, 2) - 1
+        rv = random_normal((5, 2))
+        nv = gp.stack([rv.iid_copy() for _ in range(4)])
+        nv = gp.stack([nv.iid_copy() for _ in range(3)])    
+        nv_list.append(ro + rs * nv)
+        snv_list.append(ro + rs * iid_repeat(iid_repeat(rv, 4), 3))
+
+    nv = sum(nv_list)
+    snv = sum(snv_list)
+
+    nvc = nv.condition(nv_list[0] + 0.4 * nv_list[1])
+    snvc = snv.condition(snv_list[0] + 0.4 * snv_list[1])
+    check_sparse_vs_normal(snvc, nvc)
+    del snvc, nvc
+
+    check_permutations(snv_list, nv_list)
+
+
+    # TODO:
+    # trivial cases
+    # 1, 2 independence axees
+    # scalar - vector dense subspaces
+    # single-multiple condition
+    # complex-real variable and, separately, the condition
+    # various transpositions of independence axes between the variable and the conditions
+    # warnings for non-matching numbers of iaxes and incompatible iaxes sizes
+    pass
 
 def test_cumsum():
     v = iid_repeat(iid_repeat(normal(size=(4, 5)), 2, axis=1), 3, axis=1)

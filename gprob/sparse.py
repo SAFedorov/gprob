@@ -1,12 +1,16 @@
-import numpy as np
-from numpy.exceptions import AxisError
 from functools import reduce
 from operator import mul
+from warnings import warn
+
+import numpy as np
+from numpy.linalg import LinAlgError
+from numpy.exceptions import AxisError
 
 from .normal_ import (Normal, asnormal, print_normal, broadcast_to, 
                       validate_logp_samples)
 from .external import einsubs
 from . import emaps
+from .emaps import ElementaryMap
 
 
 def iid_repeat(x, nrep=1, axis=0):
@@ -18,7 +22,7 @@ def iid_repeat(x, nrep=1, axis=0):
     
     axis = _normalize_axis(axis, x.ndim + 1)
 
-    n = len(x._iaxid) - x._iaxid.count(None) + 1
+    n = x._niax + 1
     iaxid = x._iaxid[:axis] + (n,) + x._iaxid[axis:]
     v = x.v
 
@@ -94,6 +98,10 @@ class SparseNormal:
         """Ordered sequence of axes along which the array elements 
         are independent from each other."""
         return tuple([i for i, b in enumerate(self._iaxid) if b])
+    
+    @property
+    def _niax(self):
+        return len(self._iaxid) - self._iaxid.count(None)
     
     def __repr__(self):
         return print_normal(self, extra_attrs=("iaxes",))
@@ -285,6 +293,10 @@ class SparseNormal:
     
     def __setitem__(self, key, value):
         raise NotImplementedError
+    
+    def __or__(self, observations):
+        """Conditioning operation."""
+        return self.condition(observations)
         
     # ---------- array methods ----------
 
@@ -643,8 +655,104 @@ class SparseNormal:
     def iid_copy(self):
         return SparseNormal(self.v.iid_copy(), self._iaxid)
 
-    def condition(self, observations, mask=None):  # TODO-----------------------------
-        raise NotImplementedError
+    def condition(self, observations):
+
+        if isinstance(observations, dict):
+            obs = [assparsenormal(k-v) for k, v in observations.items()]
+        else:
+            obs = [assparsenormal(observations)]
+
+        niax = self._niax  # A shorthand.
+
+        # Moves the sparse axes first, reordering them in increasing order,
+        # and flattens the dense subspaces.
+
+        s_sparse_ax = [i for i, b in enumerate(self._iaxid) if b]
+        s_dense_ax = [i for i, b in enumerate(self._iaxid) if not b]
+        dense_sz = reduce(mul, [self.shape[i] for i in s_dense_ax], 1)
+
+        self_fl = self.transpose(tuple(s_sparse_ax + s_dense_ax))
+        self_fl = self_fl.reshape(self_fl.shape[:niax] + (dense_sz,))
+
+        mismatch_w_msg = ("Conditions with different numbers or sizes of "
+                          "independence axes compared to `self` are ignored. "
+                          "The consistency of such conditions is not checked.")
+        obs_flat = []
+        iax_ord = [i for i in self._iaxid if i]
+        for c in obs:
+            if c._niax != niax:
+                warn(mismatch_w_msg)
+                continue
+
+            sparse_ax = [c._iaxid.index(i) for i in iax_ord]
+            dense_ax = [i for i, b in enumerate(c._iaxid) if not b]
+            dense_sz = reduce(mul, [c.shape[i] for i in dense_ax], 1)
+            
+            c = c.transpose(tuple(sparse_ax + dense_ax))
+            c = c.reshape(c.shape[:niax] + (dense_sz,))
+
+            if c.shape[:niax] != self_fl.shape[:niax]:
+                warn(mismatch_w_msg)
+                continue
+
+            if c.iscomplex:
+                obs_flat.extend([c.real, c.imag])
+            else:
+                obs_flat.append(c)
+
+        # Combines the observations in one and completes them w.r.t. self.
+        cond = SparseNormal._concatenate(obs_flat, axis=-1)
+        emv, emc = emaps.complete((self_fl.v.emap, cond.v.emap))
+
+        t_ax = tuple(range(1, niax+1)) + (0, -1)
+
+        a = emv.a.transpose(t_ax)
+        m = self_fl.mean()
+        if self.iscomplex:
+            a = np.concatenate([a.real, a.imag], axis=-1)
+            m = np.concatenate([m.real, m.imag], axis=-1)
+
+        ac = emc.a.transpose(t_ax)
+        mc = cond.mean()
+
+        # The calculation of the conditional map and mean.
+
+        q, r = np.linalg.qr(ac, mode="reduced")
+
+        # If there are zero diagonal elements in the triangular matrix, 
+        # some colums of `ac` are linearly dependent.
+        dia_r = np.abs(np.diagonal(r, axis1=-1, axis2=-2))
+        tol = np.finfo(r.dtype).eps
+        if (dia_r < (tol * np.max(dia_r))).any():
+            raise LinAlgError("Degenerate conditions.")
+
+        t_ax = tuple(range(niax)) + (-1, -2)
+        es = np.linalg.solve(r.transpose(t_ax), -mc)
+        aproj = (q.transpose(t_ax) @ a)
+
+        cond_a = a - q @ aproj
+        cond_m = m + np.einsum("...i, ...ij -> ...j", es, aproj)
+
+        # Transposing and shaping back.
+
+        t_ax = (-2,) + tuple(range(niax)) + (-1,)
+        cond_a = cond_a.transpose(t_ax)
+
+        if self.iscomplex:
+            # Converting back to complex.
+            n = cond_m.shape[-1] // 2
+            cond_a = cond_a[..., :n] + 1j * cond_a[..., n:]
+            cond_m = cond_m[..., :n] + 1j * cond_m[..., n:]
+
+        v = Normal(ElementaryMap(cond_a, emv.elem), cond_m)
+
+        dense_sh = tuple([n for n, i in zip(self.shape, self._iaxid) if not i])
+        v = v.reshape(v.shape[:niax] + dense_sh)
+        t_ax = tuple([i[0] for i in sorted(enumerate(s_sparse_ax + s_dense_ax), 
+                                           key=lambda x:x[1])])
+        v = v.transpose(t_ax)
+
+        return SparseNormal(v, self._iaxid)
     
     def mean(self):
         """Mean"""
@@ -750,7 +858,7 @@ class SparseNormal:
             # Casts to real with a warning.
             delta_x = delta_x.astype(delta_x.real.dtype)
 
-        niax = len(self._iaxid) - self._iaxid.count(None)
+        niax = self._niax
         
         if self.ndim == niax:
             # Scalar dense subspace.
