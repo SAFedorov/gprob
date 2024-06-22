@@ -199,6 +199,21 @@ def test_complex_conditioning():
     assert np.max(np.abs(vrcond.mean() - vrcond2.mean())) < tol
     assert np.max(np.abs(vrcond.cov() - vrcond2.cov())) < tol
 
+    # A case when real and complex conditions are mixed.
+    # This case checks that there is no problem with verifying 
+    # the consistency of such conditions.
+    v_list = [random_normal(tuple()) for _ in range(5)]  # ncond < 5 < 2*ncond
+    v = sum(v_list)
+    vcond = v | {v_list[0] + 0.3 * v_list[1] : 0.2,
+                 v_list[1] - 1.3 * v_list[2] : -1,
+                 v_list[1] + 0.7j * v_list[2] + (1 - 0.5j) * v_list[3] : 0.1}
+    vrcond = v | {v_list[0] + 0.3 * v_list[1] : 0.2,
+                  0.7 * v_list[2] - 0.5 * v_list[3] : 0,
+                  v_list[1] - 1.3 * v_list[2] : -1,
+                  v_list[1]  + v_list[3] : 0.1}
+    assert np.max(np.abs(vcond.mean() - vrcond.mean())) < tol
+    assert np.max(np.abs(vcond.cov() - vrcond.cov())) < tol
+
 
 def test_masked_conditioning():
     tol = 1e-10

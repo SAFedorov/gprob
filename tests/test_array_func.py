@@ -629,6 +629,7 @@ def _test_concat_func(f, *args, test_shapes=None, vins_list=None, **kwargs):
 
     ns = [1, 2, 3, 11]  # Numbers of input arrays.
 
+    # Composes lists of input variables.
     if vins_list is None:
         vins_list = []
         for sh in test_shapes:
@@ -644,11 +645,28 @@ def _test_concat_func(f, *args, test_shapes=None, vins_list=None, **kwargs):
 
             vins_list += [[vins2[0], vins2[1]], [vins2[1], vins2[0]]]
 
-            # Also adds a cace of deterministic arrays promoted to Normals.
+            # Adds a cace of deterministic arrays promoted to Normals.
             vins_list += [[random_det_normal(sh) for _ in range(1)],
                           [random_det_normal(sh) for _ in range(2)],
                           [random_det_normal(sh) for _ in range(3)]]
+            
+            # Cases with one of the input arrays being complex.
+            vins3 = random_correlate([random_normal(sh), 
+                                      random_normal(sh, dtype=np.complex64)])
+            vins3[0] = vins3[0] + np.random.rand(*sh) * normal(-0.1, 0.8)
+            vins_list += [[vins3[0], vins3[1]], [vins3[1], vins3[0]]]
 
+            vins4 = random_correlate([random_normal(sh),
+                                      random_normal(sh), 
+                                      random_normal(sh, dtype=np.complex64)])
+            vins_list += [vins4]
+
+            # A case to check the optimization branch for two operands, 
+            # where the elementary variables are the same.
+            vin = random_normal(sh, dtype=np.complex64)
+            vins_list += [[vin.real, vin.imag], [vin.imag, vin.imag]]
+
+    # Tests the function for all input lists.
     for vins in vins_list:
         vout = f(vins, *args, **kwargs)
 

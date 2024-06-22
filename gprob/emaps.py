@@ -421,11 +421,16 @@ def _broadcast_shapes(shape1, shape2):
 
 
 def concatenate(emaps, vaxis=0):
-    if len(emaps) == 1:
-        return emaps[0]
-
     if vaxis < 0:
         vaxis = emaps[0].vndim + vaxis
+
+    if len(emaps) == 1:
+        return emaps[0]
+    elif len(emaps) == 2 and emaps[0].elem is emaps[1].elem:
+        # An optimization targeting uses like concatenate([x.real, x.imag]).
+        op1, op2 = emaps
+        cat_a = np.concatenate([op1.a, op2.a], axis=vaxis+1)
+        return ElementaryMap(cat_a, op1.elem)
 
     dims = [em.a.shape[vaxis + 1] for em in emaps]
 
@@ -478,6 +483,11 @@ def stack(emaps, vaxis=0):
 
     if len(emaps) == 1:
         return emaps[0][*base_jidx, None]
+    elif len(emaps) == 2 and emaps[0].elem is emaps[1].elem:
+        # An optimization targeting uses like stack([x.real, x.imag]).
+        op1, op2 = emaps
+        cat_a = np.stack([op1.a, op2.a], axis=vaxis+1)
+        return ElementaryMap(cat_a, op1.elem)
 
     dtype = np.result_type(*[em.a.dtype for em in emaps])
     new_vshape = list(emaps[0].vshape)

@@ -287,7 +287,7 @@ def condition_qr(m, a, mc, ac, mask=None):
                           "with degenerate constraints. Use SVD instead.")
 
     es = sp.linalg.solve_triangular(tri.T, -mc, lower=(qtri is qu),
-                                    check_finite=False) # TODO: check the mean for the case with masking
+                                    check_finite=False)
 
     aproj = (q.T @ a)
     # The projection of the column vectors of `a` on the subspace spanned by 

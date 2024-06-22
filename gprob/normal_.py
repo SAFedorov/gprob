@@ -1,3 +1,5 @@
+from functools import reduce
+from operator import mul
 from builtins import sum as sum_
 
 import numpy as np
@@ -413,10 +415,22 @@ class Normal:
         else:
             obs = [asnormal(observations)]
 
+        vr = []
+        for x in obs + [self]:
+            if x.iscomplex:
+                # Doubles the dimension preserving the triangular structure.
+                x = stack([x.real, x.imag], axis=-1)
+
+            vr.append(x)
+
+        self_r = vr.pop()
+        obs_r = vr
+
         if mask is None:
-            cond = concatenate([c.ravel() for c in obs])
+            cond = concatenate([c.ravel() for c in obs_r])
         else:
-            # Concatenates preserving the element order along the 0th axis.
+            # Concatenates the conditions preserving the element order along 
+            # the 0th axis, and expands the mask to the right shape.
 
             if self.ndim < 1:
                 raise ValueError("The variable must have at least one "
@@ -425,40 +439,23 @@ class Normal:
             if any(c.ndim < 1 for c in obs):
                 raise ValueError("All conditions must have at least one "
                                  "dimension to be compatible with masking.")
-            
-            obs = [c.reshape((c.shape[0], -1)) for c in obs]
-            cond = concatenate(obs, axis=1).ravel()
 
-            k = sum_(c.shape[1] for c in obs)
-            l = 1 if self.ndim == 1 else np.prod(self.shape[1:])
+            obs_r = [c.reshape((c.shape[0], -1)) for c in obs_r]
+            cond = concatenate(obs_r, axis=1).ravel()
+
+            k = sum_(c.shape[1] for c in obs_r)
+            l = reduce(mul, self_r.shape[1:], 1)
             ms = mask.shape
 
             mask = np.broadcast_to(mask[:, None, :, None], (ms[0], k, ms[1], l))
             mask = mask.reshape((ms[0] * k, ms[1] * l))
 
-        emv, emc = emaps.complete((self.emap, cond.emap))
+        emv, emc = emaps.complete((self_r.emap, cond.emap))
 
         a = emv.a2d
-        m = self.b.ravel()
-        if self.iscomplex:
-            # Doubles the dimension preserving the triangular structure.
-            a = np.stack([a.real, a.imag], axis=-1).reshape(a.shape[0], -1)
-            m = np.stack([m.real, m.imag], axis=-1).ravel()
-
-            if mask is not None:
-                mask = np.stack([mask, mask], axis=-1)
-                mask = mask.reshape(mask.shape[0], -1)
-
+        m = self_r.b.ravel()
         ac = emc.a
         mc = cond.b
-        if cond.iscomplex:
-            # Doubles the dimension preserving the triangular structure.
-            ac = np.stack([ac.real, ac.imag], axis=-1).reshape(ac.shape[0], -1)
-            mc = np.stack([mc.real, mc.imag], axis=-1).ravel()
-
-            if mask is not None:
-                mask = np.stack([mask, mask], axis=-2)
-                mask = mask.reshape(-1, mask.shape[-1])
 
         new_b, new_a = func.condition(m, a, mc, ac, mask)
 
@@ -468,7 +465,7 @@ class Normal:
             new_b = new_b[0::2] + 1j * new_b[1::2]
 
         # Shaping back.
-        new_a = np.reshape(new_a, emv.a.shape)
+        new_a = np.reshape(new_a, (new_a.shape[0],) + self.shape)
         new_b = np.reshape(new_b, self.b.shape)
 
         return Normal(ElementaryMap(new_a, emv.elem), new_b)
