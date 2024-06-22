@@ -6,7 +6,8 @@ from numpy.exceptions import ComplexWarning
 
 import gprob as gp
 from gprob.normal_ import normal
-from gprob.sparse import _parse_index_key, iid_repeat, assparsenormal
+from gprob.sparse import (_parse_index_key, iid_repeat, assparsenormal, 
+                          SparseConditionWarning)
 
 from utils import random_normal
 
@@ -622,16 +623,64 @@ def test_condition():
 
     check_permutations(snv_list, nv_list)
 
+    # Other cases. -------------------------------------------------------------
 
-    # TODO:
-    # trivial cases
-    # 1, 2 independence axees
-    # scalar - vector dense subspaces
-    # single-multiple condition
-    # complex-real variable and, separately, the condition
-    # various transpositions of independence axes between the variable and the conditions
-    # warnings for non-matching numbers of iaxes and incompatible iaxes sizes
-    pass
+    snv1 = iid_repeat(iid_repeat(normal(), 4), 5)
+    snv2 = iid_repeat(normal(), 4)
+
+    # Conditioning a variable on itself.
+    x = np.random.rand(5, 4)
+    snvc = snv1 | {snv1 : x}
+    assert np.max(np.abs(snvc.mean() - x)) < tol 
+    assert np.max(np.abs(snvc.var())) < tol
+
+    # Conditioning a variable on an empty dictionary.
+    snvc = snv1 | dict()
+    assert snvc is snv1
+
+    # Different numbers of axes.
+    with pytest.warns(SparseConditionWarning):
+        snvc = snv1 | normal()
+        assert snvc is snv1
+
+    with pytest.warns(SparseConditionWarning):
+        snvc = snv2 | snv1
+        assert snvc is snv2
+
+    with pytest.warns(SparseConditionWarning):
+        snvc = snv1 | snv2
+        assert snvc is snv1
+
+    # Different sizes of independence axes.
+    snv1 = iid_repeat(normal(), 5)
+    snv2 = iid_repeat(normal(), 4)
+    with pytest.warns(SparseConditionWarning):
+        snvc = snv2 | snv1
+        assert snvc is snv2
+
+    with pytest.warns(SparseConditionWarning):
+        snvc = snv1 | snv2
+        assert snvc is snv1
+
+    snv1 = iid_repeat(iid_repeat(normal(), 5), 4)
+    snv2 = iid_repeat(iid_repeat(normal(), 5), 3)
+    with pytest.warns(SparseConditionWarning):
+        snvc = snv2 | snv1
+        assert snvc is snv2
+
+    with pytest.warns(SparseConditionWarning):
+        snvc = snv1 | snv2
+        assert snvc is snv1
+
+    snv3 = iid_repeat(iid_repeat(normal(), 5), 4)
+    snv13 = snv1 + snv3
+    with pytest.warns(SparseConditionWarning):
+        nv1 = normal(size=(4, 5))
+        nv3 = normal(size=(4, 5))
+        nvc = (nv1 + nv3) | {nv1 - 1.3 * nv3: 0.2}
+        snvc = snv13 | {snv2: 1, snv1 - 1.3 * snv3: 0.2}
+        check_sparse_vs_normal(snvc, nvc)
+
 
 def test_cumsum():
     v = iid_repeat(iid_repeat(normal(size=(4, 5)), 2, axis=1), 3, axis=1)

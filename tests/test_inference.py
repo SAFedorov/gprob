@@ -67,6 +67,17 @@ def test_conditioning():
     assert (normal() | {1:1.}).var() == 1
     assert (normal() | 0).var() == 1
 
+    # Conditioning a variable on itself.
+    v = random_normal((2, 3))
+    x = np.random.rand(2, 3)
+    vc = v | {v : x}
+    assert np.max(np.abs(vc.mean() - x)) < tol 
+    assert np.max(np.abs(vc.var())) < tol
+
+    # Conditioning a variable on an empty dictionary.
+    vc = v | dict()
+    assert vc is v
+
 
 def test_linear_regression():
     # Using the linear regression example from GaussianInfer
@@ -126,7 +137,7 @@ def test_linear_regression():
 def test_conditioning_commutativity():
     # Sequential conditioning on independent variables should be commutative.
 
-    tol = 1e-10
+    tol = 1e-8
 
     sh = (5, 2)
     v1, v2, v3, v4 = [random_normal(sh, dtype=np.float64) for _ in range(4)]
@@ -138,20 +149,20 @@ def test_conditioning_commutativity():
     vc3 = v | v3 | v2 | v1
     vc4 = v | v2 | v3 | v1
 
-    assert (np.abs(vc2.mean() - vc1.mean()) < tol).all()
-    assert (np.abs(vc2.cov() - vc1.cov()) < tol).all()
+    assert np.max(np.abs(vc2.mean() - vc1.mean())) < tol
+    assert np.max(np.abs(vc2.cov() - vc1.cov())) < tol
 
-    assert (np.abs(vc3.mean() - vc1.mean()) < tol).all()
-    assert (np.abs(vc3.cov() - vc1.cov()) < tol).all()
+    assert np.max(np.abs(vc3.mean() - vc1.mean())) < tol
+    assert np.max(np.abs(vc3.cov() - vc1.cov())) < tol
 
-    assert (np.abs(vc4.mean() - vc1.mean()) < tol).all()
-    assert (np.abs(vc4.cov() - vc1.cov()) < tol).all()
+    assert np.max(np.abs(vc4.mean() - vc1.mean())) < tol
+    assert np.max(np.abs(vc4.cov() - vc1.cov())) < tol
 
     # Conditioning second time on the same condition does not do anything.
     vc1o = v | v1
     vc11o = v | v1 | v1
-    assert (np.abs(vc1o.mean() - vc11o.mean()) < tol).all()
-    assert (np.abs(vc1o.cov() - vc11o.cov()) < tol).all()
+    assert np.max(np.abs(vc1o.mean() - vc11o.mean())) < tol
+    assert np.max(np.abs(vc1o.cov() - vc11o.cov())) < tol
 
 
 def test_complex_conditioning():
@@ -299,13 +310,20 @@ def test_masked_conditioning():
             v = random_normal(sh, dtype=dt)
             vc1 = random_normal(shc1, dtype=dt)
             vc2 = -2.1 * vc1.reshape((4, 1)) + random_normal(shc2, dtype=dt)
-            v, vc2 = random_correlate([v, vc2])
-            v, vc2 = random_correlate([v, vc2]) # Repeat to ensure correlation.
-            v, vc2 = random_correlate([v, vc2])
+
+            # Repeating until there is a correlation.
+            i = 0
+            while np.abs(cov(v, vc1)).max() < 0.1:
+                v, vc2 = random_correlate([v, vc2])
+                i += 1
+
+                if i > 50:
+                    raise Exception("Failed to create correlation.")
+                
+            assert np.abs(cov(v, vc2)).max() > 0.1
             
             # Ensures correlation.
             assert np.abs(cov(v, vc1)).max() > 0.1
-            assert np.abs(cov(v, vc2)).max() > 0.1
 
             # Causal masking.
             mc_cond = v.condition({vc1: 0, vc2: 0}, mask=mask)

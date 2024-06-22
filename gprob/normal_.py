@@ -415,6 +415,9 @@ class Normal:
         else:
             obs = [asnormal(observations)]
 
+        if not obs:
+            return self
+
         if self.iscomplex:
             # Doubles the dimension preserving the triangular structure.
             self_r = stack([self.real, self.imag], axis=-1)
@@ -621,9 +624,9 @@ def asnormal(x):
         return x
     elif hasattr(x, "_normal_priority_"):
         if x._normal_priority_ > Normal._normal_priority_:
-            raise TypeError(f"The variable {x} cannot be converted to "
-                            "a normal variable because it is "
-                            f"of higher type ({x._normal_priority_} "
+            raise TypeError(f"The variable of type {x.__class__.__name__} "
+                            "cannot be converted to a normal variable because "
+                            f"it is of higher type ({x._normal_priority_} "
                             f"> {Normal._normal_priority_}).")
         else:
             # For possible future extensions.
@@ -632,7 +635,7 @@ def asnormal(x):
     b = np.asanyarray(x)
     if b.dtype.kind not in NUMERIC_ARRAY_KINDS:
         if b.ndim == 0:
-            raise TypeError(f"Variable of type '{x.__class__.__name__}' cannot "
+            raise TypeError(f"Variable of type {x.__class__.__name__} cannot "
                             "be converted to a normal variable.")
         
         return stack([asnormal(vi) for vi in x])

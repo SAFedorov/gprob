@@ -681,7 +681,7 @@ class SparseNormal:
         iax_ord = [i for i in self._iaxid if i]
         for c in obs:
             if c._niax != niax:
-                warn(mismatch_w_msg)
+                warn(mismatch_w_msg, SparseConditionWarning)
                 continue
 
             sparse_ax = [c._iaxid.index(i) for i in iax_ord]
@@ -692,13 +692,16 @@ class SparseNormal:
             c = c.reshape(c.shape[:niax] + (dense_sz,))
 
             if c.shape[:niax] != self_fl.shape[:niax]:
-                warn(mismatch_w_msg)
+                warn(mismatch_w_msg, SparseConditionWarning)
                 continue
 
             if c.iscomplex:
                 obs_flat.extend([c.real, c.imag])
             else:
                 obs_flat.append(c)
+
+        if not obs_flat:
+            return self
 
         # Combines the observations in one and completes them w.r.t. self.
         cond = SparseNormal._concatenate(obs_flat, axis=-1)
@@ -1174,3 +1177,9 @@ def cov(*args):
     subs = f"{"".join(in_symb1)},{"".join(in_symb2)}->{"".join(out_symb)}"
     ax, ay = [em.a for em in emaps.complete([x.v.emap, y.v.emap])]
     return np.einsum(subs, ax, ay.conj())
+
+
+class SparseConditionWarning(RuntimeWarning):
+    """The warning issued when a condition is skipped during 
+    the conditioning of a sparse variable."""
+    pass
