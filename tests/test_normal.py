@@ -5,6 +5,7 @@ from numpy.linalg import LinAlgError
 from numpy.exceptions import ComplexWarning
 from gprob.normal_ import (normal, hstack, vstack, Normal, broadcast_to,
                            asnormal, safer_cholesky, cov, cov)
+from gprob.sparse import iid_repeat
 from utils import random_normal, random_correlate
 
 np.random.seed(0)
@@ -1133,6 +1134,50 @@ def test_setitem():
         assert np.max(np.abs(cov(v1[szv:], v2) - cov_ref)) < tol
         assert np.max(np.abs(v1[:szv].mean() - v3.mean())) < tol
         assert np.max(np.abs(v1[:szv].cov() - v3.cov())) < tol
+
+
+def test_asnormal():
+    tol = 1e-8
+
+    for sh in [tuple(), (3,), (2, 3)]:
+        x = np.random.rand(*sh)
+        v = asnormal(x)
+        assert isinstance(v, Normal)
+        assert np.max(np.abs(v.mean() - x)) < tol
+        assert np.max(v.var()) < tol
+
+    v = asnormal([normal(), 1, normal(1.2, 2.2)])
+    assert isinstance(v, Normal)
+    assert v.shape == (3,)
+    assert np.max(np.abs(v.mean() - [0, 1, 1.2])) < tol
+    assert np.max(np.abs(v.var() - [1, 0, 2.2])) < tol
+
+    v = asnormal([normal(size=(2,)), [1, 1], normal(1.2, 2.2, size=2)])
+    assert isinstance(v, Normal)
+    assert v.shape == (3, 2)
+    assert np.max(np.abs(v.mean() - [[0, 0], [1, 1], [1.2, 1.2]])) < tol
+    assert np.max(np.abs(v.var() - [[1, 1], [0, 0], [2.2, 2.2]])) < tol
+
+    v = asnormal([normal(size=(3,)), normal(1.2, 2.2, size=3)])
+    assert isinstance(v, Normal)
+    assert v.shape == (2, 3)
+    assert np.max(np.abs(v.mean() - [[0, 0, 0], [1.2, 1.2, 1.2]])) < tol
+    assert np.max(np.abs(v.var() - [[1, 1, 1], [2.2, 2.2, 2.2]])) < tol
+
+    with pytest.raises(TypeError):
+        asnormal(["s", NotImplemented])
+
+    with pytest.raises(TypeError):
+        asnormal([normal(), "s"])
+
+    with pytest.raises(TypeError) as te1:
+        asnormal("s")
+    
+    with pytest.raises(TypeError) as te2:
+        asnormal(iid_repeat(normal(), 3))
+
+    # Checks that the messages thrown in the two cases are different.
+    assert te1.value.args[0] != te2.value.args[0]
 
 
 def test_cov_func():

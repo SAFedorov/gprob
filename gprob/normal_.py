@@ -591,6 +591,12 @@ NUMERIC_ARRAY_KINDS = {"b", "i", "u", "f", "c"}
 def _as_numeric_or_normal(x):
     """Prepares the operand `x` for an arithmetic operation by converting 
     it to either a numeric array or a normal variable.
+
+    Args:
+        x: 
+            Normal variable, or a variable convertible to a numeric array.
+            In particular, it should be ensured externally that `x` 
+            is not a higher-type random variable.  
     
     Returns:
         Tuple (`numeric_or_normal_x`, `isnormal`)
@@ -613,22 +619,23 @@ def asnormal(x):
 
     if isinstance(x, Normal):
         return x
+    elif hasattr(x, "_normal_priority_"):
+        if x._normal_priority_ > Normal._normal_priority_:
+            raise TypeError(f"The variable {x} cannot be converted to "
+                            "a normal variable because it is "
+                            f"of higher type ({x._normal_priority_} "
+                            f"> {Normal._normal_priority_}).")
+        else:
+            # For possible future extensions.
+            raise TypeError("Unknown normal subtype.")
 
     b = np.asanyarray(x)
     if b.dtype.kind not in NUMERIC_ARRAY_KINDS:
-        if (hasattr(x, "_normal_priority_") 
-            and x._normal_priority_ > Normal._normal_priority_):
-
-            raise TypeError(f"The variable {x} cannot be converted to "
-                            "a normal variable because it is already "
-                            f"of higher priority ({x._normal_priority_} "
-                            f"> {Normal._normal_priority_}).")
-    
         if b.ndim == 0:
             raise TypeError(f"Variable of type '{x.__class__.__name__}' cannot "
                             "be converted to a normal variable.")
         
-        return stack([asnormal(vi) for vi in b])
+        return stack([asnormal(vi) for vi in x])
 
     em = ElementaryMap(np.zeros((0, *b.shape), dtype=b.dtype))
     return Normal(em, b)
