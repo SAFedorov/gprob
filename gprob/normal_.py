@@ -371,10 +371,11 @@ class Normal:
     # ---------- probability-related methods ----------
 
     def iid_copy(self):
-        """Creates an independent identically distributed copy."""
+        """Creates an independent identically distributed copy 
+        of the varaible."""
 
-        # Copies of `a` and `b` are needed for the case if the original array 
-        # is in-place modified later. Such modifications should not affect 
+        # Copies of `a` and `b` are taken becase if the original variable 
+        # is in-place modified later, those modifications should not affect 
         # the new variable.
         return Normal(self.a.copy(), self.b.copy())
 
@@ -383,12 +384,12 @@ class Normal:
         
         Args:
             observations (Normal or dict):
-                A single random normal variable or a dictionary of observations
+                A single normal variable or a dictionary of observations
                 of the format 
                 {`variable`: `value`, ...}, where `variable`s are normal 
                 variables, and `value`s can be numerical constants or 
-                random variables. A single normal `variable` is equavalent to 
-                {`variable`: `0`}.
+                normal variables. Specifying a single normal `variable` 
+                is equavalent to specifying {`variable`: `0`}.
             mask (optional): 
                 A 2d bool array, in which `mask[i, j] == True` means that 
                 the `i`-th condition applies to the `j`-th variable, and
@@ -476,26 +477,45 @@ class Normal:
         return Normal(ElementaryMap(new_a, emv.elem), new_b)
 
     def mean(self):
-        """Mean"""
+        """Mean.
+        
+        Returns:
+            An array of the mean values with the same shape as 
+            the random variable.
+        """
         return self.b
 
     def var(self):
-        """Variance, `<(x-<x>)(x-<x>)^*>` where `*` is complex conjugation."""
+        """Variance, `<(x-<x>)(x-<x>)^*>`, where `*` denotes 
+        complex conjugation, and `< >` taking the expectation value.
+        
+        Returns:
+            An array of the varaince values with the same shape as 
+            the random variable.
+        """
 
         a = self.emap.a        
         return np.real(np.einsum("i..., i... -> ...", a, a.conj()))
 
     def cov(self):
-        """Covariance. 
-        
-        For a vector variable `x` returns the matrix `C = <(x-<x>)(x-<x>)^H>`, 
-        where `H` is conjugate transpose.
+        """Covariance, `<outer((x-<x>), (x-<x>)^H)>`, where `H` denotes 
+        conjugate transposition, and `< >` taking the expectation value.
 
-        For a general array `x` returns the array `C` with twice the number of 
-        dimensions of `x` and the components
-        `C[ijk... lmn...] = <(x[ijk..] - <x>) (x[lmn..] - <x>)*>`, 
-        where the indices `ijk...` and `lmn...` run over the components of `x`,
-        and `*` is complex conjugation.
+        Returns:
+            An array `c` with twice the dimension number as 
+            the variable, whose components are 
+            `c[ijk... lmn...] = <(x[ijk..] - <x>)(x[lmn..] - <x>)*>`, 
+            where `ijk...` and `lmn...` are indices that run over 
+            the elements of the variable (here `x`), 
+            and `*` is complex conjugation.
+
+        Examples:
+            >>> v = normal(size=(2, 3))
+            >>> c = v.cov()
+            >>> c.shape
+            (2, 3, 2, 3)
+            >>> np.all(c.reshape((v.size, v.size)) == np.eye(v.size))
+            True
         """
 
         a = self.emap.a2d
@@ -503,8 +523,32 @@ class Normal:
         return cov2d.reshape(self.shape * 2)
     
     def sample(self, n=None):
-        """Samples the random variable `n` times."""
-        # n=None returns scalar output
+        """Samples the random variable `n` times.
+        
+        Args:
+            n: An integer number of samples or None.
+        
+        Returns:
+            A single sample with the same shape as the varaible if `n` is None, 
+            or an array of samples of the lenght `n` if `n` is an integer,
+            in which case the total shape of the array is the shape of 
+            the varaible plus (n,) prepended as the first dimension.
+
+        Examples:
+            >>> v.shape
+            (2, 3)
+            >>> v.sample()
+            array([[-0.33993954, -0.26758247, -0.33927517],
+                   [-0.36414751,  0.76830802,  0.0997399 ]])
+            >>> v.sample(2)
+            array([[[-1.78808198,  1.08481027,  0.40414722],
+                    [ 0.95298205, -0.42652839,  0.62417706]],
+
+                   [[-0.81295799,  1.76126207, -0.36532098],
+                    [-0.22637276, -0.67915003, -1.55995937]]])
+            >>> v.sample(5).shape
+            (5, 2, 3)
+        """
 
         if n is None:
             nshape = tuple()
@@ -655,6 +699,21 @@ def normal(mu=0., sigmasq=1., size=None):
 
     Returns:
         A Normal random variable.
+
+    Examples:
+        >>> v = normal(1, 3, size=2)
+        >>> v.mean()
+        array([1, 1])
+        >>> v.cov()
+        array([[3., 0.],
+               [0., 3.]])
+
+        >>> v = normal([0.5, 0.1], [[2, 1], [1, 2]])
+        >>> v.mean()
+        array([0.5, 0.1])
+        >>> v.cov()
+        array([[2., 1.],
+               [1., 2.]])
     """
 
     sigmasq = np.asanyarray(sigmasq)
@@ -732,17 +791,48 @@ def safer_cholesky(x):
 
 
 def cov(*args):
-    """Covariance. For a single variable `x` returns `x.cov()`.
+    """Covariance, `<outer((x-<x>), (y-<y>)^H)>`, where `H` denotes 
+    conjugate transposition, and `< >` taking the expectation value.
     
-    For two scalar variables `x` and `y` returns the expectation 
-    `<(x-<x>) (y-<y>)^*>`, where `*` is complex conjugation.
+    Args:
+        One or two random variables.
 
-    For two arrays `x` and `y` returns the array `C` whose number of 
-    dimensions is equal to the sum of the dimensions of `x` and `y` and 
-    whose components are
-    `C[ijk... lmn...] = <(x[ijk..] - <x>) (y[lmn..] - <y>)*>`, 
-    where the indices `ijk...` and `lmn...` run over the components 
-    of `x` and `y`, respectively.
+    Returns:
+        For one random variable `x`, returns `x.cov()`. 
+        For two random variables, `x` and `y`, returns the cross-covariance,
+        which is an array `c` with the dimension number equal 
+        to the sum of the dimensions of `x` and `y`, and 
+        whose components are
+        `c[ijk... lmn...] = <(x[ijk..] - <x>)(y[lmn..] - <y>)*>`, 
+        where the indices `ijk...` and `lmn...` run over the elements 
+        of `x` and `y`, respectively.
+
+    Raises:
+        ValueError if the number of input arguments is not 1 or 2.
+
+    Examples:
+        >>> v = normal(size=(2, 3))
+        >>> c = cov(v)
+        >>> c.shape
+        (2, 3, 2, 3)
+        >>> np.all(c.reshape((v.size, v.size)) == np.eye(v.size))
+        True
+
+        >>> v1 = normal(size=2)
+        >>> v2 = 0.5 * v1[0] + normal()
+        >>> cov(v1, v2)
+        array([0.5, 0. ])
+
+        >>> v1 = normal(size=2)
+        >>> v2 = 0.5 * v1[0] + normal(size=3)
+        >>> cov(v1, v2)
+        array([[0.5, 0.5, 0.5],
+               [0. , 0. , 0. ]])
+
+        >>> v1 = normal()
+        >>> v2 = 1j * v1 + normal()
+        >>> cov(v1, v2)
+        array(0.-1.j)
     """
 
     if len(args) == 0 or len(args) > 2:

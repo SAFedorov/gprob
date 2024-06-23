@@ -1,1 +1,1 @@
-The files in this folder are from a neat project [GaussianInfer](https://github.com/damast93/GaussianInfer) by Dario Stein. They are used for cross-validation only.
+The files in this folder belong to the Dario Stein's project [GaussianInfer](https://github.com/damast93/GaussianInfer). They are used for testing only.

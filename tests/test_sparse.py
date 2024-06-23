@@ -5,9 +5,9 @@ from numpy.exceptions import AxisError
 from numpy.exceptions import ComplexWarning
 
 import gprob as gp
-from gprob.normal_ import normal
+from gprob.normal_ import normal, Normal
 from gprob.sparse import (_parse_index_key, iid_repeat, assparsenormal, 
-                          SparseConditionWarning)
+                          SparseNormal, SparseConditionWarning)
 
 from utils import random_normal
 
@@ -1949,3 +1949,35 @@ def test_einsum():
     v_ei = gp.einsum("kl, ij -> lj", x, v)
     v_ou = gp.outer(x, v)
     assert_equal(v_ei, v_ou)
+
+
+def test_iid_copy():
+    tol = 1e-8
+
+    v = iid_repeat(random_normal((3, 4)), 5, axis=1)
+    v = iid_repeat(v, 6, axis=-1)
+    v_ = v.iid_copy()
+
+    assert v.shape == v_.shape
+    assert v.iscomplex == v_.iscomplex
+    assert np.max(np.abs(gp.sparse.cov(v, v_))) < tol
+    assert np.max(np.abs(v.mean() - v_.mean())) < tol
+    assert np.max(np.abs(v.cov() - v_.cov())) < tol
+
+    v = iid_repeat(random_normal((4, 3), dtype=np.complex64), 5, axis=1)
+    v = iid_repeat(v, 6, axis=-2)
+    v_ = v.iid_copy()
+
+    assert v.shape == v_.shape
+    assert v.iscomplex == v_.iscomplex
+    assert np.max(np.abs(gp.sparse.cov(v, v_))) < tol
+    assert np.max(np.abs(v.mean() - v_.mean())) < tol
+    assert np.max(np.abs(v.cov() - v_.cov())) < tol
+
+
+def test_doc_string_sync():
+    methods = ["iid_copy", "mean", "var", "sample", "logp", "__or__"]
+
+    for m in methods:
+        assert getattr(Normal, m).__doc__
+        assert getattr(Normal, m).__doc__ == getattr(SparseNormal, m).__doc__

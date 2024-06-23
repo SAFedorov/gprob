@@ -4,7 +4,7 @@ from scipy.stats import multivariate_normal as mvn
 from numpy.linalg import LinAlgError
 from numpy.exceptions import ComplexWarning
 from gprob.normal_ import (normal, hstack, vstack, Normal, broadcast_to,
-                           asnormal, safer_cholesky, cov, cov)
+                           asnormal, safer_cholesky, cov, cov, iid_copy)
 from gprob.sparse import iid_repeat
 from utils import random_normal, random_correlate
 
@@ -1217,3 +1217,41 @@ def test_cov_func():
         c = hstack([v1, v2]).cov()
         assert np.max(np.abs(c[:, :2, :, :2] - c11)) < tol
         assert np.max(np.abs(c[:, :2, :, 2:] - c12)) < tol
+
+        # Too few input arguments.
+        with pytest.raises(ValueError):
+            cov()
+
+        # Too many input arguments.
+        with pytest.raises(ValueError):
+            cov(normal(), normal(), normal())
+
+
+def test_iid_copy():
+    tol = 1e-8
+
+    v = random_normal((3, 4))
+    v_ = v.iid_copy()
+
+    assert v.shape == v_.shape
+    assert v.iscomplex == v_.iscomplex
+    assert np.max(np.abs(cov(v, v_))) < tol
+    assert np.max(np.abs(v.mean() - v_.mean())) < tol
+    assert np.max(np.abs(v.cov() - v_.cov())) < tol
+
+    v_ = iid_copy(v)
+
+    assert v.shape == v_.shape
+    assert v.iscomplex == v_.iscomplex
+    assert np.max(np.abs(cov(v, v_))) < tol
+    assert np.max(np.abs(v.mean() - v_.mean())) < tol
+    assert np.max(np.abs(v.cov() - v_.cov())) < tol
+
+    v = random_normal((4, 3), dtype=np.complex64)
+    v_ = v.iid_copy()
+
+    assert v.shape == v_.shape
+    assert v.iscomplex == v_.iscomplex
+    assert np.max(np.abs(cov(v, v_))) < tol
+    assert np.max(np.abs(v.mean() - v_.mean())) < tol
+    assert np.max(np.abs(v.cov() - v_.cov())) < tol

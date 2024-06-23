@@ -650,12 +650,27 @@ class SparseNormal:
 
     # ---------- probability-related methods ----------
 
-    # TODO: add a test that the doc strings are in sync with those of Normal --------------------
-
     def iid_copy(self):
+        """Creates an independent identically distributed copy 
+        of the varaible."""
         return SparseNormal(self.v.iid_copy(), self._iaxid)
 
     def condition(self, observations):
+        """Conditioning operation. Applicable between variables having the same 
+        numbers and sizes of independence axes.
+        
+        Args:
+            observations (SparseNormal or dict):
+                A single sparse normal variable or a dictionary
+                of observations of the format 
+                {`variable`: `value`, ...}, where `variable`s are sparse normal 
+                variables, and `value`s can be numerical constants or 
+                sparse normal variables. Specifying a single normal `variable` 
+                is equavalent to specifying {`variable`: `0`}.
+        
+        Returns:
+            Conditional sparse normal variable.
+        """
 
         if isinstance(observations, dict):
             obs = [assparsenormal(k-v) for k, v in observations.items()]
@@ -758,29 +773,56 @@ class SparseNormal:
         return SparseNormal(v, self._iaxid)
     
     def mean(self):
-        """Mean"""
+        """Mean.
+        
+        Returns:
+            An array of the mean values with the same shape as 
+            the random variable.
+        """
         return self.v.b
 
     def var(self):
-        """Variance, `<(x-<x>)(x-<x>)^*>` where `*` is complex conjugation."""
+        """Variance, `<(x-<x>)(x-<x>)^*>`, where `*` denotes 
+        complex conjugation, and `< >` taking the expectation value.
+        
+        Returns:
+            An array of the varaince values with the same shape as 
+            the random variable.
+        """
         return self.v.var()
 
     def cov(self):
-        # TODO: update the doc string ----------------------------------------------------------
-        """Covariance. 
-        
-        While the covariance `C` for a dense variable have twice the number of 
-        dimensions of the variable,
-        `C[ijk... lmn...] = <(x[ijk..] - <x>) (x[lmn..] - <x>)*>`, 
-        where the indices `ijk...` and `lmn...` run over the components 
-        of the variable, and `*` is complex conjugation,
-        the covariance for a sparse variable only contains the diagonals of
-        the independence axes, which are appended to the end of the array.
-        For one independence axis, this amounts to taking the diagonal as
-        
-        `np.diagonal(C, axis1=x.iaxes[0], axis2=(x.ndim + x.iaxes[0]))`,
+        """Covariance, `<outer((x-<x>), (x-<x>)^H)>`, where `H` denotes 
+        conjugate transposition, and `< >` taking the expectation value.
 
-        where `C` is the dense covariance.
+        Returns:
+            An array with the dimension number equal to twice 
+            the number of the regular dimensions of the variable, plus 
+            the undoubled number of its sparse (independence) dimensions. 
+            In the resulting covariance array, the regular dimensions 
+            go first in the order they appear in the variable, and 
+            the independence dimensions are appended at the end.
+            The resulting array is the same as the result produced 
+            by repeated applications of `np.diagonal` over all the 
+            independence dimensions of the full-sized covariance matrix `c`,
+            `c[ijk... lmn...] = <(x[ijk..] - <x>)(x[lmn..] - <x>)*>`, 
+            where `ijk...` and `lmn...` are indices that run over 
+            the elements of the variable (here `x`), 
+            and `*` is complex conjugation.
+
+        Examples:
+            >>> v = iid_repeat(normal(size=(3,)), 4)
+            >>> v.shape
+            (4, 3)
+            >>> v.cov().shape
+            (3, 3, 4)
+
+            >>> v = iid_repeat(normal(size=(3, 2)), 4)
+            >>> v = iid_repeat(v, 5)
+            >>> v.shape
+            (5, 4, 3, 2)
+            >>> v.cov().shape
+            (3, 2, 3, 2, 5, 4)
         """
 
         symb = [einsubs.get_symbol(i) for i in range(2 * self.ndim + 1)]
@@ -807,10 +849,32 @@ class SparseNormal:
 
     
     def sample(self, n=None):
-        """Samples the random variable `n` times."""
-        # n=None returns scalar output
+        """Samples the random variable `n` times.
+        
+        Args:
+            n: An integer number of samples or None.
+        
+        Returns:
+            A single sample with the same shape as the varaible if `n` is None, 
+            or an array of samples of the lenght `n` if `n` is an integer,
+            in which case the total shape of the array is the shape of 
+            the varaible plus (n,) prepended as the first dimension.
 
-        # TODO: document the output shape ----------------------------------------------
+        Examples:
+            >>> v.shape
+            (2, 3)
+            >>> v.sample()
+            array([[-0.33993954, -0.26758247, -0.33927517],
+                   [-0.36414751,  0.76830802,  0.0997399 ]])
+            >>> v.sample(2)
+            array([[[-1.78808198,  1.08481027,  0.40414722],
+                    [ 0.95298205, -0.42652839,  0.62417706]],
+
+                   [[-0.81295799,  1.76126207, -0.36532098],
+                    [-0.22637276, -0.67915003, -1.55995937]]])
+            >>> v.sample(5).shape
+            (5, 2, 3)
+        """
         
         if n is None:
             nsh = tuple()
