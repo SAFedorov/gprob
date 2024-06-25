@@ -366,7 +366,7 @@ class ElementaryMap:
 
         return ElementaryMap(new_a, self.elem)
     
-    def tensordot(self, other, otherfirst=False, axes=2):
+    def tensordot(self, other, axes, otherfirst=False):
         try:
             iter(axes)
         except Exception:

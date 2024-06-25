@@ -4,7 +4,7 @@ from scipy.stats import multivariate_normal as mvn
 
 np.random.seed(0)
 
-from gprob.normal_ import normal, hstack
+from gprob import normal, hstack
 from gprob.func import logp, logp_lstsq, dlogp, d2logp, fisher
 
 from reffunc import logp as logp_

@@ -3,8 +3,9 @@ import numpy as np
 from scipy.stats import multivariate_normal as mvn
 from numpy.linalg import LinAlgError
 from numpy.exceptions import ComplexWarning
-from gprob.normal_ import (normal, hstack, vstack, Normal, broadcast_to,
-                           asnormal, safer_cholesky, cov, cov, iid_copy)
+from gprob import hstack, vstack, iid_copy
+from gprob.normal_ import (normal, Normal, safer_cholesky, broadcast_to, 
+                           asnormal, cov)
 from gprob.sparse import iid_repeat
 from utils import random_normal, random_correlate
 
@@ -503,10 +504,20 @@ def test_complex_logp():
 
 
 def test_len():
+    xi = normal()
+    with pytest.raises(TypeError):
+        len(xi)
+
+    xi = normal(size=(1,))
+    assert len(xi) == 1
+
     xi = normal(0, 2, size=2)
     assert len(xi) == 2
 
-    xi = (normal() & normal() & normal() & normal())
+    xi = normal(0, 2, size=(2, 3))
+    assert len(xi) == 2
+
+    xi = hstack([normal(), normal(), normal(), normal()])
     assert len(xi) == 4
 
 

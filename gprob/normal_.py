@@ -209,11 +209,11 @@ class Normal:
     
     def __and__(self, other):
         """Combines two random variables into one vector."""
-        return hstack([self, other])  
+        return stack([self, other])  
     
     def __rand__(self, other):
         """Combines two random variables into one vector."""
-        return hstack([other, self])
+        return stack([other, self])
     
     def _is_lower_than(self, other):
         """Checks if `self` has lower operation priority than `other`."""
@@ -287,86 +287,6 @@ class Normal:
         b = self.b.trace(offset=offset, axis1=axis1, axis2=axis2)
         em = self.emap.trace(offset, axis1, axis2)
         return Normal(em, b)
-    
-    @staticmethod
-    def _concatenate(arrays, axis):
-        arrays = [asnormal(ar) for ar in arrays]
-        b = np.concatenate([x.b for x in arrays], axis=axis)
-        em = emaps.concatenate([x.emap for x in arrays], vaxis=axis)
-        return Normal(em, b)
-    
-    @staticmethod
-    def _stack(arrays, axis):
-        arrays = [asnormal(ar) for ar in arrays]
-        b = np.stack([x.b for x in arrays], axis=axis)
-        em = emaps.stack([x.emap for x in arrays], vaxis=axis)
-        return Normal(em, b)
-
-    @staticmethod
-    def _bilinearfunc(name, op1, op2, *args, **kwargs):
-        op1, isnormal1 = _as_numeric_or_normal(op1)
-        op2, isnormal2 = _as_numeric_or_normal(op2)
-
-        if isnormal2 and isnormal1:
-            b = getattr(np, name)(op1.b, op2.b, *args, **kwargs)
-            em = getattr(op1.emap, name)(op2.b, *args, **kwargs)
-
-            kwargs.update(otherfirst=True)
-            em += getattr(op2.emap, name)(op1.b, *args, **kwargs)
-            return Normal(em, b)
-
-        if isnormal1 and not isnormal2:
-            b = getattr(np, name)(op1.b, op2, *args, **kwargs)
-            em = getattr(op1.emap, name)(op2, *args, **kwargs)
-            return Normal(em, b)
-        
-        if isnormal2 and not isnormal1:
-            b = getattr(np, name)(op1, op2.b, *args, **kwargs)
-
-            kwargs.update(otherfirst=True)
-            em = getattr(op2.emap, name)(op1, *args, **kwargs)
-            return Normal(em, b)
-
-        return getattr(np, name)(op1, op2, *args, **kwargs)
-
-    @staticmethod
-    def _einsum(subs, op1, op2):
-        op1, isnormal1 = _as_numeric_or_normal(op1)
-        op2, isnormal2 = _as_numeric_or_normal(op2)
-
-        if isnormal2 and isnormal1:
-            b = einsum(subs, op1.b, op2.b)
-            em = op1.emap.einsum(subs, op2.b)
-            em += op2.emap.einsum(subs, op1.b, otherfirst=True)
-            return Normal(em, b)
-
-        if isnormal1 and not isnormal2:
-            b = np.einsum(subs, op1.b, op2)
-            em = op1.emap.einsum(subs, op2)
-            return Normal(em, b)
-        
-        if isnormal2 and not isnormal1:
-            b = np.einsum(subs, op1, op2.b)
-            em = op2.emap.einsum(subs, op1, otherfirst=True)
-            return Normal(em, b)
-
-        return np.einsum(subs, op1, op2)
-
-    @staticmethod
-    def _fftfunc(name, x, n, axis, norm):
-        x = asnormal(x)
-        func = getattr(np.fft, name)
-        b = func(x.b, n, axis, norm)
-        em = x.emap.fftfunc(name, n, axis, norm)
-        return Normal(em, b)
-
-    @staticmethod
-    def _fftfunc_n(name, x, s, axes, norm):
-        x = asnormal(x)
-        func = getattr(np.fft, name)
-        b = func(x.b, s, axes, norm)
-        em = x.emap.fftfunc_n(name, s, axes, norm)
-        return Normal(em, b)
 
     # ---------- probability-related methods ----------
 
@@ -408,8 +328,9 @@ class Normal:
             Conditional normal variable.
 
         Raises:
-            ConditionError if the observations are mutually incompatible,
-            or if a mask is given with degenerate observations.
+            ConditionError: 
+                If the observations are mutually incompatible,
+                or if a mask is given with degenerate observations.
         """
         if isinstance(observations, dict):
             obs = [asnormal(k-v) for k, v in observations.items()]
@@ -808,7 +729,8 @@ def cov(*args):
         of `x` and `y`, respectively.
 
     Raises:
-        ValueError if the number of input arguments is not 1 or 2.
+        ValueError: 
+            If the number of input arguments is not 1 or 2.
 
     Examples:
         >>> v = normal(size=(2, 3))
@@ -836,7 +758,7 @@ def cov(*args):
     """
 
     if len(args) == 0 or len(args) > 2:
-        raise ValueError("The function only accepts one or two input "
+        raise ValueError("The function can only accept one or two input "
                          f"arguments, while {len(args)} areguments are given.")
     
     if len(args) == 1:
@@ -849,12 +771,7 @@ def cov(*args):
     return cov2d.reshape(x.shape + y.shape)
 
 
-def iid_copy(x):
-    """Creates an independent identically distributed copy of `x`."""
-    return x.iid_copy()
-
-
-# ---------- linear array functions ----------
+# ---------- array functions ----------
 
 
 def broadcast_to(x, shape):
@@ -864,246 +781,85 @@ def broadcast_to(x, shape):
     return Normal(em, b)
 
 
-def diagonal(x, offset=0, axis1=0, axis2=1):
-    return x.diagonal(offset=offset, axis1=axis1, axis2=axis2)
-
-
-def sum(x, axis=None, keepdims=False):
-    return x.sum(axis=axis, keepdims=keepdims)
-
-
-def cumsum(x, axis=None):
-    return x.cumsum(axis=axis)
-
-
-def moveaxis(x, source, destination):
-    return x.moveaxis(source, destination)
-
-
-def ravel(x, order="C"):
-    return x.ravel(order=order)
-
-
-def reshape(x, newshape, order="C"):
-    return x.reshape(newshape, order=order)
-
-
-def transpose(x, axes=None):
-    return x.transpose(axes=axes)
-
-
-def trace(x, offset=0, axis1=0, axis2=1):
-    return x.trace(offset=offset, axis1=axis1, axis2=axis2)
-
-
-def get_highest_class(seq):
-    """Returns the class of the highest-priority object in the sequence `seq`
-    according to `_normal_priority_`, defaulting to `Normal`."""
-
-    obj = max(seq, default=0, key=lambda a: getattr(a, "_normal_priority_", 
-                                                    Normal._normal_priority_-1))
-    cls = obj.__class__
-    if not hasattr(cls, "_normal_priority_"):
-        return Normal 
-    
-    return cls
-
-
 def concatenate(arrays, axis=0):
-    if len(arrays) == 0:
-        raise ValueError("Need at least one array to concatenate.")
-    cls = get_highest_class(arrays)
-    return cls._concatenate(arrays, axis)
+    arrays = [asnormal(ar) for ar in arrays]
+    b = np.concatenate([x.b for x in arrays], axis=axis)
+    em = emaps.concatenate([x.emap for x in arrays], vaxis=axis)
+    return Normal(em, b)
 
 
 def stack(arrays, axis=0):
-    if len(arrays) == 0:
-        raise ValueError("Need at least one array to stack.")
-    cls = get_highest_class(arrays)
-    return cls._stack(arrays, axis)
+    arrays = [asnormal(ar) for ar in arrays]
+    b = np.stack([x.b for x in arrays], axis=axis)
+    em = emaps.stack([x.emap for x in arrays], vaxis=axis)
+    return Normal(em, b)
 
 
-def _as_array_seq(arrays_or_scalars):
-    return [x if hasattr(x, "ndim") else np.array(x) for x in arrays_or_scalars]
+def bilinearfunc(name, op1, op2, args=tuple(), pargs=tuple()):
+    op1, isnormal1 = _as_numeric_or_normal(op1)
+    op2, isnormal2 = _as_numeric_or_normal(op2)
+
+    if isnormal2 and isnormal1:
+        b = getattr(np, name)(*pargs, op1.b, op2.b, *args)
+        em = getattr(op1.emap, name)(*pargs, op2.b, *args)
+        em += getattr(op2.emap, name)(*pargs, op1.b, *args, otherfirst=True)
+        return Normal(em, b)
+
+    if isnormal1 and not isnormal2:
+        b = getattr(np, name)(*pargs, op1.b, op2, *args)
+        em = getattr(op1.emap, name)(*pargs, op2, *args)
+        return Normal(em, b)
     
+    if isnormal2 and not isnormal1:
+        b = getattr(np, name)(*pargs, op1, op2.b, *args)
+        em = getattr(op2.emap, name)(*pargs, op1, *args, otherfirst=True)
+        return Normal(em, b)
 
-def hstack(arrays):
-    if len(arrays) == 0:
-        raise ValueError("Need at least one array to stack.")
-    
-    arrays = _as_array_seq(arrays)
-    arrays = [a.ravel() if a.ndim == 0 else a for a in arrays]
-    if arrays[0].ndim == 1:
-        return concatenate(arrays, axis=0)
-    
-    return concatenate(arrays, axis=1)
-    
-
-def vstack(arrays):
-    if len(arrays) == 0:
-        raise ValueError("Need at least one array to stack.")
-    
-    arrays = _as_array_seq(arrays)
-    if arrays[0].ndim <= 1:
-        arrays = [a.reshape((1, -1)) for a in arrays]
-    
-    return concatenate(arrays, axis=0)
+    return getattr(np, name)(*pargs, op1, op2, *args)
 
 
-def dstack(arrays):
-    if len(arrays) == 0:
-        raise ValueError("Need at least one array to stack.")
-    
-    arrays = _as_array_seq(arrays)
-    if arrays[0].ndim <= 1:
-        arrays = [a.reshape((1, -1, 1)) for a in arrays]
-    elif arrays[0].ndim == 2:
-        arrays = [a.reshape((*a.shape, 1)) for a in arrays]
-    
-    return concatenate(arrays, axis=2)
+def dot(op1, op2): 
+    return bilinearfunc("dot", op1, op2)
 
 
-def split(x, indices_or_sections, axis=0):   
-    return x.split(indices_or_sections=indices_or_sections, axis=axis)
-
-
-def hsplit(x, indices_or_sections):
-    if x.ndim < 1:
-        raise ValueError("hsplit only works on arrays of 1 or more dimensions")
-    if x.ndim == 1:
-        return split(x, indices_or_sections, axis=0)
-    return split(x, indices_or_sections, axis=1)
-
-
-def vsplit(x, indices_or_sections):
-    if x.ndim < 2:
-        raise ValueError("vsplit only works on arrays of 2 or more dimensions")
-    return split(x, indices_or_sections, axis=0)
-
-
-def dsplit(x, indices_or_sections):
-    if x.ndim < 3:
-        raise ValueError("dsplit only works on arrays of 3 or more dimensions")
-    return split(x, indices_or_sections, axis=2)
-    
-
-def einsum(subs, op1, op2):
-    cls = get_highest_class([op1, op2])
-    return cls._einsum(subs, op1, op2)
-
-
-def add(op1, op2):
-    return op1 + op2
-
-
-def subtract(op1, op2):
-    return op1 - op2
-
-
-def multiply(op1, op2):
-    return op1 * op2
-
-
-def divide(op1, op2):
-    return op1 / op2
-
-
-def power(op1, op2):
-    return op1 ** op2
-
-
-def matmul(op1, op2):
-    return op1 @ op2
-
-
-def dot(op1, op2):
-    return _bilinearfunc("dot", op1, op2)
-
-
-def inner(op1, op2):
-    return _bilinearfunc("inner", op1, op2)
+def inner(op1, op2): 
+    return bilinearfunc("inner", op1, op2)
 
 
 def outer(op1, op2):
-    return _bilinearfunc("outer", op1, op2)
+    return bilinearfunc("outer", op1, op2)
 
 
 def kron(op1, op2):
-    return _bilinearfunc("kron", op1, op2)
+    return bilinearfunc("kron", op1, op2)
 
 
 def tensordot(op1, op2, axes=2):
-    return _bilinearfunc("tensordot", op1, op2, axes=axes)
+    return bilinearfunc("tensordot", op1, op2, [axes])
 
 
-def _bilinearfunc(name, op1, op2, *args, **kwargs):
-    cls = get_highest_class([op1, op2])
-    return cls._bilinearfunc(name, op1, op2, *args, **kwargs)
+def einsum(subs, op1, op2):
+    return bilinearfunc("einsum", op1, op2, pargs=[subs])
 
 
-# ---------- linear and linearized unary array ufuncs ----------
-
-def linearized_unary(jmpf):
-    if not jmpf.__name__.endswith("_jmp"):
-        raise ValueError()
-    
-    fnm = jmpf.__name__[:-4]
-    f = getattr(np, fnm)
-
-    def flin(x):
-        x, isnormal = _as_numeric_or_normal(x)
-
-        if not isnormal:
-            return f(x)
-        
-        new_b = f(x.b)
-        em = jmpf(x.b, new_b, x.emap)
-        return Normal(em, new_b)
-    
-    flin.__name__ = fnm
-    return flin
+def fftfunc(name, x, n, axis, norm):
+    x = asnormal(x)
+    func = getattr(np.fft, name)
+    b = func(x.b, n, axis, norm)
+    em = x.emap.fftfunc(name, n, axis, norm)
+    return Normal(em, b)
 
 
-# Elementwise Jacobian-matrix products.
-def exp_jmp(x, ans, a):     return a * ans
-def exp2_jmp(x, ans, a):    return a * (ans * np.log(2.))
-def log_jmp(x, ans, a):     return a / x
-def log2_jmp(x, ans, a):    return a / (x * np.log(2.))
-def log10_jmp(x, ans, a):   return a / (x * np.log(10.))
-def sqrt_jmp(x, ans, a):    return a / (2. * ans)
-def cbrt_jmp(x, ans, a):    return a / (3. * ans**2)
-def sin_jmp(x, ans, a):     return a * np.cos(x)
-def cos_jmp(x, ans, a):     return a * (-np.sin(x))
-def tan_jmp(x, ans, a):     return a / np.cos(x)**2
-def arcsin_jmp(x, ans, a):  return a / np.sqrt(1 - x**2)
-def arccos_jmp(x, ans, a):  return a / (-np.sqrt(1 - x**2))
-def arctan_jmp(x, ans, a):  return a / (1 + x**2)
-def sinh_jmp(x, ans, a):    return a * np.cosh(x)
-def cosh_jmp(x, ans, a):    return a * np.sinh(x)
-def tanh_jmp(x, ans, a):    return a / np.cosh(x)**2
-def arcsinh_jmp(x, ans, a): return a / np.sqrt(x**2 + 1)
-def arccosh_jmp(x, ans, a): return a / np.sqrt(x**2 - 1)
-def arctanh_jmp(x, ans, a): return a / (1 - x**2)
-def conjugate_jmp(x, ans, a): return a.conj()
+def fftfunc_n(name, x, s, axes, norm):
+    x = asnormal(x)
+    func = getattr(np.fft, name)
+    b = func(x.b, s, axes, norm)
+    em = x.emap.fftfunc_n(name, s, axes, norm)
+    return Normal(em, b)
 
 
-exp = linearized_unary(exp_jmp)
-exp2 = linearized_unary(exp2_jmp)
-log = linearized_unary(log_jmp)
-log2 = linearized_unary(log2_jmp)
-log10 = linearized_unary(log10_jmp)
-sqrt = linearized_unary(sqrt_jmp)
-cbrt = linearized_unary(cbrt_jmp)
-sin = linearized_unary(sin_jmp)
-cos = linearized_unary(cos_jmp)
-tan = linearized_unary(tan_jmp)
-arcsin = linearized_unary(arcsin_jmp)
-arccos = linearized_unary(arccos_jmp)
-arctan = linearized_unary(arctan_jmp)
-sinh = linearized_unary(sinh_jmp)
-cosh = linearized_unary(cosh_jmp)
-tanh = linearized_unary(tanh_jmp)
-arcsinh = linearized_unary(arcsinh_jmp)
-arccosh = linearized_unary(arccosh_jmp)
-arctanh = linearized_unary(arctanh_jmp)
-conjugate = conj = linearized_unary(conjugate_jmp)
+def call_linearized(x, func, jmpfunc):
+    x = asnormal(x)
+    new_b = func(x.b)
+    em = jmpfunc(x.b, new_b, x.emap)
+    return Normal(em, new_b)

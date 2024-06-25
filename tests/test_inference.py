@@ -1,7 +1,8 @@
 import pytest
 import numpy as np
 from external.Infer import Infer
-from gprob.normal_ import normal, hstack, stack, cov
+from gprob import hstack, stack
+from gprob.normal_ import normal, cov
 from gprob.func import ConditionError
 from utils import random_normal, random_correlate
 

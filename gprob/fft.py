@@ -1,4 +1,4 @@
-from .normal_ import get_highest_class
+from .arrayops import resolve_module
 
 
 def fft(x, n=None, axis=-1, norm=None):
@@ -26,8 +26,8 @@ def ihfft(x, n=None, axis=-1, norm=None):
 
 
 def _fftfunc(name, x, n, axis, norm):
-    cls = get_highest_class(x)
-    return cls._fftfunc(name, x, n, axis, norm)
+    mod = resolve_module([x])
+    return mod.fftfunc(name, x, n, axis, norm)
 
 
 def fft2(x, s=None, axes=(-2, -1), norm=None):
@@ -63,5 +63,5 @@ def irfftn(x, s=None, axes=None, norm=None):
 
 
 def _fftfunc_n(name, x, s, axes, norm):
-    cls = get_highest_class(x)
-    return cls._fftfunc_n(name, x, s, axes, norm)
+    mod = resolve_module([x])
+    return mod.fftfunc_n(name, x, s, axes, norm)

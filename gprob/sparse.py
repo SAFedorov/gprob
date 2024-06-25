@@ -6,8 +6,8 @@ import numpy as np
 from numpy.linalg import LinAlgError
 from numpy.exceptions import AxisError
 
-from .normal_ import (Normal, asnormal, print_normal, broadcast_to, 
-                      validate_logp_samples)
+from . import normal_
+from .normal_ import Normal, asnormal, print_normal
 from .external import einsubs
 from . import emaps
 from .emaps import ElementaryMap
@@ -32,7 +32,7 @@ def iid_repeat(x, nrep=1, axis=0):
     idx = tuple(idx)
 
     new_shape = v.shape[:axis] + (nrep,) + v.shape[axis:]
-    v = broadcast_to(v[idx], new_shape)
+    v = normal_.broadcast_to(v[idx], new_shape)
 
     return SparseNormal(v, iaxid)
 
@@ -469,184 +469,6 @@ class SparseNormal:
         s = {axis1, axis2}
         iaxid = tuple([b for i, b in enumerate(self._iaxid) if i not in s])
         return SparseNormal(self.v.trace(offset, axis1, axis2), iaxid)
-    
-    @staticmethod
-    def _concatenate(arrays, axis):
-        arrays = [assparsenormal(ar) for ar in arrays]
-        iaxid = _validate_iaxes(arrays)
-        axis = _normalize_axis(axis, len(iaxid))
-        
-        if iaxid[axis]:
-            raise ValueError("Concatenation along independence axes "
-                             "is not allowed.")
-
-        v = Normal._concatenate([x.v for x in arrays], axis=axis)
-        return SparseNormal(v, iaxid)
-    
-    @staticmethod
-    def _stack(arrays, axis):
-        arrays = [assparsenormal(ar) for ar in arrays]
-        iaxid = _validate_iaxes(arrays)
-        iaxid = iaxid[:axis] + (None,) + iaxid[axis:]
-
-        v = Normal._stack([x.v for x in arrays], axis=axis)
-        return SparseNormal(v, iaxid)
-    
-    # TODO: separate the individual functions - --------------------------------------
-
-    @staticmethod
-    def _bilinearfunc(name, op1, op2, *args, **kwargs):
-        op1 = assparsenormal(op1)
-        op2 = assparsenormal(op2)
-
-        mn = f"_{name}_get_axes"
-
-        op1, op2, op_axes1, op_axes2, iaxid1, iaxid2 = getattr(SparseNormal, mn)(op1, op2, *args, **kwargs)
-        _validate_iaxes_bilinear(op1, op2, op_axes1, op_axes2)
-
-        if not _is_deterministic(op1):
-            v = Normal._bilinearfunc(name, op1.v, op2.v.mean(), *args, **kwargs)
-            w = SparseNormal(v, iaxid1)
-
-            if not _is_deterministic(op2):
-                w += SparseNormal._bilinearfunc(op1.mean(), (op2 - op2.mean()))
-
-        elif not _is_deterministic(op2):
-            v = Normal._bilinearfunc(name, op1.v.mean(), op2.v, *args, **kwargs)
-            w = SparseNormal(v, iaxid2)
-
-        else:
-            w = getattr(np, name)(op1.v.mean(), op2.v.mean())
-
-        return w
-    
-    @staticmethod
-    def _dot_get_axes(op1, op2):
-        if op1.ndim == 0:
-            op_axis1 = -1
-        elif op1.ndim == 1:
-            op_axis1 = 0
-        else:
-            op_axis1 = op1.ndim - 1
-        
-        if op2.ndim == 0:
-            op_axis2 = -1
-        elif op2.ndim == 1:
-            op_axis2 = 0
-        else:
-            op_axis2 = op2.ndim - 2
-
-        iaxid1 = op1._iaxid
-
-        iaxid2 = list(op2._iaxid)
-        iaxid2.pop(op2.ndim-1)
-        iaxid2 = (None,) * max(op1.ndim - 1, 0) + tuple(iaxid2)
-
-        return op1, op2, op_axis1, op_axis2, iaxid1, iaxid2
-
-    @staticmethod
-    def _inner_get_axes(op1, op2):
-        op_axis1 = op1.ndim - 1
-        op_axis2 = op2.ndim - 1
-        
-        iaxid1 = op1._iaxid[:-1]
-        iaxid2 = (None,) * (op1.ndim - 1) + op2._iaxid[:-1]
-
-        return op1, op2, op_axis1, op_axis2, iaxid1, iaxid2
-
-    @staticmethod
-    def _outer_get_axes(op1, op2):
-        op1 = op1.ravel()
-        op2 = op2.ravel()
-
-        op_axes1 = tuple()
-        op_axes2 = tuple()
-
-        iaxid1 = (True, False) if any(op1._iaxid) else (False, False)
-        iaxid2 = (False, True) if any(op2._iaxid) else (False, False)
-
-        return op1, op2, op_axes1, op_axes2, iaxid1, iaxid2
-
-    @staticmethod
-    def _kron_get_axes(op1, op2):
-        ndim = max(op1.ndim, op2.ndim)
-
-        op_axes1 = tuple()
-        op_axes2 = tuple()
-        
-        d1 = ndim - op1.ndim
-        d2 = ndim - op2.ndim
-
-        iaxid1 = (None,) * d1 + op1._iaxid
-        iaxid2 = (None,) * d2 + op2._iaxid
-
-        return op1, op2, op_axes1, op_axes2, iaxid1, iaxid2
-
-    @staticmethod
-    def _tensordot_get_axes(op1, op2, axes=2):
-        try:
-            iter(axes)
-        except Exception:
-            op_ax1 = list(range(op1.ndim - axes, op1.ndim))
-            op_ax2 = list(range(0, axes))
-        else:
-            op_ax1, op_ax2 = axes
-        # This is the same how numpy.tensordot handles the axes.
-        # TODO: reuse this code from emaps module ------------------------------------------------
-
-        iaxid1 = tuple([b for i, b in enumerate(op1._iaxid) if i not in op_ax1])
-        iaxid2 = tuple([b for i, b in enumerate(op2._iaxid) if i not in op_ax2])
-        iaxid2 = (None,) * len(iaxid1) + iaxid2
-
-        return op1, op2, op_ax1, op_ax2, iaxid1, iaxid2
-    
-    @staticmethod
-    def _einsum(subs, op1, op2):
-        def out_iaxes(op, insubs, outsubs):
-            """Calculates the indices of the independence axes for
-            the output operand."""
-            
-            for i, c in enumerate(insubs):
-                if op._iaxid[i] and c not in outsubs:
-                    raise ValueError("Contraction over an independence"
-                                     f" axis ({i}).")
-                
-            iaxid = op._iaxid + (None,)  # Augments with a default.  
-            return tuple([iaxid[insubs.find(c)] for c in outsubs])
-        
-        op1 = assparsenormal(op1)
-        op2 = assparsenormal(op2)
-
-        # Converts the subscripts to an explicit form.
-        (insu1, insu2), outsu = einsubs.parse(subs, (op1.shape, op2.shape))
-        subs = f"{insu1},{insu2}->{outsu}"
-
-        iaxid1 = out_iaxes(op1, insu1, outsu)
-        iaxid2 = out_iaxes(op2, insu2, outsu)
-
-        if not _is_deterministic(op1):
-            v = Normal._einsum(subs, op1.v, op2.v.mean())
-            w = SparseNormal(v, iaxid1)
-
-            if not _is_deterministic(op2):
-                w += SparseNormal._einsum(op1.mean(), (op2 - op2.mean()))
-
-        elif not _is_deterministic(op2):
-            v = Normal._einsum(subs, op1.v.mean(), op2.v)
-            w = SparseNormal(v, iaxid2)
-
-        else:
-            w = np.einsum(op1.v.mean(), op2.v.mean())
-
-        return w
-    
-    @staticmethod
-    def _fftfunc(name, x, n, axis, norm):
-        raise NotImplementedError
-
-    @staticmethod
-    def _fftfunc_n(name, x, s, axes, norm):
-        raise NotImplementedError
 
     # ---------- probability-related methods ----------
 
@@ -719,7 +541,7 @@ class SparseNormal:
             return self
 
         # Combines the observations in one and completes them w.r.t. self.
-        cond = SparseNormal._concatenate(obs_flat, axis=-1)
+        cond = concatenate(obs_flat, axis=-1)
         emv, emc = emaps.complete((self_fl.v.emap, cond.v.emap))
 
         t_ax = tuple(range(1, niax+1)) + (0, -1)
@@ -916,7 +738,7 @@ class SparseNormal:
         """
 
         delta_x = x - self.mean()
-        validate_logp_samples(self, delta_x)
+        normal_.validate_logp_samples(self, delta_x)
 
         if self.iscomplex:
             delta_x = np.hstack([delta_x.real, delta_x.imag])
@@ -986,7 +808,7 @@ def _normalize_axis(axis, ndim):
         Normalized axis index.
     
     Raises:
-        AxisError
+        AxisError: 
             If the axis is out of range.
     """
 
@@ -1009,9 +831,9 @@ def _normalize_axes(axes, ndim):
         Tuple of normalized axes indices.
     
     Raises:
-        AxisError
+        AxisError:
             If one of the axes is out of range.
-        ValueError
+        ValueError:
             If there are duplicates among the axes.
     """
 
@@ -1034,7 +856,7 @@ def _normalize_axes(axes, ndim):
 
 def _validate_iaxes(seq):
     """Checks that the independence axes of the sparse normal arrays in `seq`
-    are compatible and returns them.
+    are compatible.
     
     Returns:
         `iaxid` of the final shape for the broadcasted arrays.
@@ -1094,7 +916,7 @@ def _validate_iaxes(seq):
 
     raise ValueError("Incompatible orders of the independence axes "
                      f"of the operands{valstr}.\n{msg}")
-
+    
 
 def _parse_index_key(x, key):
     """Validates the key and calculates the number of the input axis 
@@ -1169,24 +991,6 @@ def _parse_index_key(x, key):
                              "are valid indices for independence axes. "
                              f"Axis {i} is indexed with an invalid key.")
     return out_axs
-
-
-def _validate_iaxes_bilinear(op1, op2, op_axes1, op_axes2):
-    if not isinstance(op_axes1, tuple):
-        op_axes1 = (op_axes1,)
-
-    if not isinstance(op_axes2, tuple):
-        op_axes2 = (op_axes2,)
-
-    if any([op1._iaxid[ax] for ax in op_axes1]):
-        raise ValueError("Bilinear operations affecting "
-                         "independence axes are not supported. "
-                         f"Axes {op_axes1} of operand 1 are affected.")
-    
-    if any([op2._iaxid[ax] for ax in op_axes2]):
-        raise ValueError("Bilinear operations affecting "
-                         "independence axes are not supported. "
-                         f"Axes {op_axes2} of operand 2 are affected.")
     
 
 def cov(*args):
@@ -1247,3 +1051,203 @@ class SparseConditionWarning(RuntimeWarning):
     """The warning issued when a condition is skipped during 
     the conditioning of a sparse variable."""
     pass
+
+
+# ---------- array functions ----------
+
+
+def broadcast_to(x, shape):
+    """Broadcasts the sparse normal variable to a new shape."""
+    raise NotImplementedError  # TODO: implement ----------------------------------------
+
+
+def concatenate(arrays, axis=0):
+    arrays = [assparsenormal(ar) for ar in arrays]
+    iaxid = _validate_iaxes(arrays)
+    axis = _normalize_axis(axis, len(iaxid))
+    
+    if iaxid[axis]:
+        raise ValueError("Concatenation along independence axes "
+                            "is not allowed.")
+
+    v = normal_.concatenate([x.v for x in arrays], axis=axis)
+    return SparseNormal(v, iaxid)
+
+
+def stack(arrays, axis=0):
+    arrays = [assparsenormal(ar) for ar in arrays]
+    iaxid = _validate_iaxes(arrays)
+    iaxid = iaxid[:axis] + (None,) + iaxid[axis:]
+
+    v = normal_.stack([x.v for x in arrays], axis=axis)
+    return SparseNormal(v, iaxid)
+
+
+def _validate_iaxes_binary(op1, op2, op_axes1, op_axes2):
+    """Checks that the operation axes are not independence axes 
+    for `op1` and `op2`."""
+    
+    if any([op1._iaxid[ax] for ax in op_axes1]):
+        raise ValueError("Bilinear operations affecting "
+                         "independence axes are not supported. "
+                         f"Axes {op_axes1} of operand 1 are affected.")
+    
+    if any([op2._iaxid[ax] for ax in op_axes2]):
+        raise ValueError("Bilinear operations affecting "
+                         "independence axes are not supported. "
+                         f"Axes {op_axes2} of operand 2 are affected.")
+    
+
+def bilinearfunc(name, op1, op2, iaxid1, iaxid2, args=tuple(), pargs=tuple()):
+    """ Applies a bilinear function specified by its numpy name 
+    to two SparseNormal operands, `op1` and `op2`."""
+
+    if not _is_deterministic(op1):
+        v = normal_.bilinearfunc(name, op1.v, op2.v.mean(), args, pargs)
+        w = SparseNormal(v, iaxid1)
+
+        if not _is_deterministic(op2):
+            w += bilinearfunc(op1.mean(), (op2 - op2.mean()))
+
+    elif not _is_deterministic(op2):
+        v = normal_.bilinearfunc(name, op1.v.mean(), op2.v, args, pargs)
+        w = SparseNormal(v, iaxid2)
+
+    else:
+        w = getattr(np, name)(op1.v.mean(), op2.v.mean())
+
+    return w
+
+
+def dot(op1, op2):
+    op1 = assparsenormal(op1)
+    op2 = assparsenormal(op2)
+
+    if op1.ndim == 0:
+        op_axes1 = tuple()
+    elif op1.ndim == 1:
+        op_axes1 = (0,)
+    else:
+        op_axes1 = (-1,)
+    
+    if op2.ndim == 0:
+        op_axes2 = tuple()
+        d = 1
+    elif op2.ndim == 1:
+        op_axes2 = (0,)
+        d = 0
+    else:
+        op_axes2 = (-2,)
+        d = op2.ndim - 1
+
+    _validate_iaxes_binary(op1, op2, op_axes1, op_axes2)
+ 
+    iaxid1 = op1._iaxid[:-1] + (None,) * d
+
+    iaxid2 = list(op2._iaxid)
+    iaxid2.pop(op2.ndim - 1)
+    iaxid2 = (None,) * (op1.ndim - 1) + tuple(iaxid2)
+
+    return bilinearfunc("dot", op1, op2, iaxid1, iaxid2)
+
+
+def inner(op1, op2):
+    op1 = assparsenormal(op1)
+    op2 = assparsenormal(op2)
+
+    op_axes1 = (-1,)
+    op_axes2 = (-1,)
+
+    _validate_iaxes_binary(op1, op2, op_axes1, op_axes2)
+    
+    iaxid1 = op1._iaxid[:-1] + (None,) * (op2.ndim - 1)
+    iaxid2 = (None,) * (op1.ndim - 1) + op2._iaxid[:-1]
+
+    return bilinearfunc("inner", op1, op2, iaxid1, iaxid2)
+
+
+def outer(op1, op2):
+    op1 = assparsenormal(op1).ravel()
+    op2 = assparsenormal(op2).ravel()
+
+    # iaxes are always valid.
+
+    iaxid1 = (True, False) if any(op1._iaxid) else (False, False)
+    iaxid2 = (False, True) if any(op2._iaxid) else (False, False)
+
+    return bilinearfunc("outer", op1, op2, iaxid1, iaxid2)
+
+
+def kron(op1, op2):
+    op1 = assparsenormal(op1)
+    op2 = assparsenormal(op2)
+
+    # iaxes are always valid.
+
+    ndim = max(op1.ndim, op2.ndim)  # ndim of the result.
+    iaxid1 = (None,) * (ndim - op1.ndim) + op1._iaxid
+    iaxid2 = (None,) * (ndim - op2.ndim) + op2._iaxid
+
+    return bilinearfunc("kron", op1, op2, iaxid1, iaxid2)
+
+
+def tensordot(op1, op2, axes=2):
+    op1 = assparsenormal(op1)
+    op2 = assparsenormal(op2)
+
+    try:
+        iter(axes)
+    except Exception:
+        op_axes1 = set(range(op1.ndim - axes, op1.ndim))
+        op_axes2 = set(range(0, axes))
+    else:
+        op_axes1, op_axes2 = axes
+    # This follows how numpy.tensordot handles the axes.
+
+    _validate_iaxes_binary(op1, op2, op_axes1, op_axes2)
+
+    iaxid1 = tuple([b for i, b in enumerate(op1._iaxid) if i not in op_axes1])
+    iaxid2 = tuple([b for i, b in enumerate(op2._iaxid) if i not in op_axes2])
+    iaxid2 = (None,) * len(iaxid1) + iaxid2
+
+    return bilinearfunc("tensordot", op1, op2, iaxid1, iaxid2, args=[axes])
+    
+
+def einsum(subs, op1, op2):
+    def out_iaxes(op, insubs, outsubs):
+        """Calculates the indices of the independence axes for
+        the output operand."""
+        
+        for i, c in enumerate(insubs):
+            if op._iaxid[i] and c not in outsubs:
+                raise ValueError("Contraction over an independence"
+                                 f" axis ({i}).")
+            
+        iaxid = op._iaxid + (None,)  # Augments with a default.  
+        return tuple([iaxid[insubs.find(c)] for c in outsubs])
+    
+    op1 = assparsenormal(op1)
+    op2 = assparsenormal(op2)
+
+    # Converts the subscripts to an explicit form.
+    (insu1, insu2), outsu = einsubs.parse(subs, (op1.shape, op2.shape))
+    subs = f"{insu1},{insu2}->{outsu}"
+
+    iaxid1 = out_iaxes(op1, insu1, outsu)
+    iaxid2 = out_iaxes(op2, insu2, outsu)
+
+    return bilinearfunc("einsum", op1, op2, iaxid1, iaxid2, pargs=[subs])
+
+
+def fftfunc(name, x, n, axis, norm):
+    raise NotImplementedError
+
+
+def fftfunc_n(name, x, s, axes, norm):
+    raise NotImplementedError
+
+
+def call_linearized(x, func, jmpfunc):
+    x = assparsenormal(x)
+    v = normal_.call_linearized(x.v, func, jmpfunc)
+    return SparseNormal(v, x._iaxid)
