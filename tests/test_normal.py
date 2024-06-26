@@ -3,9 +3,8 @@ import numpy as np
 from scipy.stats import multivariate_normal as mvn
 from numpy.linalg import LinAlgError
 from numpy.exceptions import ComplexWarning
-from gprob import hstack, vstack, iid_copy
-from gprob.normal_ import (normal, Normal, safer_cholesky, broadcast_to, 
-                           asnormal, cov)
+from gprob import hstack, vstack, iid_copy, broadcast_to
+from gprob.normal_ import normal, Normal, safer_cholesky, asnormal, cov
 from gprob.sparse import iid_repeat
 from utils import random_normal, random_correlate
 
@@ -1011,6 +1010,27 @@ def test_broadcasting():
     assert (normal(size=(2, 3)) - asnormal(np.ones((2, 1)))).shape == (2, 3)
     assert (normal(size=(2, 3)) * asnormal(np.ones((2, 1)))).shape == (2, 3)
     assert (normal(size=(2, 3)) / asnormal(np.ones((2, 1)))).shape == (2, 3)
+
+
+def test_broadcast_to():
+    v = broadcast_to(1, (2, 3))
+    assert isinstance(v, Normal)
+    assert v.shape == (2, 3)
+
+    v = broadcast_to(normal(), (2, 3))
+    assert isinstance(v, Normal)
+    assert v.shape == (2, 3)
+
+    v = broadcast_to(normal(size=(2, 1)), (4, 2, 3))
+    assert isinstance(v, Normal)
+    assert v.shape == (4, 2, 3)
+
+    with pytest.raises(ValueError):
+        broadcast_to(v, (2,))
+
+    with pytest.raises(ValueError):
+        broadcast_to(v, (3, 1))
+
 
 def test_getitem():
     v = normal(size=(2, 3, 4))

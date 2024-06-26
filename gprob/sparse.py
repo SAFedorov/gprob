@@ -62,8 +62,10 @@ class SparseNormal:
     
     def __init__(self, v, iaxid):
         self.v = v
-        self._iaxid = iaxid  # The integer ids of the independence axes, 
-                             # with None's for regular axes.
+        self._iaxid = iaxid  # A tuple of the length equal to ndim, containing 
+                             # integer ids at positions corresponding to 
+                             # independence axes, and None's at positions 
+                             # corresponding to regular axes.
 
     @property
     def size(self):
@@ -1057,8 +1059,11 @@ class SparseConditionWarning(RuntimeWarning):
 
 
 def broadcast_to(x, shape):
-    """Broadcasts the sparse normal variable to a new shape."""
-    raise NotImplementedError  # TODO: implement ----------------------------------------
+    """Broadcasts a sparse normal variable to a new shape."""
+    x = assparsenormal(x)
+    v = normal_.broadcast_to(x.v, shape)
+    iaxid = (None,) * (len(shape) - x.ndim) + x._iaxid
+    return SparseNormal(v, iaxid)
 
 
 def concatenate(arrays, axis=0):

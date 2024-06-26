@@ -94,7 +94,7 @@ def resolve_module(seq):
 def broadcast_to(x, shape):
     """Broadcasts the variable to a new shape."""
     mod = resolve_module([x])
-    return mod.broadcast_to(shape)
+    return mod.broadcast_to(x, shape)
 
 
 def concatenate(arrays, axis=0):

@@ -229,6 +229,67 @@ def test_broadcasting():
     assert (v1 ** v2).iaxes == (1,)
 
 
+def test_broadcast_to():
+    # broadcast_to of the sparse variable module is a convenience function for 
+    # explicit broadcasting, while broadcasting in arithmetic operations is
+    # implemented differently.
+
+    # Trivial examples.
+
+    v = assparsenormal(normal())
+    v = gp.broadcast_to(v, (3, 4))
+    assert v.shape == (3, 4)
+    assert v.iaxes == tuple()
+
+    v = assparsenormal(normal(size=(3, 1)))
+    v = gp.broadcast_to(v, (5, 3, 4))
+    assert v.shape == (5, 3, 4)
+    assert v.iaxes == tuple()
+
+    with pytest.raises(ValueError):
+        gp.broadcast_to(v, (4,))
+
+    with pytest.raises(ValueError):
+        gp.broadcast_to(v, (4, 1))
+
+    # 1 Independence axis.
+
+    v = iid_repeat(normal(), 4)
+    v = gp.reshape(v, (1, 4, 1))
+    assert v.iaxes == (1,)
+    v = gp.broadcast_to(v, (5, 3, 4, 2))
+    assert v.shape == (5, 3, 4, 2)
+    assert v.iaxes == (2,)
+
+    v = iid_repeat(normal(size=(2, 3)), 4)
+    assert v.iaxes == (0,)
+    v = gp.broadcast_to(v, (2, 6, 4, 2, 3))
+    assert v.shape == (2, 6, 4, 2, 3)
+    assert v.iaxes == (2,)
+
+    with pytest.raises(ValueError):
+        gp.broadcast_to(v, (4, 3, 3))
+
+    with pytest.raises(ValueError):
+        gp.broadcast_to(v, (2, 3))
+
+    # 2 independence axes.
+
+    v = iid_repeat(normal(size=(2, 4)), 3, axis=1)
+    v = iid_repeat(v, 5, axis=-1)
+    assert v.iaxes == (1, 3)
+    v = gp.broadcast_to(v, (6, 2, 3, 4, 5))
+    assert v.shape == (6, 2, 3, 4, 5)
+    assert v.iaxes == (2, 4)
+
+    v = iid_repeat(normal(size=(2, 1)), 3, axis=1)
+    v = iid_repeat(v, 5, axis=-1)
+    assert v.iaxes == (1, 3)
+    v = gp.broadcast_to(v, (6, 2, 3, 4, 5))
+    assert v.shape == (6, 2, 3, 4, 5)
+    assert v.iaxes == (2, 4)
+    
+
 def test_cov():
     tol = 1e-10
 

@@ -775,7 +775,8 @@ def cov(*args):
 
 
 def broadcast_to(x, shape):
-    """Broadcasts the normal variable to a new shape."""    
+    """Broadcasts the normal variable to a new shape.""" 
+    x = asnormal(x)   
     em = x.emap.broadcast_to(shape)
     b = np.broadcast_to(x.b, shape)
     return Normal(em, b)
