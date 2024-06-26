@@ -138,6 +138,47 @@ def test_iid_repeat():
         iid_repeat(normal(), 7, axis=22)
 
 
+def test_properties():
+    # size, shape, ndim, iscomplex, real, imag, iaxes, T
+
+    tol = 1e-8
+
+    v1 = iid_repeat(iid_repeat(normal(), 4), 8) * np.random.rand(8, 4)
+    v2 = iid_repeat(iid_repeat(normal(), 4), 8)
+
+    vc = v1 + 1j * v2
+
+    assert v1.iscomplex == False
+    assert vc.iscomplex == True
+
+    for v in [v1, vc]:
+        assert v.size == 4 * 8
+        assert v.shape == (8, 4)
+        assert v.ndim == 2
+        assert v.iaxes == (0, 1)
+
+        vt = v.T
+        assert isinstance(vt, SparseNormal)
+        assert vt.shape == (4, 8)
+        assert vt.iscomplex == v.iscomplex
+        assert np.max(np.abs(vt.mean() - v.mean().T)) < tol
+        assert np.max(np.abs(vt.var() - v.var().T)) < tol
+
+        vr = v.real
+        assert isinstance(vr, SparseNormal)
+        assert vr.shape == (8, 4)
+        assert vr.iscomplex == False
+        assert np.max(np.abs(vr.mean() - v.mean().real)) < tol
+
+        vi = v.imag
+        assert isinstance(vi, SparseNormal)
+        assert vi.shape == (8, 4)
+        assert vi.iscomplex == False
+        assert np.max(np.abs(vi.mean() - v.mean().imag)) < tol
+
+        assert np.max(np.abs(vr.var() + vi.var() - v.var())) < tol
+
+
 def test_index_key_parsing():
     v = iid_repeat(iid_repeat(normal(size=(4, 5)), 2, axis=1), 3, axis=1)
     # v.shape is (4, 3, 2, 5), v.iaxes are (1, 2)
