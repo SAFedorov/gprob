@@ -7,18 +7,22 @@ from .normal_ import Normal
 from .sparse import SparseNormal
 
 
-# ---------- probability-related functions ----------
-
-def iid_copy(x):
-    """Creates an independent identically distributed copy of `x`."""
-    return x.iid_copy()
+MODULE_DICT = {Normal: normal_, SparseNormal: sparse}
 
 
-def cov():
-    raise NotImplementedError # TODO: ------------------------------------------------------------------
+def resolve_module(seq):
+    """Returns the module corresponding to the highest class 
+    in the sequence `seq`. The classes are ordered according 
+    to `_normal_priority_`, and the default highest is `Normal`."""
 
+    if len(seq) == 1:
+        return MODULE_DICT.get(seq[0].__class__, normal_)
 
-# ---------- array functions ----------
+    p = Normal._normal_priority_ - 1
+    obj = max(seq, key=lambda a: getattr(a, "_normal_priority_", p), 
+              default=None)
+    
+    return MODULE_DICT.get(obj.__class__, normal_)
 
 
 def fallback_to_normal(func):
@@ -30,6 +34,120 @@ def fallback_to_normal(func):
         
     hedged_func.__name__ = func.__name__
     return hedged_func
+
+
+# ---------- probability-related functions ----------
+
+
+@fallback_to_normal
+def iid_copy(x):
+    """Creates an independent identically distributed copy of `x`."""
+    return x.iid_copy()
+
+
+@fallback_to_normal
+def mean(x):
+    """Expectation value, `<x>`."""
+    return x.mean()
+
+
+@fallback_to_normal
+def var(x):
+    """Variance, `<(x-<x>)(x-<x>)^*>`, where `*` denotes 
+    complex conjugation, and `<...>` is the expectation value of `...`."""
+    return x.var()
+
+
+def cov(*args):
+    """Covariance, generalizing `<outer((x-<x>), (y-<y>)^H)>`, 
+    where `H` denotes conjugate transposition, and `<...>` is 
+    the expectation value of `...`.
+    
+    Args:
+        One or two random variables.
+
+    Returns:
+        For one random variable, `x`, the function returns `x.cov()`. 
+        For two random variables, `x` and `y`, the function returns 
+        their cross-covariance.
+        
+        The cross-covariance of two normal variables 
+        is an array `c` with the dimension number equal 
+        to the sum of the dimensions of `x` and `y`, whose components are
+        `c[ijk... lmn...] = <(x[ijk..] - <x>)(y[lmn..] - <y>)*>`, 
+        where the indices `ijk...` and `lmn...` run over the elements 
+        of `x` and `y`, respectively, and `*` denotes complex conjugation.
+
+        The cross-covariance of two sparse variables is an array 
+        with the dimension number equal to the sum of the dense dimensions 
+        of `x` and `y`, plus the number of their sparse (independence) 
+        dimensions, which should be the same in `x` and `y`. 
+        In the returned array, the regular dimensions 
+        go first in the order they appear in the variable shapes, 
+        and the independence dimensions are appended at the end.
+        The resulting structure is the same as the structure produced 
+        by repeated applications of `np.diagonal` over all the 
+        independence dimensions of the full-sized covariance matrix `c` 
+        for `x` and `y`.
+
+    Raises:
+        TypeError: 
+            If the number of input arguments is not 1 or 2.
+
+    Examples:
+        Normal variables.
+
+        >>> v1 = normal(size=(3,))  # shape (3,)
+        >>> v2 = normal(size=(3,))  # shape (3,)
+        >>> cov(v1, v1 + v2)
+        array([[1., 0., 0.],
+               [0., 1., 0.],
+               [0., 0., 1.]])
+
+        >>> v = normal(size=(2, 3))
+        >>> c = cov(v)
+        >>> c.shape
+        (2, 3, 2, 3)
+        >>> np.all(c.reshape((v.size, v.size)) == np.eye(v.size))
+        True
+
+        >>> v1 = normal(size=2)
+        >>> v2 = 0.5 * v1[0] + normal()
+        >>> cov(v1, v2)
+        array([0.5, 0. ])
+
+        >>> v1 = normal(size=2)
+        >>> v2 = 0.5 * v1[0] + normal(size=3)
+        >>> cov(v1, v2)
+        array([[0.5, 0.5, 0.5],
+               [0. , 0. , 0. ]])
+
+        >>> v1 = normal()
+        >>> v2 = 1j * v1 + normal()
+        >>> cov(v1, v2)
+        array(0.-1.j)
+
+        Sparse normal variables.
+
+        >>> v1 = iid_repeat(normal(), 3)  # shape (3,)
+        >>> v2 = iid_repeat(normal(), 3)  # shape (3,)
+        >>> cov(v1, v1 + v2)
+        array([1., 1., 1.])
+
+        >>> v1 = iid_repeat(normal(size=3), 4)  # shape (4, 3)
+        >>> v2 = iid_repeat(normal(size=2), 4)  # shape (4, 2)
+        >>> cov(v1, v2).shape
+        (3, 2, 4)
+    """
+    if len(args) == 0 or len(args) > 2:
+        raise TypeError("The function can accept only one or two input "
+                        f"arguments, while {len(args)} arguments are given.")
+    
+    mod = resolve_module(args)
+    return mod.cov(*args)
+
+
+# ---------- array functions ----------
 
 
 @fallback_to_normal
@@ -71,24 +189,6 @@ def transpose(x, axes=None):
 @fallback_to_normal
 def trace(x, offset=0, axis1=0, axis2=1):
     return x.trace(offset=offset, axis1=axis1, axis2=axis2)
-
-
-MODULE_DICT = {Normal: normal_, SparseNormal: sparse}
-
-
-def resolve_module(seq):
-    """Returns the module corresponding to the highest class 
-    in the sequence `seq`. The classes are ordered according 
-    to `_normal_priority_`, and the default is `Normal`."""
-
-    if len(seq) == 1:
-        return MODULE_DICT.get(seq[0].__class__, normal_)
-
-    p = Normal._normal_priority_ - 1
-    obj = max(seq, key=lambda a: getattr(a, "_normal_priority_", p), 
-              default=None)
-    
-    return MODULE_DICT.get(obj.__class__, normal_)
 
 
 def broadcast_to(x, shape):

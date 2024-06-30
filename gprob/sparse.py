@@ -61,7 +61,10 @@ class SparseNormal:
     _normal_priority_ = 10
     
     def __init__(self, v, iaxid):
-        self.v = v
+        self.v = v  # A fully-correlated normal variable with the same mean 
+                    # and variance as the sparse varaible, serving 
+                    # as the basis for most calculations.
+        
         self._iaxid = iaxid  # A tuple of the length equal to ndim, containing 
                              # integer ids at positions corresponding to 
                              # independence axes, and None's at positions 
@@ -607,7 +610,7 @@ class SparseNormal:
 
     def var(self):
         """Variance, `<(x-<x>)(x-<x>)^*>`, where `*` denotes 
-        complex conjugation, and `< >` taking the expectation value.
+        complex conjugation, and `<...>` is the expectation value of `...`.
         
         Returns:
             An array of the varaince values with the same shape as 
@@ -616,23 +619,24 @@ class SparseNormal:
         return self.v.var()
 
     def cov(self):
-        """Covariance, `<outer((x-<x>), (x-<x>)^H)>`, where `H` denotes 
-        conjugate transposition, and `< >` taking the expectation value.
+        """Covariance, generalizing `<outer((x-<x>), (x-<x>)^H)>`, 
+        where `H` denotes conjugate transposition, and `<...>` is 
+        the expectation value of `...`.
 
         Returns:
-            An array with the dimension number equal to twice 
-            the number of the regular dimensions of the variable, plus 
+            An array with the dimension number equal to the doubled 
+            number of the regular dimensions of the variable, plus 
             the undoubled number of its sparse (independence) dimensions. 
-            In the resulting covariance array, the regular dimensions 
-            go first in the order they appear in the variable, and 
-            the independence dimensions are appended at the end.
-            The resulting array is the same as the result produced 
+            In the returned array, the regular dimensions 
+            go first in the order they appear in the variable shape, 
+            and the independence dimensions are appended at the end.
+            The resulting structure is the same as the structure produced 
             by repeated applications of `np.diagonal` over all the 
             independence dimensions of the full-sized covariance matrix `c`,
             `c[ijk... lmn...] = <(x[ijk..] - <x>)(x[lmn..] - <x>)*>`, 
             where `ijk...` and `lmn...` are indices that run over 
             the elements of the variable (here `x`), 
-            and `*` is complex conjugation.
+            and `*` denotes complex conjugation.
 
         Examples:
             >>> v = iid_repeat(normal(size=(3,)), 4)
@@ -996,20 +1000,86 @@ def _parse_index_key(x, key):
     
 
 def cov(*args):
+    """The sparse implementation of the covariance. The function 
+    expects `args` to have strictly one or two elements."""
+
+    def find_det_dense_shape(v, d):
+        # Tries resolving what the independence axes of the deterministic 
+        # variable `d` could be based on the shape and the independence axes 
+        # of the sparse variable `v`. If the resolution is ambiguous or fails, 
+        # the function throws an error.
+
+        sparse_shape_v = [s for b, s in zip(v._iaxid, v.shape) if b]
+        dense_shape_d = list(d.shape)
+
+        for s in set(sparse_shape_v):
+            cnt_v = sparse_shape_v.count(s)
+            cnt_d = dense_shape_d.count(s)
+
+            if cnt_d == cnt_v:
+                for _ in range(cnt_d):
+                    dense_shape_d.remove(s)
+            elif cnt_d == 0:
+                iax = v.shape.index(s)
+                raise ValueError("The shape of the deterministic variable "
+                                 f"{d.shape} does not contain a dimension "
+                                 f"of size {s} that can correspond to the "
+                                 f"independence axis {iax} of the sparse "
+                                 f"normal variable with the shape {v.shape}.")
+            elif cnt_d < cnt_v:
+                raise ValueError("The shape of the deterministic variable "
+                                 f"{d.shape} does not contain {cnt_v} "
+                                 f"dimensions of size {s} to match the "
+                                 "independence axes of the sparse "
+                                 f"normal variable with the shape {v.shape}.")
+            else:
+                # cnt_d > cnt_v
+                raise ValueError("The shape of the deterministic variable "
+                                 f"{d.shape} contains too many dimensions "
+                                 f"of size {s}, which makes their "
+                                 "correspondence with the independence axes "
+                                 "of the sparse normal variable ambiguous.")
+        return dense_shape_d
+
     args = [assparsenormal(arg) for arg in args]
 
     if len(args) == 1:
         return args[0].cov()
 
-    # For the case len(args) == 2.
+    # The remaining case is len(args) == 2.
     x, y = args
 
-    if _is_deterministic(x) or _is_deterministic(y):
-        # If either x or y is deterministic, their independence axes are not
-        # checked, but a zero result is returned anyway. 
+    if _is_deterministic(x) and _is_deterministic(y):
+        # This branch should never be reached under normal circumstances, 
+        # because two constants are dispatched to the dense 
+        # implementation of covariance.
 
+        # It is not allowed for both inputs to be deterministic 
+        # in this function, because the independence axes cannot 
+        # be determined.
+        raise ValueError
+    
+    # If either x or y is deterministic, a zero result is returned.
+
+    elif _is_deterministic(x): 
+        dense_shape_y = [s for b, s in zip(y._iaxid, y.shape) if not b]
+        sparse_shape = [s for b, s in zip(y._iaxid, y.shape) if b]
+        dense_shape_x = find_det_dense_shape(y, x)
+
+        res_shape = tuple(dense_shape_x + dense_shape_y + sparse_shape)
         dt = np.result_type(x.v.a, y.v.a)
-        return np.zeros(x.shape + y.shape, dtype=dt)
+        return np.zeros(res_shape, dtype=dt)
+
+    elif _is_deterministic(y):
+        dense_shape_x = [s for b, s in zip(x._iaxid, x.shape) if not b]
+        sparse_shape = [s for b, s in zip(x._iaxid, x.shape) if b]
+        dense_shape_y = find_det_dense_shape(x, y)
+
+        res_shape = tuple(dense_shape_x + dense_shape_y + sparse_shape)
+        dt = np.result_type(x.v.a, y.v.a)
+        return np.zeros(res_shape, dtype=dt)
+    
+    # The default case, when both variables are non-trivially random.
 
     iax_ord_x = [i for i in x._iaxid if i is not None]
     iax_ord_y = [i for i in y._iaxid if i is not None]

@@ -9,7 +9,7 @@ from gprob.normal_ import normal, Normal
 from gprob.sparse import (_parse_index_key, iid_repeat, assparsenormal, 
                           SparseNormal, SparseConditionWarning)
 
-from utils import random_normal
+from utils import random_normal, get_message
 
 np.random.seed(0)
 
@@ -385,19 +385,108 @@ def test_cov():
     with pytest.raises(ValueError):
         gp.sparse.cov(v, iid_repeat(normal((4,)), 4))
 
-    # Deterministic constants should work.
-    c = gp.sparse.cov(v, 1)
-    assert c.shape == v.shape
-    assert np.max(np.abs(c - np.zeros(v.shape))) < tol
 
-    r = np.random.rand(2, 3)
+def test_cov_det():
+    # Tests for sparse covariance with deterministic constants, covering
+    # all the error messaves in different branches.
+
+    tol = 1e-8
+
+    with pytest.raises(ValueError):
+        gp.sparse.cov(1, 1)  # Two deterministic constants are not allowed 
+                             # in the sparse implementation.
+
+    # One independence axis.
+
+    v = iid_repeat(normal(), 4)  # shape (4,)
+
+    c = gp.sparse.cov(v, np.ones((4,)))
+    assert c.shape == (4,)
+    assert np.max(np.abs(c)) < tol
+
+    c = gp.sparse.cov(np.ones((4,)), v)
+    assert c.shape == (4,)
+    assert np.max(np.abs(c)) < tol
+
+    v = iid_repeat(normal(size=(4,)), 4)  # shape (4,)
+
+    with pytest.raises(ValueError):
+        gp.sparse.cov(v, np.ones((4, 4)))
+
+    with pytest.raises(ValueError):
+        gp.sparse.cov(np.ones((4, 4)), v)
+
+    v = iid_repeat(normal(size=(3,)), 4)  # shape (4, 3)
+
+    c = gp.sparse.cov(v, np.ones((2, 4)))
+    assert c.shape == (3, 2, 4)
+    assert np.max(np.abs(c)) < tol
+
+    c = gp.sparse.cov(np.ones((2, 4)), v)
+    assert c.shape == (2, 3, 4)
+    assert np.max(np.abs(c)) < tol
+    
+    with pytest.raises(ValueError) as e_1l:
+        gp.sparse.cov(v, np.ones((2, 3)))  # Mismatching shape.
+
+    with pytest.raises(ValueError) as e_1r:
+        gp.sparse.cov(np.ones((2, 3)), v)
+    
+    with pytest.raises(ValueError) as e_2l:
+        gp.sparse.cov(v, np.ones((4, 4)))  # Ambiguous shape.
+
+    with pytest.raises(ValueError) as e_2r:
+        gp.sparse.cov(np.ones((4, 4)), v)
+
+    # Two independence axes.
+
+    v = iid_repeat(iid_repeat(normal(), 4), 4)
+
+    r = np.random.rand(4, 4)
     c = gp.sparse.cov(v, r)
-    assert c.shape == v.shape + r.shape
-    assert np.max(np.abs(c - np.zeros(v.shape + r.shape))) < tol
+    assert c.shape == (4, 4)
+    assert np.max(np.abs(c)) < tol
 
     c = gp.sparse.cov(r, v)  # Changing the order.
-    assert c.shape == r.shape + v.shape
-    assert np.max(np.abs(c - np.zeros(r.shape + v.shape))) < tol
+    assert c.shape == (4, 4)
+    assert np.max(np.abs(c)) < tol
+
+    v = iid_repeat(iid_repeat(normal(size=(3,)), 4), 4)  # shape (4, 4, 3)
+
+    c = gp.sparse.cov(v, np.ones((4, 2, 4)))
+    assert c.shape == (3, 2, 4, 4)
+    assert np.max(np.abs(c)) < tol
+
+    c = gp.sparse.cov(np.ones((4, 2, 5, 4)), v)
+    assert c.shape == (2, 5, 3, 4, 4)
+    assert np.max(np.abs(c)) < tol
+
+    with pytest.raises(ValueError) as e_3l:
+        gp.sparse.cov(v, np.ones((2, 4)))  # Too few dimensions of size 4.
+
+    with pytest.raises(ValueError) as e_3r:
+        gp.sparse.cov(np.ones((2, 4)), v)
+
+    assert get_message(e_1l) == get_message(e_1r)
+    assert get_message(e_2l) == get_message(e_2r)
+    assert get_message(e_3l) == get_message(e_3r)
+
+    emsgs = [get_message(e_1l), get_message(e_2l), get_message(e_3l)]
+
+    # All the error messages are unique.
+    assert len(set(emsgs)) == 3
+
+    # Checks that there were no other errors while generating the message.
+    for m in emsgs:
+        assert "sparse" in m
+
+    # More error tests.
+
+    with pytest.raises(ValueError):
+        gp.sparse.cov(v, np.ones((4, 2, 4, 4)))
+
+    with pytest.raises(ValueError):
+        gp.sparse.cov(np.ones((4, 2, 4, 4)), v)
 
 
 def test_sample():

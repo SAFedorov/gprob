@@ -408,7 +408,7 @@ class Normal:
 
     def var(self):
         """Variance, `<(x-<x>)(x-<x>)^*>`, where `*` denotes 
-        complex conjugation, and `< >` taking the expectation value.
+        complex conjugation, and `<...>` is the expectation value of `...`.
         
         Returns:
             An array of the varaince values with the same shape as 
@@ -419,8 +419,9 @@ class Normal:
         return np.real(np.einsum("i..., i... -> ...", a, a.conj()))
 
     def cov(self):
-        """Covariance, `<outer((x-<x>), (x-<x>)^H)>`, where `H` denotes 
-        conjugate transposition, and `< >` taking the expectation value.
+        """Covariance, generalizing `<outer((x-<x>), (x-<x>)^H)>`, 
+        where `H` denotes conjugate transposition, and `<...>` is 
+        the expectation value of `...`.
 
         Returns:
             An array `c` with twice the dimension number as 
@@ -428,7 +429,7 @@ class Normal:
             `c[ijk... lmn...] = <(x[ijk..] - <x>)(x[lmn..] - <x>)*>`, 
             where `ijk...` and `lmn...` are indices that run over 
             the elements of the variable (here `x`), 
-            and `*` is complex conjugation.
+            and `*` denotes complex conjugation.
 
         Examples:
             >>> v = normal(size=(2, 3))
@@ -712,59 +713,15 @@ def safer_cholesky(x):
 
 
 def cov(*args):
-    """Covariance, `<outer((x-<x>), (y-<y>)^H)>`, where `H` denotes 
-    conjugate transposition, and `< >` taking the expectation value.
-    
-    Args:
-        One or two random variables.
+    """The normal implementation of the covariance. The function 
+    expects `args` to have strictly one or two elements."""
 
-    Returns:
-        For one random variable `x`, returns `x.cov()`. 
-        For two random variables, `x` and `y`, returns the cross-covariance,
-        which is an array `c` with the dimension number equal 
-        to the sum of the dimensions of `x` and `y`, and 
-        whose components are
-        `c[ijk... lmn...] = <(x[ijk..] - <x>)(y[lmn..] - <y>)*>`, 
-        where the indices `ijk...` and `lmn...` run over the elements 
-        of `x` and `y`, respectively.
-
-    Raises:
-        ValueError: 
-            If the number of input arguments is not 1 or 2.
-
-    Examples:
-        >>> v = normal(size=(2, 3))
-        >>> c = cov(v)
-        >>> c.shape
-        (2, 3, 2, 3)
-        >>> np.all(c.reshape((v.size, v.size)) == np.eye(v.size))
-        True
-
-        >>> v1 = normal(size=2)
-        >>> v2 = 0.5 * v1[0] + normal()
-        >>> cov(v1, v2)
-        array([0.5, 0. ])
-
-        >>> v1 = normal(size=2)
-        >>> v2 = 0.5 * v1[0] + normal(size=3)
-        >>> cov(v1, v2)
-        array([[0.5, 0.5, 0.5],
-               [0. , 0. , 0. ]])
-
-        >>> v1 = normal()
-        >>> v2 = 1j * v1 + normal()
-        >>> cov(v1, v2)
-        array(0.-1.j)
-    """
-
-    if len(args) == 0 or len(args) > 2:
-        raise ValueError("The function can only accept one or two input "
-                         f"arguments, while {len(args)} areguments are given.")
+    args = [asnormal(arg) for arg in args]
     
     if len(args) == 1:
-        return asnormal(args[0]).cov()
+        return args[0].cov()
     
-    # For the case len(args) == 2.
+    # The remaining case is len(args) == 2.
     x, y = args
     ax, ay = [em.a2d for em in emaps.complete([x.emap, y.emap])]
     cov2d = ax.T @ ay.conj()

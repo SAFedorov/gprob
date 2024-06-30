@@ -62,3 +62,10 @@ def random_correlate(vs):
                               replace=False)
         v.emap.elem = {i: v.emap.elem[k] for i, k in zip(new_ind, v.emap.elem)}
     return vs
+
+
+def get_message(e):
+    """Extracts the message from the error object captured in 
+    `pytest.raises(SomeException) as e`
+    """
+    return e.value.args[0]
