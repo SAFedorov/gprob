@@ -2,7 +2,7 @@ from . import fft
 from . import func
 from .normal_ import Normal, normal, asnormal 
     
-from .arrayops import (iid_copy, cov, 
+from .arrayops import (iid_copy, mean, var, cov, 
     broadcast_to, stack, hstack, vstack, dstack, concatenate,
     split, hsplit, vsplit, dsplit, sum, cumsum, trace, diagonal, reshape, 
     moveaxis, ravel, transpose, add, subtract, multiply, divide, power, 

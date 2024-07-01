@@ -601,8 +601,8 @@ def asnormal(x):
     b = np.asanyarray(x)
     if b.dtype.kind not in NUMERIC_ARRAY_KINDS:
         if b.ndim == 0:
-            raise TypeError(f"Variable of type {x.__class__.__name__} cannot "
-                            "be converted to a normal variable.")
+            raise TypeError(f"The variable of type {x.__class__.__name__} "
+                            "cannot be converted to a normal variable.")
         
         return stack([asnormal(vi) for vi in x])
 
@@ -614,7 +614,7 @@ def normal(mu=0., sigmasq=1., size=None):
     """Creates a new normal random variable.
     
     Args:
-        mu: Scalar mean value or an array of mean values.
+        mu: Scalar mean value or array of mean values.
         sigmasq: Scalar variance or matrix covariance.
         size (optional): Integer or sequence of integers specifying the shape 
             of the variable. Only has an effect with scalar mean and variance. 
