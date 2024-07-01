@@ -1,6 +1,5 @@
 from functools import reduce
 from operator import mul
-from builtins import sum as sum_
 
 import numpy as np
 from numpy.linalg import LinAlgError
@@ -370,7 +369,7 @@ class Normal:
             obs_r = [c.reshape((c.shape[0], -1)) for c in obs_r]
             cond = concatenate(obs_r, axis=1).ravel()
 
-            k = sum_(c.shape[1] for c in obs_r)
+            k = sum(c.shape[1] for c in obs_r)
             l = reduce(mul, self_r.shape[1:], 1)
             ms = mask.shape
 
