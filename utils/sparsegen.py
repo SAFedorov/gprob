@@ -9,21 +9,23 @@ def gen_op_method(name: str):
     
     if name.startswith("__r"):
         op = op_dict[name[3:-2]]
-        vln = f"v = other.v {op} self.v"
+        vln = f"fcv = other.fcv {op} self.fcv"
+        nlns = "other = assparsenormal(other)"
     else:
         op = op_dict[name[2:-2]]
-        vln = f"v = self.v {op} other.v"
-
-    code = f"""
-    def {name}(self, other):
-        try:
+        vln = f"fcv = self.fcv {op} other.fcv"
+        nlns = """try:
             other = assparsenormal(other)
         except TypeError:
             return NotImplemented
-        
+        """
+
+    code = f"""
+    def {name}(self, other):
+        {nlns}
         {vln}
         iaxid = _validate_iaxes([self, other])
-        return SparseNormal(v, iaxid)
+        return SparseNormal(fcv, iaxid)
     """
     return code
 

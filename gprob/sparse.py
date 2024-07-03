@@ -24,17 +24,17 @@ def iid_repeat(x, nrep=1, axis=0):
 
     n = x._niax + 1
     iaxid = x._iaxid[:axis] + (n,) + x._iaxid[axis:]
-    v = x.v
+    fcv = x.fcv
 
     # Index that adds a new axis.
-    idx = [slice(None, None, None)] * v.ndim
+    idx = [slice(None, None, None)] * fcv.ndim
     idx.insert(axis, None)
     idx = tuple(idx)
 
-    new_shape = v.shape[:axis] + (nrep,) + v.shape[axis:]
-    v = normal_.broadcast_to(v[idx], new_shape)
+    new_shape = fcv.shape[:axis] + (nrep,) + fcv.shape[axis:]
+    fcv = normal_.broadcast_to(fcv[idx], new_shape)
 
-    return SparseNormal(v, iaxid)
+    return SparseNormal(fcv, iaxid)
 
 
 def assparsenormal(x):
@@ -49,46 +49,46 @@ def assparsenormal(x):
                         f"of higher priority ({x._normal_priority_} "
                         f"> {SparseNormal._normal_priority_}).")
     
-    v = asnormal(x)
-    return SparseNormal(v, (None,) * v.ndim)
+    fcv = asnormal(x)
+    return SparseNormal(fcv, (None,) * fcv.ndim)
 
 
 class SparseNormal:
     """Array of block-independent normal random variables."""
 
-    __slots__ = ("v", "_iaxid")
+    __slots__ = ("fcv", "_iaxid")
     __array_ufunc__ = None
     _normal_priority_ = 10
     
-    def __init__(self, v, iaxid):
-        self.v = v  # A fully-correlated normal variable with the same mean 
-                    # and variance as the sparse varaible, serving 
-                    # as the basis for most calculations.
+    def __init__(self, fcv, iaxid):
+        self.fcv = fcv  # A fully-correlated normal variable with the same 
+                        # mean and variance as the sparse varaible, serving 
+                        # as the basis for most calculations.
         
         self._iaxid = iaxid  # A tuple of the length equal to ndim, containing 
                              # integer ids at positions corresponding to 
-                             # independence axes, and None's at positions 
+                             # independence axes, and `None`s at positions 
                              # corresponding to regular axes.
 
     @property
     def size(self):
-        return self.v.size
+        return self.fcv.size
     
     @property
     def shape(self):
-        return self.v.shape
+        return self.fcv.shape
     
     @property
     def ndim(self):
-        return self.v.ndim
+        return self.fcv.ndim
     
     @property
     def real(self):
-        return SparseNormal(self.v.real, self._iaxid)
+        return SparseNormal(self.fcv.real, self._iaxid)
     
     @property
     def imag(self):
-        return SparseNormal(self.v.imag, self._iaxid)
+        return SparseNormal(self.fcv.imag, self._iaxid)
     
     @property
     def T(self):
@@ -96,7 +96,7 @@ class SparseNormal:
     
     @property
     def iscomplex(self):
-        return self.v.iscomplex
+        return self.fcv.iscomplex
     
     @property
     def iaxes(self):
@@ -112,10 +112,10 @@ class SparseNormal:
         return print_normal(self, extra_attrs=("iaxes",))
     
     def __len__(self):
-        return len(self.v)
+        return len(self.fcv)
     
     def __neg__(self):
-        return SparseNormal(-self.v, self._iaxid)
+        return SparseNormal(-self.fcv, self._iaxid)
 
     def __add__(self, other):
         try:
@@ -123,19 +123,15 @@ class SparseNormal:
         except TypeError:
             return NotImplemented
 
-        v = self.v + other.v
+        fcv = self.fcv + other.fcv
         iaxid = _validate_iaxes([self, other])
-        return SparseNormal(v, iaxid)
+        return SparseNormal(fcv, iaxid)
 
     def __radd__(self, other):
-        try:
-            other = assparsenormal(other)
-        except TypeError:
-            return NotImplemented
-
-        v = other.v + self.v
+        other = assparsenormal(other)
+        fcv = other.fcv + self.fcv
         iaxid = _validate_iaxes([self, other])
-        return SparseNormal(v, iaxid)
+        return SparseNormal(fcv, iaxid)
 
     def __sub__(self, other):
         try:
@@ -143,19 +139,15 @@ class SparseNormal:
         except TypeError:
             return NotImplemented
 
-        v = self.v - other.v
+        fcv = self.fcv - other.fcv
         iaxid = _validate_iaxes([self, other])
-        return SparseNormal(v, iaxid)
+        return SparseNormal(fcv, iaxid)
 
     def __rsub__(self, other):
-        try:
-            other = assparsenormal(other)
-        except TypeError:
-            return NotImplemented
-
-        v = other.v - self.v
+        other = assparsenormal(other)
+        fcv = other.fcv - self.fcv
         iaxid = _validate_iaxes([self, other])
-        return SparseNormal(v, iaxid)
+        return SparseNormal(fcv, iaxid)
 
     def __mul__(self, other):
         try:
@@ -163,19 +155,15 @@ class SparseNormal:
         except TypeError:
             return NotImplemented
 
-        v = self.v * other.v
+        fcv = self.fcv * other.fcv
         iaxid = _validate_iaxes([self, other])
-        return SparseNormal(v, iaxid)
+        return SparseNormal(fcv, iaxid)
 
     def __rmul__(self, other):
-        try:
-            other = assparsenormal(other)
-        except TypeError:
-            return NotImplemented
-
-        v = other.v * self.v
+        other = assparsenormal(other)
+        fcv = other.fcv * self.fcv
         iaxid = _validate_iaxes([self, other])
-        return SparseNormal(v, iaxid)
+        return SparseNormal(fcv, iaxid)
 
     def __truediv__(self, other):
         try:
@@ -183,19 +171,15 @@ class SparseNormal:
         except TypeError:
             return NotImplemented
 
-        v = self.v / other.v
+        fcv = self.fcv / other.fcv
         iaxid = _validate_iaxes([self, other])
-        return SparseNormal(v, iaxid)
+        return SparseNormal(fcv, iaxid)
 
     def __rtruediv__(self, other):
-        try:
-            other = assparsenormal(other)
-        except TypeError:
-            return NotImplemented
-
-        v = other.v / self.v
+        other = assparsenormal(other)
+        fcv = other.fcv / self.fcv
         iaxid = _validate_iaxes([self, other])
-        return SparseNormal(v, iaxid)
+        return SparseNormal(fcv, iaxid)
 
     def __pow__(self, other):
         try:
@@ -203,19 +187,15 @@ class SparseNormal:
         except TypeError:
             return NotImplemented
 
-        v = self.v ** other.v
+        fcv = self.fcv ** other.fcv
         iaxid = _validate_iaxes([self, other])
-        return SparseNormal(v, iaxid)
+        return SparseNormal(fcv, iaxid)
 
     def __rpow__(self, other):
-        try:
-            other = assparsenormal(other)
-        except TypeError:
-            return NotImplemented
-
-        v = other.v ** self.v
+        other = assparsenormal(other)
+        fcv = other.fcv ** self.fcv
         iaxid = _validate_iaxes([self, other])
-        return SparseNormal(v, iaxid)
+        return SparseNormal(fcv, iaxid)
 
     def __matmul__(self, other):
         if self.ndim == 0:
@@ -242,16 +222,16 @@ class SparseNormal:
             iaxid = (None,) * d + self._iaxid
 
         # Calculates the contribution from the deterministic part of `other`.
-        v = self.v @ other.mean()
-        w = SparseNormal(v, iaxid)
+        fcv = self.fcv @ other.mean()
+        v = SparseNormal(fcv, iaxid)
         
         if not _is_deterministic(other):
             # Adds the linearized contribution from the random part of `other`.
             # As `other`` is a sparse normal, the consistency of
             # independence axes is ensured by the addition operation.
-            w += self.mean() @ (other - other.mean())
+            v += self.mean() @ (other - other.mean())
 
-        return w
+        return v
 
     def __rmatmul__(self, other):
         if self.ndim == 0:
@@ -279,8 +259,8 @@ class SparseNormal:
             iaxid = (None,) * d + self._iaxid
 
         # Calculates the contribution from the deterministic part of `other`.
-        v = other.mean() @ self.v
-        w = SparseNormal(v, iaxid)
+        fcv = other.mean() @ self.fcv
+        w = SparseNormal(fcv, iaxid)
         
         if not _is_deterministic(other):
             # Adds the linearized contribution from the random part of `other`.
@@ -294,7 +274,7 @@ class SparseNormal:
         out_ax = _parse_index_key(self, key)
         iaxid = tuple([self._iaxid[ax] if ax is not None else False 
                        for ax in out_ax])
-        return SparseNormal(self.v[key], iaxid)
+        return SparseNormal(self.fcv[key], iaxid)
     
     def __setitem__(self, key, value):
         raise NotImplementedError
@@ -306,7 +286,7 @@ class SparseNormal:
     # ---------- array methods ----------
 
     def conjugate(self):
-        return SparseNormal(self.v.conjugate(), self._iaxid)
+        return SparseNormal(self.fcv.conjugate(), self._iaxid)
     
     def conj(self):
         return self.conjugate()
@@ -323,7 +303,7 @@ class SparseNormal:
             raise ValueError("The computation of cumulative sums along "
                              "independence axes is not supported.")
 
-        return SparseNormal(self.v.cumsum(axis), self._iaxid)
+        return SparseNormal(self.fcv.cumsum(axis), self._iaxid)
     
     def diagonal(self, offset=0, axis1=0, axis2=1):
         [axis1, axis2] = _normalize_axes([axis1, axis2], self.ndim)
@@ -334,18 +314,18 @@ class SparseNormal:
         s = {axis1, axis2}
         iaxid = (tuple([idx for i, idx in enumerate(self._iaxid) if i not in s]) 
                  + (None,))
-        return SparseNormal(self.v.diagonal(offset, axis1, axis2), iaxid)
+        return SparseNormal(self.fcv.diagonal(offset, axis1, axis2), iaxid)
 
     def flatten(self, order="C"):
         if not any(self._iaxid) or self.ndim <= 1:
-            return SparseNormal(self.v.flatten(order=order), self._iaxid)
+            return SparseNormal(self.fcv.flatten(order=order), self._iaxid)
         
         # Checks if all dimensions except maybe one are <= 1.
         max_sz = max(self.shape)
         max_dim = self.shape.index(max_sz)
         if all(x <= 1 for i, x in enumerate(self.shape) if i != max_dim):
             iaxid = (self._iaxid[max_dim],)
-            return SparseNormal(self.v.flatten(order=order), iaxid)
+            return SparseNormal(self.fcv.flatten(order=order), iaxid)
         
         raise ValueError("Sparse normal variables can only be flattened if "
                          "all their dimensions except maybe one have size <=1, "
@@ -359,18 +339,18 @@ class SparseNormal:
         iaxid.insert(destination, iaxid.pop(source))
         iaxid = tuple(iaxid)
 
-        return SparseNormal(self.v.moveaxis(source, destination), iaxid)
+        return SparseNormal(self.fcv.moveaxis(source, destination), iaxid)
     
     def ravel(self, order="C"):
         if not any(self._iaxid) or self.ndim <= 1:
-            return SparseNormal(self.v.ravel(order=order), self._iaxid)
+            return SparseNormal(self.fcv.ravel(order=order), self._iaxid)
         
         # Checks if all dimensions except maybe one are <= 1.
         max_sz = max(self.shape)
         max_dim = self.shape.index(max_sz)
         if all(x <= 1 for i, x in enumerate(self.shape) if i != max_dim):
             iaxid = (self._iaxid[max_dim],)
-            return SparseNormal(self.v.ravel(order=order), iaxid)
+            return SparseNormal(self.fcv.ravel(order=order), iaxid)
         
         raise ValueError("Sparse normal variables can only be flattened if "
                          "all their dimensions except maybe one have size <=1, "
@@ -378,24 +358,24 @@ class SparseNormal:
     
     def reshape(self, newshape, order="C"):
 
-        v = self.v.reshape(newshape, order)  
+        fcv = self.fcv.reshape(newshape, order)  
         # Reshaping the underlying varibale before the axes check is
         # to yield a meaningful error message if the shapes are inconsistent.
 
-        newshape = v.shape  # To replace '-1' if it was in newshape originally.
+        newshape = fcv.shape  # Replaces '-1' if it was in newshape.
 
-        if v.size == 0:
+        if fcv.size == 0:
             # The transformation of independence axes for zero-size variables 
             # cannot be determined unambiguously, so we always assume that 
             # the transformed variable has no independence axes.
-            return SparseNormal(v, (None,) * v.ndim)
+            return SparseNormal(fcv, (None,) * fcv.ndim)
 
         new_dim = 0
 
         new_cnt = 1
         old_cnt = 1
 
-        iaxid = [False] * v.ndim
+        iaxid = [False] * fcv.ndim
         for i, n in enumerate(self.shape):
             if self._iaxid[i]:
                 if n != 1:
@@ -423,7 +403,7 @@ class SparseNormal:
                     new_dim += 1
         
         iaxid = tuple(iaxid)
-        return SparseNormal(v, iaxid)
+        return SparseNormal(fcv, iaxid)
     
     def split(self, indices_or_sections, axis=0):
         axis = _normalize_axis(axis, self.ndim)
@@ -432,7 +412,7 @@ class SparseNormal:
             raise ValueError("Splitting along independence axes "
                              "is not supported.")
         
-        vpieces = self.v.split(indices_or_sections, axis)
+        vpieces = self.fcv.split(indices_or_sections, axis)
         return [SparseNormal(v, self._iaxid) for v in vpieces]
     
     def sum(self, axis, keepdims=False):
@@ -454,8 +434,8 @@ class SparseNormal:
         else:
             iaxid = [b for i, b in enumerate(self._iaxid) if i not in sum_axes]
 
-        v = self.v.sum(axis=axis, keepdims=keepdims)
-        return SparseNormal(v, iaxid)
+        fcv = self.fcv.sum(axis=axis, keepdims=keepdims)
+        return SparseNormal(fcv, iaxid)
 
     def transpose(self, axes=None):
         if axes is None:
@@ -463,7 +443,7 @@ class SparseNormal:
         else:
             iaxid = tuple([self._iaxid[ax] for ax in axes])
 
-        return SparseNormal(self.v.transpose(axes), iaxid)
+        return SparseNormal(self.fcv.transpose(axes), iaxid)
     
     def trace(self, offset=0, axis1=0, axis2=1):
         [axis1, axis2] = _normalize_axes([axis1, axis2], self.ndim)
@@ -473,14 +453,14 @@ class SparseNormal:
                              "are not supported.")
         s = {axis1, axis2}
         iaxid = tuple([b for i, b in enumerate(self._iaxid) if i not in s])
-        return SparseNormal(self.v.trace(offset, axis1, axis2), iaxid)
+        return SparseNormal(self.fcv.trace(offset, axis1, axis2), iaxid)
 
     # ---------- probability-related methods ----------
 
     def iid_copy(self):
         """Creates an independent identically distributed copy 
         of the varaible."""
-        return SparseNormal(self.v.iid_copy(), self._iaxid)
+        return SparseNormal(self.fcv.iid_copy(), self._iaxid)
 
     def condition(self, observations):
         """Conditioning operation. Applicable between variables having the same 
@@ -547,7 +527,7 @@ class SparseNormal:
 
         # Combines the observations in one and completes them w.r.t. self.
         cond = concatenate(obs_flat, axis=-1)
-        emv, emc = emaps.complete((self_fl.v.emap, cond.v.emap))
+        emv, emc = emaps.complete((self_fl.fcv.emap, cond.fcv.emap))
 
         t_ax = tuple(range(1, niax+1)) + (0, -1)
 
@@ -589,15 +569,15 @@ class SparseNormal:
             cond_a = cond_a[..., :n] + 1j * cond_a[..., n:]
             cond_m = cond_m[..., :n] + 1j * cond_m[..., n:]
 
-        v = Normal(ElementaryMap(cond_a, emv.elem), cond_m)
+        fcv = Normal(ElementaryMap(cond_a, emv.elem), cond_m)
 
         dense_sh = tuple([n for n, i in zip(self.shape, self._iaxid) if not i])
-        v = v.reshape(v.shape[:niax] + dense_sh)
+        fcv = fcv.reshape(fcv.shape[:niax] + dense_sh)
         t_ax = tuple([i[0] for i in sorted(enumerate(s_sparse_ax + s_dense_ax), 
                                            key=lambda x:x[1])])
-        v = v.transpose(t_ax)
+        fcv = fcv.transpose(t_ax)
 
-        return SparseNormal(v, self._iaxid)
+        return SparseNormal(fcv, self._iaxid)
     
     def mean(self):
         """Mean.
@@ -606,7 +586,7 @@ class SparseNormal:
             An array of the mean values with the same shape as 
             the random variable.
         """
-        return self.v.b
+        return self.fcv.b
 
     def var(self):
         """Variance, `<(x-<x>)(x-<x>)^*>`, where `*` denotes 
@@ -616,7 +596,7 @@ class SparseNormal:
             An array of the varaince values with the same shape as 
             the random variable.
         """
-        return self.v.var()
+        return self.fcv.var()
 
     def cov(self):
         """Covariance, generalizing `<outer((x-<x>), (x-<x>)^H)>`, 
@@ -672,7 +652,7 @@ class SparseNormal:
         in_symb2.insert(0, elem_symb)
 
         subs = f"{"".join(in_symb1)},{"".join(in_symb2)}->{"".join(out_symb)}"
-        a = self.v.emap.a
+        a = self.fcv.emap.a
         return np.einsum(subs, a, a.conj())
 
     
@@ -709,7 +689,7 @@ class SparseNormal:
         else:
             nsh = (n,)
 
-        a = self.v.emap.a
+        a = self.fcv.emap.a
 
         iaxsh = [m for m, b in zip(self.shape, self._iaxid) if b]
         r = np.random.normal(size=(*nsh, *iaxsh, a.shape[0]))
@@ -758,7 +738,7 @@ class SparseNormal:
         if self.ndim == niax:
             # Scalar dense subspace.
 
-            sigmasq = np.einsum("i..., i... -> ...", self.v.a, self.v.a)
+            sigmasq = np.einsum("i..., i... -> ...", self.fcv.a, self.fcv.a)
             llk = -0.5 * (delta_x**2 / sigmasq + np.log(2 * np.pi * sigmasq))
             return np.sum(llk, axis=tuple(range(-self.ndim, 0)))
         
@@ -804,7 +784,7 @@ class SparseNormal:
 def _is_deterministic(x):
     """True if the sparse normal `x` is a promoted numeric constant, 
     False if it is not."""
-    return len(x.v.emap.elem) == 0
+    return len(x.fcv.emap.elem) == 0
 
 
 def _normalize_axis(axis, ndim):
@@ -1067,7 +1047,7 @@ def cov(*args):
         dense_shape_x = find_det_dense_shape(y, x)
 
         res_shape = tuple(dense_shape_x + dense_shape_y + sparse_shape)
-        dt = np.result_type(x.v.a, y.v.a)
+        dt = np.result_type(x.fcv.a, y.fcv.a)
         return np.zeros(res_shape, dtype=dt)
 
     elif _is_deterministic(y):
@@ -1076,7 +1056,7 @@ def cov(*args):
         dense_shape_y = find_det_dense_shape(x, y)
 
         res_shape = tuple(dense_shape_x + dense_shape_y + sparse_shape)
-        dt = np.result_type(x.v.a, y.v.a)
+        dt = np.result_type(x.fcv.a, y.fcv.a)
         return np.zeros(res_shape, dtype=dt)
     
     # The default case, when both variables are non-trivially random.
@@ -1115,7 +1095,7 @@ def cov(*args):
     in_symb2.insert(0, elem_symb)
     
     subs = f"{"".join(in_symb1)},{"".join(in_symb2)}->{"".join(out_symb)}"
-    ax, ay = [em.a for em in emaps.complete([x.v.emap, y.v.emap])]
+    ax, ay = [em.a for em in emaps.complete([x.fcv.emap, y.fcv.emap])]
     return np.einsum(subs, ax, ay.conj())
 
 
@@ -1131,9 +1111,9 @@ class SparseConditionWarning(RuntimeWarning):
 def broadcast_to(x, shape):
     """Broadcasts a sparse normal variable to a new shape."""
     x = assparsenormal(x)
-    v = normal_.broadcast_to(x.v, shape)
+    fcv = normal_.broadcast_to(x.fcv, shape)
     iaxid = (None,) * (len(shape) - x.ndim) + x._iaxid
-    return SparseNormal(v, iaxid)
+    return SparseNormal(fcv, iaxid)
 
 
 def concatenate(arrays, axis=0):
@@ -1145,8 +1125,8 @@ def concatenate(arrays, axis=0):
         raise ValueError("Concatenation along independence axes "
                             "is not allowed.")
 
-    v = normal_.concatenate([x.v for x in arrays], axis=axis)
-    return SparseNormal(v, iaxid)
+    fcv = normal_.concatenate([x.fcv for x in arrays], axis=axis)
+    return SparseNormal(fcv, iaxid)
 
 
 def stack(arrays, axis=0):
@@ -1154,8 +1134,8 @@ def stack(arrays, axis=0):
     iaxid = _validate_iaxes(arrays)
     iaxid = iaxid[:axis] + (None,) + iaxid[axis:]
 
-    v = normal_.stack([x.v for x in arrays], axis=axis)
-    return SparseNormal(v, iaxid)
+    fcv = normal_.stack([x.fcv for x in arrays], axis=axis)
+    return SparseNormal(fcv, iaxid)
 
 
 def _validate_iaxes_binary(op1, op2, op_axes1, op_axes2):
@@ -1178,20 +1158,20 @@ def bilinearfunc(name, op1, op2, iaxid1, iaxid2, args=tuple(), pargs=tuple()):
     to two SparseNormal operands, `op1` and `op2`."""
 
     if not _is_deterministic(op1):
-        v = normal_.bilinearfunc(name, op1.v, op2.v.mean(), args, pargs)
-        w = SparseNormal(v, iaxid1)
+        fcv = normal_.bilinearfunc(name, op1.fcv, op2.fcv.mean(), args, pargs)
+        v = SparseNormal(fcv, iaxid1)
 
         if not _is_deterministic(op2):
-            w += bilinearfunc(op1.mean(), (op2 - op2.mean()))
+            v += bilinearfunc(op1.mean(), (op2 - op2.mean()))
 
     elif not _is_deterministic(op2):
-        v = normal_.bilinearfunc(name, op1.v.mean(), op2.v, args, pargs)
-        w = SparseNormal(v, iaxid2)
+        fcv = normal_.bilinearfunc(name, op1.fcv.mean(), op2.fcv, args, pargs)
+        v = SparseNormal(fcv, iaxid2)
 
     else:
-        w = getattr(np, name)(op1.v.mean(), op2.v.mean())
+        v = getattr(np, name)(op1.fcv.mean(), op2.fcv.mean())
 
-    return w
+    return v
 
 
 def dot(op1, op2):
@@ -1324,5 +1304,5 @@ def fftfunc_n(name, x, s, axes, norm):
 
 def call_linearized(x, func, jmpfunc):
     x = assparsenormal(x)
-    v = normal_.call_linearized(x.v, func, jmpfunc)
-    return SparseNormal(v, x._iaxid)
+    fcv = normal_.call_linearized(x.fcv, func, jmpfunc)
+    return SparseNormal(fcv, x._iaxid)

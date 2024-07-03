@@ -883,9 +883,9 @@ def test_cumsum():
         assert vout.iaxes == v.iaxes
         assert np.all(vout.mean() == np.cumsum(v.mean(), axis=ax))
 
-        vvs = v.v.cumsum(axis=ax)
-        assert np.all(vvs.emap.a == vout.v.emap.a)
-        assert np.all(vvs.emap.elem == vout.v.emap.elem)
+        vvs = v.fcv.cumsum(axis=ax)
+        assert np.all(vvs.emap.a == vout.fcv.emap.a)
+        assert np.all(vvs.emap.elem == vout.fcv.emap.elem)
 
     # Independence axes are not allowed.
     with pytest.raises(ValueError):
@@ -1412,9 +1412,9 @@ def test_sum():
         assert vout.iaxes == iax
         assert np.all(vout.mean() == mean_ref)
 
-        vvs = v.v.sum(axis=ax)
-        assert np.all(vvs.emap.a == vout.v.emap.a)
-        assert np.all(vvs.emap.elem == vout.v.emap.elem)
+        vvs = v.fcv.sum(axis=ax)
+        assert np.all(vvs.emap.a == vout.fcv.emap.a)
+        assert np.all(vvs.emap.elem == vout.fcv.emap.elem)
 
         vout = v.sum(axis=ax, keepdims=True)
         mean_ref = np.sum(v.mean(), axis=ax, keepdims=True)
@@ -1422,9 +1422,9 @@ def test_sum():
         assert vout.iaxes == v.iaxes
         assert np.all(vout.mean() == mean_ref)
 
-        vvs = v.v.sum(axis=ax, keepdims=True)
-        assert np.all(vvs.emap.a == vout.v.emap.a)
-        assert np.all(vvs.emap.elem == vout.v.emap.elem)
+        vvs = v.fcv.sum(axis=ax, keepdims=True)
+        assert np.all(vvs.emap.a == vout.fcv.emap.a)
+        assert np.all(vvs.emap.elem == vout.fcv.emap.elem)
 
     assert v[:, :, None].sum(axis=2).shape == v.shape
     assert v[:, :, None].sum(axis=2).iaxes == v.iaxes
@@ -1976,7 +1976,7 @@ def test_matmul():
     v2 = iid_repeat(iid_repeat(random_normal((5, 1)), 7), 4)
     # shape (4, 7, 5, 1), iaxes (0, 1)
 
-    v2.v += v1.v[0, 0, 0, 0]  # for establishing correlation.
+    v2.fcv += v1.fcv[0, 0, 0, 0]  # for establishing correlation.
 
     w = v1 @ v2
     assert w.shape == (4, 7, 3, 1)
@@ -2001,8 +2001,8 @@ def test_einsum():
     def assert_equal(v1, v2):
         assert v1.shape == v2.shape
         assert v1.iaxes == v2.iaxes
-        assert np.max(np.abs(v1.v.emap.a - v2.v.emap.a)) < tol
-        assert v1.v.emap.elem == v2.v.emap.elem
+        assert np.max(np.abs(v1.fcv.emap.a - v2.fcv.emap.a)) < tol
+        assert v1.fcv.emap.elem == v2.fcv.emap.elem
         assert np.max(np.abs(v1.mean() - v2.mean())) < tol
 
     # Tests against matrix multiplication.
