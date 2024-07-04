@@ -14,8 +14,17 @@ from .emaps import ElementaryMap
 
 
 def iid_repeat(x, nrep=1, axis=0):
-    """Creates a sparse array of independent identically distributed 
-    copies of `x`."""
+    """Creates a sparse array of `nrep` independent identically distributed 
+    copies of `x` stacked together along `axis`.
+    
+    Args:
+        x: Normal or sparse normal random variable.
+        nrep: Integer number of repetitions.
+        axis: Integer index of the axis along which the repetitions are stacked.
+
+    Returns:
+        A sparse normal random variable with `axis` being an independence axis.
+    """
 
     x = assparsenormal(x)
     x = x.iid_copy()
@@ -61,10 +70,16 @@ class SparseNormal:
     _normal_priority_ = 10
     
     def __init__(self, fcv, iaxid):
+        if not isinstance(fcv, Normal):
+            raise ValueError("fcv must be a normal random varaible.")
+        
         self.fcv = fcv  # A fully-correlated normal variable with the same 
                         # mean and variance as the sparse varaible, serving 
                         # as the basis for most calculations.
         
+        if not isinstance(iaxid, tuple):
+            raise ValueError("iaxid must be a tuple.")
+
         self._iaxid = iaxid  # A tuple of the length equal to ndim, containing 
                              # integer ids at positions corresponding to 
                              # independence axes, and `None`s at positions 
@@ -432,7 +447,8 @@ class SparseNormal:
         if keepdims:
             iaxid = self._iaxid
         else:
-            iaxid = [b for i, b in enumerate(self._iaxid) if i not in sum_axes]
+            iaxid = tuple([b for i, b in enumerate(self._iaxid) 
+                           if i not in sum_axes])
 
         fcv = self.fcv.sum(axis=axis, keepdims=keepdims)
         return SparseNormal(fcv, iaxid)
@@ -1143,14 +1159,14 @@ def _validate_iaxes_binary(op1, op2, op_axes1, op_axes2):
     for `op1` and `op2`."""
     
     if any([op1._iaxid[ax] for ax in op_axes1]):
-        raise ValueError("Bilinear operations affecting "
+        raise ValueError("Bilinear operations contracting over "
                          "independence axes are not supported. "
-                         f"Axes {op_axes1} of operand 1 are affected.")
+                         f"Axes {op_axes1} of operand 1 are contracted.")
     
     if any([op2._iaxid[ax] for ax in op_axes2]):
-        raise ValueError("Bilinear operations affecting "
+        raise ValueError("Bilinear operations contracting over "
                          "independence axes are not supported. "
-                         f"Axes {op_axes2} of operand 2 are affected.")
+                         f"Axes {op_axes2} of operand 2 are contracted.")
     
 
 def bilinearfunc(name, op1, op2, iaxid1, iaxid2, args=tuple(), pargs=tuple()):
@@ -1169,7 +1185,7 @@ def bilinearfunc(name, op1, op2, iaxid1, iaxid2, args=tuple(), pargs=tuple()):
         v = SparseNormal(fcv, iaxid2)
 
     else:
-        v = getattr(np, name)(op1.fcv.mean(), op2.fcv.mean())
+        v = assparsenormal(getattr(np, name)(op1.fcv.mean(), op2.fcv.mean()))
 
     return v
 
@@ -1178,31 +1194,25 @@ def dot(op1, op2):
     op1 = assparsenormal(op1)
     op2 = assparsenormal(op2)
 
-    if op1.ndim == 0:
+    if op1.ndim == 0 or op2.ndim == 0:
+        # No axes are contracted over.
         op_axes1 = tuple()
-    elif op1.ndim == 1:
-        op_axes1 = (0,)
-    else:
-        op_axes1 = (-1,)
-    
-    if op2.ndim == 0:
         op_axes2 = tuple()
-        d = 1
-    elif op2.ndim == 1:
-        op_axes2 = (0,)
-        d = 0
+
+        iaxid1 = op1._iaxid
+        iaxid2 = op2._iaxid
     else:
-        op_axes2 = (-2,)
-        d = op2.ndim - 1
+        # Contraction over one axis.
+        op_axes1 = (-1,)
+        op_axes2 = (0,) if op2.ndim == 1 else (-2,)
+
+        iaxid1 = op1._iaxid[:-1]
+
+        iaxid2 = list(op2._iaxid)
+        iaxid2.pop(op_axes2[0])
+        iaxid2 = (None,) * (op1.ndim - 1) + tuple(iaxid2)
 
     _validate_iaxes_binary(op1, op2, op_axes1, op_axes2)
- 
-    iaxid1 = op1._iaxid[:-1] + (None,) * d
-
-    iaxid2 = list(op2._iaxid)
-    iaxid2.pop(op2.ndim - 1)
-    iaxid2 = (None,) * (op1.ndim - 1) + tuple(iaxid2)
-
     return bilinearfunc("dot", op1, op2, iaxid1, iaxid2)
 
 

@@ -2142,6 +2142,385 @@ def test_einsum():
     assert_equal(v_ei, v_ou)
 
 
+def test_dot():
+    def check_scalar(sv):
+        # Checks the dot product with a scalar.
+        # `sv` is any sparse variable.
+
+        sv_ = gp.dot(sv, 2.)
+        mean_ref = np.dot(sv.mean(), 2.)
+        assert sv_.shape == mean_ref.shape
+        assert np.max(np.abs(sv_.fcv.emap.a - 2 * sv.fcv.emap.a)) < tol
+        assert np.max(np.abs(sv_.mean() - 2 * sv.mean())) < tol
+
+        sv_ = gp.dot(2., sv)
+        mean_ref = np.dot(2., sv.mean())
+        assert sv_.shape == mean_ref.shape
+        assert np.max(np.abs(sv_.fcv.emap.a - 2 * sv.fcv.emap.a)) < tol
+        assert np.max(np.abs(sv_.mean() - 2 * sv.mean())) < tol
+
+    tol = 1e-8
+
+    # Degenerate cases.
+
+    v = assparsenormal(1)
+    v_ = gp.dot(v, 2.)
+    assert v_.shape == tuple()
+    assert np.max(np.abs(v_.mean() - 2 * v.mean())) < tol
+    assert np.max(v_.var()) < tol
+
+    v_ = gp.dot(2., v)
+    assert v_.shape == tuple()
+    assert np.max(np.abs(v_.mean() - 2 * v.mean())) < tol
+    assert np.max(v_.var()) < tol
+
+    v = assparsenormal([1, 2, 3])
+    v_ = gp.dot(v, [1, 2, 3])
+    assert v_.shape == tuple()
+    assert v_.iaxes == tuple()
+    assert v_.var() < tol
+    assert np.abs(v_.mean() - 14) < tol
+
+    v_ = gp.dot([1, 2, 3], v)
+    assert v_.shape == tuple()
+    assert v_.iaxes == tuple()
+    assert v_.var() < tol
+    assert np.abs(v_.mean() - 14) < tol
+
+    v = assparsenormal(2 * np.random.rand(2, 3, 4, 5) - 1)
+    x = 2 * np.random.rand(6, 7, 5, 4) - 1
+
+    v_ = gp.dot(v, x)
+    assert v_.shape == (2, 3, 4, 6, 7, 4)
+    assert v_.iaxes == tuple()
+    assert np.max(v_.var()) < tol
+    assert np.max(np.abs(v_.mean() - np.dot(v.mean(), x))) < tol
+
+    v_ = gp.dot(x, v)
+    assert v_.shape == (6, 7, 5, 2, 3, 5)
+    assert v_.iaxes == tuple()
+    assert np.max(v_.var()) < tol
+    assert np.max(np.abs(v_.mean() - np.dot(x, v.mean()))) < tol
+
+    # 1 independence axis.
+
+    # - 1-d sparse variable.
+    sz = 5
+    v = iid_repeat(normal(), sz)
+    rs = 2 * np.random.rand(sz) - 1
+    ro = 2 * np.random.rand(sz) - 1
+    v = ro + rs * v
+
+    # -- 0-d operand 2.
+    check_scalar(v)
+
+    # -- 1-d operand 2.
+    x = np.arange(5)
+    assert np.dot(v.mean(), x).shape == tuple()
+    with pytest.raises(ValueError):
+        gp.dot(v, x)
+    assert np.dot(x, v.mean()).shape == tuple()
+    with pytest.raises(ValueError):
+        gp.dot(x, v)
+
+    # - Adds one dense dimension.
+    v = iid_repeat(normal(size=3), sz)  # shape (5, 3), iaxes (0,)
+    rs = 2 * np.random.rand(sz, 1) - 1
+    ro = 2 * np.random.rand(sz, 1) - 1
+    v = ro + rs * v
+
+    # -- 0-d operand 2.
+    check_scalar(v)
+
+    # -- 1-d operand 2.
+    x3 = np.arange(3)
+    x5 = np.arange(5)
+    
+    v_ = gp.dot(v, x3)
+    mean_ref = np.dot(v.mean(), x3)
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (0,)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - np.dot(v.var(), x3**2))) < tol
+
+    v_ = gp.dot(x3, v.T)
+    mean_ref = np.dot(x3, v.T.mean())
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (0,)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - np.dot(x3**2, v.T.var()))) < tol
+
+    assert np.dot(v.T.mean(), x5).shape == (3,)
+    with pytest.raises(ValueError):
+        gp.dot(v.T, x5)
+    assert np.dot(x5, v.mean()).shape == (3,)
+    with pytest.raises(ValueError):
+        gp.dot(x5, v)
+
+    # -- 2-d operand 2.
+    x35 = np.arange(3 * 5).reshape((3, 5))
+
+    v_ = gp.dot(v, x35)
+    mean_ref = np.dot(v.mean(), x35)
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (0,)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - np.dot(v.var(), x35**2))) < tol
+
+    v_ = gp.dot(x35.T, v.T)
+    mean_ref = np.dot(x35.T, v.T.mean())
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (1,)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - np.dot(x35.T**2, v.T.var()))) < tol
+
+    assert np.dot(v.T.mean(), x35.T).shape == (3, 3)
+    with pytest.raises(ValueError):
+        gp.dot(v.T, x35.T)
+    assert np.dot(x35, v.mean()).shape == (3, 3)
+    with pytest.raises(ValueError):
+        gp.dot(x35, v)
+
+    # - Two dense dimensions.
+    nv = normal(size=(2, 3))
+    v = iid_repeat(nv, sz, axis=1)  # shape (2, 5, 3), iaxes (1,)
+    rs = 2 * np.random.rand(sz, 1) - 1
+    ro = 2 * np.random.rand(sz, 1) - 1
+    v = ro + rs * v
+
+    # -- 0-d operand 2.
+    check_scalar(v)
+
+    # -- 1-d operand 2.
+    x3 = np.arange(3)
+    x5 = np.arange(5)
+
+    v_ = gp.dot(v, x3)
+    mean_ref = np.dot(v.mean(), x3)
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (1,)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - np.dot(v.var(), x3**2))) < tol
+
+    vt = v.transpose((0, 2, 1))  # shape (2, 3, 5), iaxes (2,)
+    v_ = gp.dot(x3, vt)
+    mean_ref = np.dot(x3, vt.mean())
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (1,)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - np.dot(x3**2, vt.var()))) < tol
+
+    assert np.dot(vt.mean(), x5).shape == (2, 3)
+    with pytest.raises(ValueError):
+        gp.dot(vt, x5)
+    assert np.dot(x5, v.mean()).shape == (2, 3)
+    with pytest.raises(ValueError):
+        gp.dot(x5, v)
+
+    # -- 2-d operand 2.
+    # v: shape (2, 5, 3), iaxes (1,) 
+    # vt: shape (2, 3, 5), iaxes (2,)
+    x35 = np.arange(3 * 5).reshape((3, 5))
+
+    v_ = gp.dot(v, x35)
+    mean_ref = np.dot(v.mean(), x35)
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (1,)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - np.dot(v.var(), x35**2))) < tol
+
+    v_ = gp.dot(x35.T, vt)
+    mean_ref = np.dot(x35.T, vt.mean())
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (2,)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - np.dot(x35.T**2, vt.var()))) < tol
+
+    assert np.dot(vt.mean(), x35.T).shape == (2, 3, 3)
+    with pytest.raises(ValueError):
+        gp.dot(vt, x35.T)
+    assert np.dot(x35, v.mean()).shape == (3, 2, 3)
+    with pytest.raises(ValueError):
+        gp.dot(x35, v)
+
+    # -- 3-d operand 2.
+    # v: shape (2, 5, 3), iaxes (1,) 
+    # vt: shape (2, 3, 5), iaxes (2,)
+    x435 = np.arange(3 * 4 * 5).reshape((4, 3, 5))
+    x453 = x435.transpose((0, 2, 1))
+
+    v_ = gp.dot(v, x435)
+    mean_ref = np.dot(v.mean(), x435)
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (1,)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - np.dot(v.var(), x435**2))) < tol
+
+    v_ = gp.dot(x453, vt)
+    mean_ref = np.dot(x453, vt.mean())
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (3,)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - np.dot(x453**2, vt.var()))) < tol
+
+    assert np.dot(vt.mean(), x453).shape == (2, 3, 4, 3)
+    with pytest.raises(ValueError):
+        gp.dot(vt, x453)
+    assert np.dot(x435, v.mean()).shape == (4, 3, 2, 3)
+    with pytest.raises(ValueError):
+        gp.dot(x435, v)
+
+    # 2 independence axis.
+
+    # - 2-d sparse variable.
+    sz1 = 5
+    sz2 = 6
+    v = iid_repeat(iid_repeat(normal(), sz1), sz2)  # shape (6, 5)
+    rs = 2 * np.random.rand(sz2, sz1) - 1
+    ro = 2 * np.random.rand(sz2, sz1) - 1
+    v = ro + rs * v
+
+    # -- 0-d operand 2.
+    check_scalar(v)
+
+    # -- 1-d operand 2.
+    x5 = np.arange(5)
+
+    assert np.dot(v.mean(), x5).shape == (6,)
+    with pytest.raises(ValueError):
+        gp.dot(v, x5)
+    assert np.dot(x5, v.T.mean()).shape == (6,)
+    with pytest.raises(ValueError):
+        gp.dot(x5, v.T)
+
+    # -- 2-d operand 2.
+    x35 = np.arange(3 * 5).reshape((3, 5))
+
+    assert np.dot(v.mean(), x35.T).shape == (6, 3)
+    with pytest.raises(ValueError):
+        gp.dot(v, x35.T)
+    assert np.dot(x35, v.T.mean()).shape == (3, 6)
+    with pytest.raises(ValueError):
+        gp.dot(x35, v.T)
+
+    # - Adds one dense dimension.
+    sz1 = 5
+    sz2 = 6
+    dsz = 7
+    nv = normal(size=dsz)
+    v = iid_repeat(iid_repeat(nv, sz1), sz2)  # shape (6, 5, 7)
+    rs = 2 * np.random.rand(sz2, sz1, dsz) - 1
+    ro = 2 * np.random.rand(sz2, sz1, dsz) - 1
+    v = ro + rs * v
+
+    # -- 0-d operand 2.
+    check_scalar(v)
+
+    # -- 1-d operand 2.
+    x5 = np.arange(5)
+    x7 = np.arange(7)
+    vt = v.transpose((0, 2, 1))  # shape (6, 7, 5), iaxes (0, 2)
+    
+    v_ = gp.dot(v, x7)
+    mean_ref = np.dot(v.mean(), x7)
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (0, 1)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - np.dot(v.var(), x7**2))) < tol
+
+    v_ = gp.dot(x7, vt)
+    mean_ref = np.dot(x7, vt.mean())
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (0, 1)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - np.dot(x7**2, vt.var()))) < tol
+
+    assert np.dot(vt.mean(), x5).shape == (6, 7)
+    with pytest.raises(ValueError):
+        gp.dot(vt, x5)
+    assert np.dot(x5, v.mean()).shape == (6, 7)
+    with pytest.raises(ValueError):
+        gp.dot(x5, v)
+
+    # -- 2-d operand 2: skip.
+
+    # -- 3-d operand 2.
+    # v: shape (6, 5, 7), iaxes (0, 1) 
+    # vt: shape (6, 7, 5), iaxes (0, 2)
+    x = np.arange(3 * 7 * 5).reshape((3, 7, 5))
+    xt = x.transpose((0, 2, 1))
+
+    v_ = gp.dot(v, x)
+    mean_ref = np.dot(v.mean(), x)
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (0, 1)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - np.dot(v.var(), x**2))) < tol
+
+    v_ = gp.dot(xt, vt)
+    mean_ref = np.dot(xt, vt.mean())
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (2, 3)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - np.dot(xt**2, vt.var()))) < tol
+
+    assert np.dot(vt.mean(), xt).shape == (6, 7, 3, 7)
+    with pytest.raises(ValueError):
+        gp.dot(vt, xt)
+    assert np.dot(x, v.mean()).shape == (3, 7, 6, 7)
+    with pytest.raises(ValueError):
+        gp.dot(x, v)
+
+    # A more complex example with correlations between elements.
+    nv = normal(size=(3, 2))
+    v1 = iid_repeat(iid_repeat(nv, 4, axis=-1), 5)  # shape (5, 3, 2, 4)
+    rs = 2 * np.random.rand(5, 3, 2, 4) - 1
+    ro = 2 * np.random.rand(5, 3, 2, 4) - 1
+    v1 = ro + rs * v1
+    v1 = v1.sum(axis=2)
+
+    nv1_ref = normal(size=(5, 3, 2, 4))
+    nv1_ref = ro + rs * nv1_ref
+    nv1_ref = nv1_ref.sum(axis=2)
+
+    nv = normal(size=(3, 2))
+    v2 = iid_repeat(iid_repeat(nv, 4, axis=-1), 5)  # shape (5, 3, 2, 4)
+    rs = 2 * np.random.rand(5, 3, 2, 4) - 1
+    ro = 2 * np.random.rand(5, 3, 2, 4) - 1
+    v2 = ro + rs * v2
+    v2 = v2.sum(axis=2)
+
+    nv2_ref = normal(size=(5, 3, 2, 4))
+    nv2_ref = ro + rs * nv2_ref
+    nv2_ref = nv2_ref.sum(axis=2)
+
+    v = v1 - v2
+    nv_ref = nv1_ref - nv2_ref
+
+    x = 2 * np.random.rand(7, 4, 3) - 1
+    v_ = gp.dot(x, v)
+    nv_ref_ = gp.dot(x, nv_ref)
+
+    assert v_.shape == nv_ref_.shape
+    assert v_.iaxes == (2, 3)
+    assert np.max(np.abs(v_.mean() - nv_ref_.mean())) < tol
+    assert np.max(np.abs(v_.cov() - 
+                         dense_to_sparse_cov(nv_ref_.cov(), (2, 3)))) < tol
+    
+    vt = v.transpose((0, 2, 1))
+    nv_ref_t = nv_ref.transpose((0, 2, 1))
+    xt = x.transpose((0, 2, 1))
+
+    v_ = gp.dot(vt, xt)
+    nv_ref_ = gp.dot(nv_ref_t, xt)
+
+    assert v_.shape == nv_ref_.shape
+    assert v_.iaxes == (0, 1)
+    assert np.max(np.abs(v_.mean() - nv_ref_.mean())) < tol
+    assert np.max(np.abs(v_.cov() - 
+                         dense_to_sparse_cov(nv_ref_.cov(), (0, 1)))) < tol
+
+
 def test_iid_copy():
     tol = 1e-8
 
