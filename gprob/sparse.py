@@ -78,11 +78,17 @@ class SparseNormal:
                         # as the basis for most calculations.
         
         if not isinstance(iaxid, tuple):
-            raise ValueError("iaxid must be a tuple.")
+            raise ValueError("iaxid must be a tuple, while now it is "
+                             f"of type {type(iaxid)}.")
         
         if len(iaxid) != fcv.ndim:
-            raise ValueError("The size of iaxid does not match the number "
-                             "of the dimensions of the variable.")
+            raise ValueError(f"The size of iaxid ({len(iaxid)}) does not "
+                             "match the number of the dimensions "
+                             f"of the variable ({fcv.ndim}).")
+        
+        if not all([i is None or i for i in iaxid]):
+            raise ValueError("iaxid can contain only Nones and integers "
+                             f"greater than zero, while now it is {iaxid}.")
 
         self._iaxid = iaxid  # A tuple of the length equal to ndim, containing 
                              # integer ids at positions corresponding to 
@@ -227,28 +233,29 @@ class SparseNormal:
         return SparseNormal(fcv, iaxid)
 
     def __matmul__(self, other):
+        other = assparsenormal(other)
+
         if self.ndim == 0:
             raise ValueError("Matrix multiplication requires at least one "
                              "dimension, while the operand 1 has 0.")
-        else:
-            op_axis = self.ndim - 1
+        if other.ndim == 0:
+            raise ValueError("Matrix multiplication requires at least one "
+                             "dimension, while the operand 2 has 0.")
+        
+        op_axis = self.ndim - 1
 
         if self._iaxid[op_axis]:
             raise ValueError("Matrix multiplication affecting independence "
                              "axes is not supported. "
                              f"Axis {op_axis} of operand 1 is affected.")
-        
-        other = assparsenormal(other)
 
-        if self.ndim == 1:
-            iaxid = (None,)  # == self._iaxid, otherwise
-                             # ValueError would have been thrown. 
-        elif other.ndim <= max(self.ndim, 2):
+        if other.ndim == 1:
+            iaxid = self._iaxid[:-1]
+        elif other.ndim <= self.ndim:
             iaxid = self._iaxid
         else:
             # There are dimensions added by broadcasting.
-            d = other.ndim - self.ndim
-            iaxid = (None,) * d + self._iaxid
+            iaxid = (None,) * (other.ndim - self.ndim) + self._iaxid
 
         # Calculates the contribution from the deterministic part of `other`.
         fcv = self.fcv @ other.mean()
@@ -256,17 +263,23 @@ class SparseNormal:
         
         if not _is_deterministic(other):
             # Adds the linearized contribution from the random part of `other`.
-            # As `other`` is a sparse normal, the consistency of
+            # As `other` is a sparse normal, the consistency of
             # independence axes is ensured by the addition operation.
             v += self.mean() @ (other - other.mean())
 
         return v
 
     def __rmatmul__(self, other):
+        other = assparsenormal(other)
+
+        if other.ndim == 0:
+            raise ValueError("Matrix multiplication requires at least one "
+                             "dimension, while the operand 1 has 0.")
         if self.ndim == 0:
             raise ValueError("Matrix multiplication requires at least one "
                              "dimension, while the operand 2 has 0.")
-        elif self.ndim == 1:
+        
+        if self.ndim == 1:
             op_axis = 0
         else:
             op_axis = self.ndim - 2
@@ -275,8 +288,6 @@ class SparseNormal:
             raise ValueError("Matrix multiplication affecting independence "
                              "axes is not supported. "
                              f"Axis {op_axis} of operand 2 is affected.")
-        
-        other = assparsenormal(other)
 
         if other.ndim == 1:
             iaxid = tuple([b for i, b in enumerate(self._iaxid) 
@@ -301,7 +312,7 @@ class SparseNormal:
     
     def __getitem__(self, key):
         out_ax = _parse_index_key(self, key)
-        iaxid = tuple([self._iaxid[ax] if ax is not None else False 
+        iaxid = tuple([self._iaxid[ax] if ax is not None else None 
                        for ax in out_ax])
         return SparseNormal(self.fcv[key], iaxid)
     
@@ -346,7 +357,10 @@ class SparseNormal:
         return SparseNormal(self.fcv.diagonal(offset, axis1, axis2), iaxid)
 
     def flatten(self, order="C"):
-        if not any(self._iaxid) or self.ndim <= 1:
+        if not any(self._iaxid):  # This covers the case of self.ndim == 0.
+            return SparseNormal(self.fcv.flatten(order=order), (None,))
+        
+        if self.ndim == 1:
             return SparseNormal(self.fcv.flatten(order=order), self._iaxid)
         
         # Checks if all dimensions except maybe one are <= 1.
@@ -371,7 +385,10 @@ class SparseNormal:
         return SparseNormal(self.fcv.moveaxis(source, destination), iaxid)
     
     def ravel(self, order="C"):
-        if not any(self._iaxid) or self.ndim <= 1:
+        if not any(self._iaxid):  # This covers the case of self.ndim == 0.
+            return SparseNormal(self.fcv.ravel(order=order), (None,))
+        
+        if self.ndim == 1:
             return SparseNormal(self.fcv.ravel(order=order), self._iaxid)
         
         # Checks if all dimensions except maybe one are <= 1.
@@ -388,7 +405,7 @@ class SparseNormal:
     def reshape(self, newshape, order="C"):
 
         fcv = self.fcv.reshape(newshape, order)  
-        # Reshaping the underlying varibale before the axes check is
+        # Reshaping the fully correlated variable before the axes check is
         # to yield a meaningful error message if the shapes are inconsistent.
 
         newshape = fcv.shape  # Replaces '-1' if it was in newshape.
@@ -404,7 +421,7 @@ class SparseNormal:
         new_cnt = 1
         old_cnt = 1
 
-        iaxid = [False] * fcv.ndim
+        iaxid = [None] * len(newshape)
         for i, n in enumerate(self.shape):
             if self._iaxid[i]:
                 if n != 1:
@@ -415,7 +432,7 @@ class SparseNormal:
                 if (new_dim < len(newshape) and newshape[new_dim] == n 
                     and new_cnt == old_cnt):
                     
-                    iaxid[new_dim] = True
+                    iaxid[new_dim] = self._iaxid[i]
                 else:
                     raise ValueError("Reshaping that affects independence axes "
                                      f"is not supported. Axis {i} is affected "
@@ -935,8 +952,8 @@ def _validate_iaxes(seq):
     
 
 def _parse_index_key(x, key):
-    """Validates the key and calculates the number of the input axis 
-    contributing to the given output axis."""
+    """Validates the key and calculates the numbers of the input axes 
+    contributing to each output axis."""
 
     if not isinstance(key, tuple):
         key = (key,)
@@ -1220,7 +1237,7 @@ def dot(op1, op2):
         op_axes1 = (-1,)
         op_axes2 = (0,) if op2.ndim == 1 else (-2,)
 
-        iaxid1 = op1._iaxid[:-1]
+        iaxid1 = op1._iaxid[:-1] + (None,) * (op2.ndim - 1)
 
         iaxid2 = list(op2._iaxid)
         iaxid2.pop(op_axes2[0])
