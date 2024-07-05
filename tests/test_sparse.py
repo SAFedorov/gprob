@@ -21,6 +21,29 @@ def dense_to_sparse_cov(cov, iaxes):
     return cov
 
 
+def test_construction():
+    tol = 1e-8
+
+    m = [[1, 2, 3], [4, 5, 6]]
+    fcv = m + normal()
+    v = SparseNormal(fcv, (1, None))
+    assert v.iaxes == (0,)
+    assert np.max(np.abs(v.var() - np.ones((2, 3)))) < tol
+    assert np.max(np.abs(v.mean() - m)) < tol
+
+    with pytest.raises(TypeError):
+        SparseNormal(m, (1, None))
+    
+    with pytest.raises(ValueError):
+        SparseNormal(fcv, [1, None])
+
+    # Wrong size of iaxid.
+    with pytest.raises(ValueError):
+        SparseNormal(fcv, (1, None, None))
+    with pytest.raises(ValueError):
+        SparseNormal(fcv, tuple())
+
+
 def test_iid_repeat():
     # A numeric constant.
     number = 1
@@ -507,12 +530,12 @@ def test_sample():
     assert len(s) == ns
 
     m = np.sum(s, axis=0) / ns
-    vv = np.sum(s ** 2, axis=0) / ns
+    vv = np.sum((s - m) ** 2, axis=0) / ns
 
-    tol = 0.03
+    tol = 10 / np.sqrt(ns)
     assert m.shape == v.mean().shape
-    assert np.mean(np.abs(m - v.mean())) / np.max(np.abs(v.mean())) < tol
-    assert np.mean((vv - v.var())**2) / np.max(v.var()**2) < tol
+    assert np.mean((m - v.mean())**2) / np.max(v.mean()**2) < tol ** 2
+    assert np.mean((vv - v.var())**2) / np.max(v.var()**2) < tol ** 2
 
 
 def test_condition():
@@ -2142,23 +2165,25 @@ def test_einsum():
     assert_equal(v_ei, v_ou)
 
 
+def _check_w_scalar_operand(sv, func_name="dot"):
+        # Checks the operation of a bilinear dunction one scalar argument.
+        # `sv` is a sparse normal variable.
+        tol = 1e-8
+
+        sv_ = getattr(gp, func_name)(sv, 2.)
+        mean_ref = getattr(np, func_name)(sv.mean(), 2.)
+        assert sv_.shape == mean_ref.shape
+        assert np.max(np.abs(sv_.fcv.emap.a - 2 * sv.fcv.emap.a)) < tol
+        assert np.max(np.abs(sv_.mean() - 2 * sv.mean())) < tol
+
+        sv_ = getattr(gp, func_name)(2., sv)
+        mean_ref = getattr(np, func_name)(2., sv.mean())
+        assert sv_.shape == mean_ref.shape
+        assert np.max(np.abs(sv_.fcv.emap.a - 2 * sv.fcv.emap.a)) < tol
+        assert np.max(np.abs(sv_.mean() - 2 * sv.mean())) < tol
+
+
 def test_dot():
-    def check_scalar(sv):
-        # Checks the dot product with a scalar.
-        # `sv` is any sparse variable.
-
-        sv_ = gp.dot(sv, 2.)
-        mean_ref = np.dot(sv.mean(), 2.)
-        assert sv_.shape == mean_ref.shape
-        assert np.max(np.abs(sv_.fcv.emap.a - 2 * sv.fcv.emap.a)) < tol
-        assert np.max(np.abs(sv_.mean() - 2 * sv.mean())) < tol
-
-        sv_ = gp.dot(2., sv)
-        mean_ref = np.dot(2., sv.mean())
-        assert sv_.shape == mean_ref.shape
-        assert np.max(np.abs(sv_.fcv.emap.a - 2 * sv.fcv.emap.a)) < tol
-        assert np.max(np.abs(sv_.mean() - 2 * sv.mean())) < tol
-
     tol = 1e-8
 
     # Degenerate cases.
@@ -2166,11 +2191,13 @@ def test_dot():
     v = assparsenormal(1)
     v_ = gp.dot(v, 2.)
     assert v_.shape == tuple()
+    assert v_.iaxes == tuple()
     assert np.max(np.abs(v_.mean() - 2 * v.mean())) < tol
     assert np.max(v_.var()) < tol
 
     v_ = gp.dot(2., v)
     assert v_.shape == tuple()
+    assert v_.iaxes == tuple()
     assert np.max(np.abs(v_.mean() - 2 * v.mean())) < tol
     assert np.max(v_.var()) < tol
 
@@ -2212,7 +2239,7 @@ def test_dot():
     v = ro + rs * v
 
     # -- 0-d operand 2.
-    check_scalar(v)
+    _check_w_scalar_operand(v)
 
     # -- 1-d operand 2.
     x = np.arange(5)
@@ -2230,7 +2257,7 @@ def test_dot():
     v = ro + rs * v
 
     # -- 0-d operand 2.
-    check_scalar(v)
+    _check_w_scalar_operand(v)
 
     # -- 1-d operand 2.
     x3 = np.arange(3)
@@ -2289,7 +2316,7 @@ def test_dot():
     v = ro + rs * v
 
     # -- 0-d operand 2.
-    check_scalar(v)
+    _check_w_scalar_operand(v)
 
     # -- 1-d operand 2.
     x3 = np.arange(3)
@@ -2381,7 +2408,7 @@ def test_dot():
     v = ro + rs * v
 
     # -- 0-d operand 2.
-    check_scalar(v)
+    _check_w_scalar_operand(v)
 
     # -- 1-d operand 2.
     x5 = np.arange(5)
@@ -2414,7 +2441,7 @@ def test_dot():
     v = ro + rs * v
 
     # -- 0-d operand 2.
-    check_scalar(v)
+    _check_w_scalar_operand(v)
 
     # -- 1-d operand 2.
     x5 = np.arange(5)
@@ -2551,3 +2578,19 @@ def test_doc_string_sync():
     for m in methods:
         assert getattr(Normal, m).__doc__
         assert getattr(Normal, m).__doc__ == getattr(SparseNormal, m).__doc__
+
+
+def test_array_conversion():
+    # The conversion of sparse normal variables to numpy arrays is 
+    # not supported. The sparse axes cannot be indexed, and it makes 
+    # the default conversion method of numpy.array() silently yield 
+    # an empty array.
+
+    v = iid_repeat(normal(), 3)
+
+    with pytest.raises(TypeError):
+        np.array(v)
+    with pytest.raises(TypeError):
+        np.asarray(v)
+    with pytest.raises(TypeError):
+        np.multiply(v, 3)

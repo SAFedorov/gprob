@@ -71,7 +71,7 @@ class SparseNormal:
     
     def __init__(self, fcv, iaxid):
         if not isinstance(fcv, Normal):
-            raise ValueError("fcv must be a normal random varaible.")
+            raise TypeError("fcv must be a normal variable.")
         
         self.fcv = fcv  # A fully-correlated normal variable with the same 
                         # mean and variance as the sparse varaible, serving 
@@ -79,6 +79,10 @@ class SparseNormal:
         
         if not isinstance(iaxid, tuple):
             raise ValueError("iaxid must be a tuple.")
+        
+        if len(iaxid) != fcv.ndim:
+            raise ValueError("The size of iaxid does not match the number "
+                             "of the dimensions of the variable.")
 
         self._iaxid = iaxid  # A tuple of the length equal to ndim, containing 
                              # integer ids at positions corresponding to 
@@ -122,6 +126,16 @@ class SparseNormal:
     @property
     def _niax(self):
         return len(self._iaxid) - self._iaxid.count(None)
+    
+    def __array__(self):
+        # Sparse variables cannot be iterated over along their 
+        # independence axes, which results in the default conversion 
+        # method of numpy.array() silently returning an empty array. 
+        # I find such behavior confusing, which is why conversion to 
+        # numpy arrays is disallowed.
+
+        raise TypeError(f"{self.__class__.__name__} variables cannot "
+                        "be converted to numpy arrays.")
     
     def __repr__(self):
         return print_normal(self, extra_attrs=("iaxes",))
@@ -1161,12 +1175,12 @@ def _validate_iaxes_binary(op1, op2, op_axes1, op_axes2):
     if any([op1._iaxid[ax] for ax in op_axes1]):
         raise ValueError("Bilinear operations contracting over "
                          "independence axes are not supported. "
-                         f"Axes {op_axes1} of operand 1 are contracted.")
+                         f"Axes {op_axes1} of operand 1 are affected.")
     
     if any([op2._iaxid[ax] for ax in op_axes2]):
         raise ValueError("Bilinear operations contracting over "
                          "independence axes are not supported. "
-                         f"Axes {op_axes2} of operand 2 are contracted.")
+                         f"Axes {op_axes2} of operand 2 are affected.")
     
 
 def bilinearfunc(name, op1, op2, iaxid1, iaxid2, args=tuple(), pargs=tuple()):
@@ -1220,14 +1234,20 @@ def inner(op1, op2):
     op1 = assparsenormal(op1)
     op2 = assparsenormal(op2)
 
-    op_axes1 = (-1,)
-    op_axes2 = (-1,)
+    if op1.ndim == 0 or op2.ndim == 0:
+        op_axes1 = tuple()
+        op_axes2 = tuple()
+
+        iaxid1 = op1._iaxid
+        iaxid2 = op2._iaxid
+    else:
+        op_axes1 = (-1,)
+        op_axes2 = (-1,)
+
+        iaxid1 = op1._iaxid[:-1] + (None,) * (op2.ndim - 1)
+        iaxid2 = (None,) * (op1.ndim - 1) + op2._iaxid[:-1]
 
     _validate_iaxes_binary(op1, op2, op_axes1, op_axes2)
-    
-    iaxid1 = op1._iaxid[:-1] + (None,) * (op2.ndim - 1)
-    iaxid2 = (None,) * (op1.ndim - 1) + op2._iaxid[:-1]
-
     return bilinearfunc("inner", op1, op2, iaxid1, iaxid2)
 
 
@@ -1235,11 +1255,10 @@ def outer(op1, op2):
     op1 = assparsenormal(op1).ravel()
     op2 = assparsenormal(op2).ravel()
 
+    iaxid1 = op1._iaxid + (None,)
+    iaxid2 = (None,) + op2._iaxid
+
     # iaxes are always valid.
-
-    iaxid1 = (True, False) if any(op1._iaxid) else (False, False)
-    iaxid2 = (False, True) if any(op2._iaxid) else (False, False)
-
     return bilinearfunc("outer", op1, op2, iaxid1, iaxid2)
 
 
@@ -1247,12 +1266,11 @@ def kron(op1, op2):
     op1 = assparsenormal(op1)
     op2 = assparsenormal(op2)
 
-    # iaxes are always valid.
-
     ndim = max(op1.ndim, op2.ndim)  # ndim of the result.
     iaxid1 = (None,) * (ndim - op1.ndim) + op1._iaxid
     iaxid2 = (None,) * (ndim - op2.ndim) + op2._iaxid
 
+    # iaxes are always valid.
     return bilinearfunc("kron", op1, op2, iaxid1, iaxid2)
 
 
