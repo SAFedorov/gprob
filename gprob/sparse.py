@@ -1209,14 +1209,15 @@ def bilinearfunc(name, op1, op2, iaxid1, iaxid2, args=tuple(), pargs=tuple()):
         v = SparseNormal(fcv, iaxid1)
 
         if not _is_deterministic(op2):
-            v += bilinearfunc(op1.mean(), (op2 - op2.mean()))
+            v += bilinearfunc(name, op1.mean(), (op2 - op2.mean()), iaxid1, iaxid2, args, pargs)
 
     elif not _is_deterministic(op2):
         fcv = normal_.bilinearfunc(name, op1.fcv.mean(), op2.fcv, args, pargs)
         v = SparseNormal(fcv, iaxid2)
 
     else:
-        v = assparsenormal(getattr(np, name)(op1.fcv.mean(), op2.fcv.mean()))
+        x = getattr(np, name)(*pargs, op1.fcv.mean(), op2.fcv.mean(), *args)
+        v = assparsenormal(x)
 
     return v
 
@@ -1304,12 +1305,13 @@ def tensordot(op1, op2, axes=2):
         op_axes1, op_axes2 = axes
     # This follows how numpy.tensordot handles the axes.
 
-    _validate_iaxes_binary(op1, op2, op_axes1, op_axes2)
-
     iaxid1 = tuple([b for i, b in enumerate(op1._iaxid) if i not in op_axes1])
-    iaxid2 = tuple([b for i, b in enumerate(op2._iaxid) if i not in op_axes2])
-    iaxid2 = (None,) * len(iaxid1) + iaxid2
+    iaxid1 = iaxid1 + (None,) * (op2.ndim - len(op_axes2))
 
+    iaxid2 = tuple([b for i, b in enumerate(op2._iaxid) if i not in op_axes2])
+    iaxid2 = (None,) * (op1.ndim - len(op_axes1)) + iaxid2
+
+    _validate_iaxes_binary(op1, op2, op_axes1, op_axes2)
     return bilinearfunc("tensordot", op1, op2, iaxid1, iaxid2, args=[axes])
     
 

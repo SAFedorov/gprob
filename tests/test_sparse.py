@@ -2071,7 +2071,12 @@ def test_einsum():
     def assert_equal(v1, v2):
         assert v1.shape == v2.shape
         assert v1.iaxes == v2.iaxes
-        assert np.max(np.abs(v1.fcv.emap.a - v2.fcv.emap.a)) < tol
+
+        if len(v1.fcv.emap.a) > 0:
+            assert np.max(np.abs(v1.fcv.emap.a - v2.fcv.emap.a)) < tol
+        else:
+            assert len(v2.fcv.emap.a) == 0
+        
         assert v1.fcv.emap.elem == v2.fcv.emap.elem
         assert np.max(np.abs(v1.mean() - v2.mean())) < tol
 
@@ -2210,6 +2215,19 @@ def test_einsum():
     v_ei = gp.einsum("kl, ij -> lj", x, v)
     v_ou = gp.outer(x, v)
     assert_equal(v_ei, v_ou)
+
+    # A purely deterministic input.
+
+    v = assparsenormal(2 * np.random.rand(2, 4, 3, 2) - 1)
+    x = 2 * np.random.rand(4, 3, 2, 5) - 1
+
+    v_ei = gp.einsum("ijkl, jklm", v, x)
+    v_td = gp.tensordot(v, x, axes=3)
+    assert_equal(v_ei, v_td)
+
+    v_ei = gp.einsum("ijkl, jklm", x.T, v.T)
+    v_td = gp.tensordot(x.T, v.T, axes=3)
+    assert_equal(v_ei, v_td)
 
 
 def _check_w_scalar_operand(sv, func_name="dot"):
@@ -3173,6 +3191,213 @@ def test_kron():
     assert np.max(np.abs(v_.mean() - nv_.mean())) < tol
     assert np.max(np.abs(v_.cov() - 
                          dense_to_sparse_cov(nv_.cov(), (2, 4)))) < tol
+
+
+def test_tensordot():
+    tol = 1e-8
+
+    # Degenerate cases.
+
+    v = assparsenormal(1)
+    v_ = gp.tensordot(v, 2., axes=0)
+    assert v_.shape == tuple()
+    assert v_.iaxes == tuple()
+    assert np.max(np.abs(v_.mean() - 2 * v.mean())) < tol
+    assert np.max(v_.var()) < tol
+
+    v_ = gp.tensordot(2., v, axes=0)
+    assert v_.shape == tuple()
+    assert v_.iaxes == tuple()
+    assert np.max(np.abs(v_.mean() - 2 * v.mean())) < tol
+    assert np.max(v_.var()) < tol
+
+    v = assparsenormal([1, 2, 3])
+    v_ = gp.tensordot(v, [1, 2, 3], axes=1)
+    assert v_.shape == tuple()
+    assert v_.iaxes == tuple()
+    assert v_.var() < tol
+    assert np.abs(v_.mean() - 14) < tol
+
+    v_ = gp.tensordot([1, 2, 3], v, axes=1)
+    assert v_.shape == tuple()
+    assert v_.iaxes == tuple()
+    assert v_.var() < tol
+    assert np.abs(v_.mean() - 14) < tol
+
+    v = assparsenormal(2 * np.random.rand(2, 3, 4, 5) - 1)
+    x = 2 * np.random.rand(3, 4, 5, 7) - 1
+
+    v_ = gp.tensordot(v, x, axes=3)
+    assert v_.shape == (2, 7)
+    assert v_.iaxes == tuple()
+    assert np.max(v_.var()) < tol
+    assert np.max(np.abs(v_.mean() - np.tensordot(v.mean(), x, axes=3))) < tol
+
+    vt = v.transpose((1, 2, 3, 0))
+    xt = x.transpose((3, 0, 1, 2))
+    v_ = gp.tensordot(xt, vt, axes=3)
+    assert v_.shape == (7, 2)
+    assert v_.iaxes == tuple()
+    assert np.max(v_.var()) < tol
+    assert np.max(np.abs(v_.mean() - 
+                         np.tensordot(xt, vt.mean(), axes=3))) < tol
+    
+    # 1 independence axis.
+
+    v = iid_repeat(normal(size=(2, 3)), 5, 1)  # shape (2, 5, 3), iaxes (1,)
+
+    rs = 2 * np.random.rand(2, 5, 3) - 1
+    ro = 2 * np.random.rand(2, 5, 3) - 1
+    v = ro + rs * v
+
+    x = 2 * np.random.rand(3, 2, 6) - 1
+
+    # - Contraction over 0 axes.
+
+    v_ = gp.tensordot(v, x, axes=0)
+    mean_ref = np.tensordot(v.mean(), x, axes=0)
+    var_ref = np.tensordot(v.var(), x**2, axes=0)
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (1,)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - var_ref)) < tol
+
+    v_ = gp.tensordot(x, v, axes=0)
+    mean_ref = np.tensordot(x, v.mean(), axes=0)
+    var_ref = np.tensordot(x**2, v.var(), axes=0)
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (4,)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - var_ref)) < tol
+
+    # - Contraction over 1 axis.
+
+    v_ = gp.tensordot(v, x, axes=1)
+    mean_ref = np.tensordot(v.mean(), x, axes=1)
+    var_ref = np.tensordot(v.var(), x**2, axes=1)
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (1,)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - var_ref)) < tol
+
+    v_ = gp.tensordot(x.T, v.T, axes=1)
+    mean_ref = np.tensordot(x.T, v.T.mean(), axes=1)
+    var_ref = np.tensordot(x.T**2, v.T.var(), axes=1)
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (2,)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - var_ref)) < tol
+
+    x_ = [1, 2, 3, 4, 5]
+    assert np.tensordot(v.mean(), x_, axes=((1,), (0,))).shape == (2, 3)
+    with pytest.raises(ValueError):
+        gp.tensordot(v, x_, axes=((1,), (0,)))
+
+    assert np.tensordot(x_, v.mean(), axes=((0,), (1,))).shape == (2, 3)
+    with pytest.raises(ValueError):
+        gp.tensordot(x_, v, axes=((0,), (1,)))
+
+    # - Contraction over 2 axes.
+
+    vt = v.transpose((1, 2, 0))  # shape (5, 3, 2), iaxes (0,)
+
+    v_ = gp.tensordot(vt, x, axes=2)
+    mean_ref = np.tensordot(vt.mean(), x, axes=2)
+    var_ref = np.tensordot(vt.var(), x**2, axes=2)
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (0,)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - var_ref)) < tol
+
+    vt = v.transpose((2, 0, 1))  # shape (3, 2, 5), iaxes (2,)
+    xt = x.transpose((2, 0, 1))  # shape (6, 3, 2)
+
+    v_ = gp.tensordot(xt, vt, axes=2)
+    mean_ref = np.tensordot(xt, vt.mean(), axes=2)
+    var_ref = np.tensordot(xt**2, vt.var(), axes=2)
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (1,)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - var_ref)) < tol
+
+    # Contraction over 2 axes with explicit designation of axes.
+
+    v_ = gp.tensordot(v, x, axes=((0, 2), (1, 0)))
+    mean_ref = np.tensordot(v.mean(), x, axes=((0, 2), (1, 0)))
+    var_ref = np.tensordot(v.var(), x**2, axes=((0, 2), (1, 0)))
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (0,)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - var_ref)) < tol
+
+    v_ = gp.tensordot(x, v, axes=((1, 0), (0, 2)))
+    mean_ref = np.tensordot(x, v.mean(), axes=((1, 0), (0, 2)))
+    var_ref = np.tensordot(x**2, v.var(), axes=((1, 0), (0, 2)))
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (1,)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - var_ref)) < tol
+
+    # 2 independence axis.
+
+    v = iid_repeat(iid_repeat(normal(size=(2, 3)), 5, axis=1), 6, axis=-1)
+    # shape (2, 5, 3, 6), iaxes (1, 3)
+
+    rs = 2 * np.random.rand(2, 5, 3, 6) - 1
+    ro = 2 * np.random.rand(2, 5, 3, 6) - 1
+    v = ro + rs * v
+
+    x = 2 * np.random.rand(3, 2, 4, 6) - 1
+
+    v_ = gp.tensordot(v, x, axes=((2,), (0,)))
+    mean_ref = np.tensordot(v.mean(), x, axes=((2,), (0,)))
+    var_ref = np.tensordot(v.var(), x**2, axes=((2,), (0,)))
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (1, 2)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - var_ref)) < tol
+
+    v_ = gp.tensordot(x, v, axes=((0,), (2,)))
+    mean_ref = np.tensordot(x, v.mean(), axes=((0,), (2,)))
+    var_ref = np.tensordot(x**2, v.var(), axes=((0,), (2,)))
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (4, 5)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - var_ref)) < tol
+
+    v_ = gp.tensordot(v, x, axes=((2, 0), (0, 1)))
+    mean_ref = np.tensordot(v.mean(), x, axes=((2, 0), (0, 1)))
+    var_ref = np.tensordot(v.var(), x**2, axes=((2, 0), (0, 1)))
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (0, 1)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - var_ref)) < tol
+
+    # Check addition after tensordot to see that iaxid are correct.
+
+    v = iid_repeat(iid_repeat(normal(size=(2, 3)), 5, axis=1), 5, axis=-1)
+    # shape (2, 5, 3, 5), iaxes (1, 3)
+
+    rs = 2 * np.random.rand(2, 5, 3, 5) - 1
+    ro = 2 * np.random.rand(2, 5, 3, 5) - 1
+    v = ro + rs * v
+
+    w = iid_repeat(iid_repeat(normal(), 5), 5, axis=-1)
+
+    x = 2 * np.random.rand(3, 2) - 1
+
+    v_ = gp.tensordot(x, v, axes=((1, 0), (0, 2)))
+    mean_ref = np.tensordot(x, v.mean(), axes=((1, 0), (0, 2)))
+    var_ref = np.tensordot(x**2, v.var(), axes=((1, 0), (0, 2)))
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (0, 1)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - var_ref)) < tol
+
+    assert (w + v_).shape == (5, 5)
+    assert (w.T + v_.T).shape == (5, 5)
+    with pytest.raises(ValueError):
+        assert (w.T + v_).shape == (5, 5)
 
 
 def test_iid_copy():
