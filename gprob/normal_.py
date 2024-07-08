@@ -208,6 +208,9 @@ class Normal:
     
     def __and__(self, other):
         """Combines two random variables into one vector."""
+        if self._is_lower_than(other):
+            return NotImplemented  # The operation must be handled by `other`.
+        
         return stack([self, other])  
     
     def __rand__(self, other):

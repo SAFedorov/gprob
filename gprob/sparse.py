@@ -322,6 +322,19 @@ class SparseNormal:
     def __or__(self, observations):
         """Conditioning operation."""
         return self.condition(observations)
+    
+    def __and__(self, other):
+        """Combines two random variables into one vector."""
+        try:
+            other = assparsenormal(other)
+        except TypeError:
+            return NotImplemented
+        
+        return stack([self, other])  
+    
+    def __rand__(self, other):
+        """Combines two random variables into one vector."""
+        return stack([other, self])
         
     # ---------- array methods ----------
 

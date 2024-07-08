@@ -3446,3 +3446,34 @@ def test_array_conversion():
         np.asarray(v)
     with pytest.raises(TypeError):
         np.multiply(v, 3)
+
+
+def test_and():
+    # Tests the combining operation & .
+
+    tol = 1e-10
+
+    v = normal() & assparsenormal(normal())
+    assert isinstance(v, SparseNormal)
+
+    v = assparsenormal(normal()) & normal()
+    assert isinstance(v, SparseNormal)
+
+    nv1 = normal() + 0.2
+    nv2 = nv1 - 0.5 * normal()
+    nv = nv1 & nv2
+
+    v1 = iid_repeat(normal(), 4) + 0.2
+    v2 = v1 - 0.5 * iid_repeat(normal(), 4)
+
+    v = v1 & v2
+    assert v.shape == (2, 4)
+    assert v.iaxes == (1,)
+    assert np.max(np.abs(v.mean() - nv.mean()[..., None])) < tol
+    assert np.max(np.abs(v.cov() - nv.cov()[..., None])) < tol
+
+    with pytest.raises(TypeError):
+        assparsenormal(normal()) & "s"
+
+    with pytest.raises(TypeError):
+        "s" & assparsenormal(normal())
