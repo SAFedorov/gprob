@@ -235,6 +235,10 @@ class SparseNormal:
     def __matmul__(self, other):
         other = assparsenormal(other)
 
+        if not _is_deterministic(other):                                         # TODO: revise this to something more clever
+            raise ValueError("Bilinear operations between two sparse normal "
+                             "variables are not supported.")
+
         if self.ndim == 0:
             raise ValueError("Matrix multiplication requires at least one "
                              "dimension, while the operand 1 has 0.")
@@ -260,17 +264,15 @@ class SparseNormal:
         # Calculates the contribution from the deterministic part of `other`.
         fcv = self.fcv @ other.mean()
         v = SparseNormal(fcv, iaxid)
-        
-        if not _is_deterministic(other):
-            # Adds the linearized contribution from the random part of `other`.
-            # As `other` is a sparse normal, the consistency of
-            # independence axes is ensured by the addition operation.
-            v += self.mean() @ (other - other.mean())
 
         return v
 
     def __rmatmul__(self, other):
         other = assparsenormal(other)
+
+        if not _is_deterministic(other):
+            raise ValueError("Bilinear operations between two sparse normal "
+                             "variables are not supported.")
 
         if other.ndim == 0:
             raise ValueError("Matrix multiplication requires at least one "
@@ -300,15 +302,9 @@ class SparseNormal:
 
         # Calculates the contribution from the deterministic part of `other`.
         fcv = other.mean() @ self.fcv
-        w = SparseNormal(fcv, iaxid)
-        
-        if not _is_deterministic(other):
-            # Adds the linearized contribution from the random part of `other`.
-            # As `other`` is a sparse normal, the consistency of
-            # independence axes is ensured by the addition operation.
-            w += (other - other.mean()) @ self.mean()
+        v = SparseNormal(fcv, iaxid)
 
-        return w
+        return v
     
     def __getitem__(self, key):
         out_ax = _parse_index_key(self, key)
@@ -938,8 +934,8 @@ def _validate_iaxes(seq):
         else:
             valstr = ""
 
-        raise ValueError("Incompatible numbers of the independence axes "
-                         f"of the operands{valstr}.\n{msg}")
+        raise ValueError("Mismatching numbers of independence axes "
+                         f"in the operands{valstr}. {msg}")
 
     get_iax_numbers = lambda ids: tuple([i for i, b in enumerate(ids) if b])
     locs = set(get_iax_numbers(ids) for ids in iaxids)
@@ -950,7 +946,7 @@ def _validate_iaxes(seq):
             valstr = ""
         
         raise ValueError("Incompatible locations of the independence axes "
-                         f"of the operands{valstr}.\n{msg}")
+                         f"of the operands{valstr}. {msg}")
 
     orders = set(tuple([ax for ax in ids if ax is not None]) for ids in iaxids)
     assert len(orders) > 1
@@ -961,7 +957,7 @@ def _validate_iaxes(seq):
         valstr = ""
 
     raise ValueError("Incompatible orders of the independence axes "
-                     f"of the operands{valstr}.\n{msg}")
+                     f"of the operands{valstr}. {msg}")
     
 
 def _parse_index_key(x, key):
@@ -1222,7 +1218,8 @@ def bilinearfunc(name, op1, op2, iaxid1, iaxid2, args=tuple(), pargs=tuple()):
         v = SparseNormal(fcv, iaxid1)
 
         if not _is_deterministic(op2):
-            v += bilinearfunc(name, op1.mean(), (op2 - op2.mean()), iaxid1, iaxid2, args, pargs)
+            raise ValueError("Bilinear operations between two sparse normal "
+                             "variables are not supported.")
 
     elif not _is_deterministic(op2):
         fcv = normal_.bilinearfunc(name, op1.fcv.mean(), op2.fcv, args, pargs)
