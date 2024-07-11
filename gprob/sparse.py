@@ -307,13 +307,24 @@ class SparseNormal:
         return v
     
     def __getitem__(self, key):
-        out_ax = _parse_index_key(self, key)
-        iaxid = tuple([self._iaxid[ax] if ax is not None else None 
-                       for ax in out_ax])
+        iaxid = _item_iaxid(self, key)
         return SparseNormal(self.fcv[key], iaxid)
     
     def __setitem__(self, key, value):
-        raise NotImplementedError
+        value = assparsenormal(value)
+
+        if not _is_deterministic(value):
+            iaxid = _item_iaxid(self, key)
+            val_iaxid = (None,) * (len(iaxid) - value.ndim) + value._iaxid
+            
+            if val_iaxid != iaxid:
+                raise ValueError("The independence axes of the indexing result "
+                                 "do not match those of the value being set.")
+            
+            # Deterministic values can skip this check, 
+            # as their axes are always compatible.
+        
+        self.fcv[key] = value.fcv
     
     def __or__(self, observations):
         """Conditioning operation."""
@@ -960,9 +971,20 @@ def _validate_iaxes(seq):
                      f"of the operands{valstr}. {msg}")
     
 
-def _parse_index_key(x, key):
-    """Validates the key and calculates the numbers of the input axes 
-    contributing to each output axis."""
+def _item_iaxid(x, key):
+    """Validates the key and calculates iaxid for the result of the indexing 
+    of `x` with `key`.
+    
+    Args:
+        x: 
+            Sparse normal variable.
+        key: 
+            Numpy-syntax array indexing key. Independence axes can only 
+            be indexed by full slices `:` (explicit or implicit via ellipsis). 
+        
+    Returns:
+        A tuple of iaxids for the indexing result.
+    """
 
     if not isinstance(key, tuple):
         key = (key,)
@@ -1032,7 +1054,9 @@ def _parse_index_key(x, key):
             raise IndexError("Only full slices (':') and ellipses ('...') "
                              "are valid indices for independence axes. "
                              f"Axis {i} is indexed with an invalid key.")
-    return out_axs
+    
+    # Returns iaxid for the indexing result.
+    return tuple([None if ax is None else x._iaxid[ax] for ax in out_axs])
     
 
 def cov(*args):

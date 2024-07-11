@@ -6,7 +6,7 @@ from numpy.exceptions import ComplexWarning
 
 import gprob as gp
 from gprob.normal_ import normal, Normal
-from gprob.sparse import (_parse_index_key, iid_repeat, assparsenormal, 
+from gprob.sparse import (_item_iaxid, iid_repeat, assparsenormal, 
                           SparseNormal, SparseConditionWarning)
 
 from utils import random_normal, get_message
@@ -210,7 +210,7 @@ def test_properties():
         assert np.max(np.abs(vr.var() + vi.var() - v.var())) < tol
 
 
-def test_index_key_parsing():
+def test_getitem():
     v = iid_repeat(iid_repeat(normal(size=(4, 5)), 2, axis=1), 3, axis=1)
     # v.shape is (4, 3, 2, 5), v.iaxes are (1, 2)
 
@@ -255,31 +255,148 @@ def test_index_key_parsing():
 
     # No indices except full slices are allowed for independence axes.
     with pytest.raises(IndexError):
-        _parse_index_key(v, np.s_[:, 1])
+        _item_iaxid(v, np.s_[:, 1])
     with pytest.raises(IndexError):
-        _parse_index_key(v, np.s_[:, :, 1])
+        _item_iaxid(v, np.s_[:, :, 1])
     with pytest.raises(IndexError):
-        _parse_index_key(v, np.s_[:, :2])
+        _item_iaxid(v, np.s_[:, :2])
     with pytest.raises(IndexError):
-        _parse_index_key(v, np.s_[:, :, :2])
+        _item_iaxid(v, np.s_[:, :, :2])
     with pytest.raises(IndexError):
-        _parse_index_key(v, np.s_[:, ::2])
+        _item_iaxid(v, np.s_[:, ::2])
     with pytest.raises(IndexError):
-        _parse_index_key(v, np.s_[:, [True, False, True]])
+        _item_iaxid(v, np.s_[:, [True, False, True]])
     with pytest.raises(IndexError):
-        _parse_index_key(v, np.s_[:, True])
+        _item_iaxid(v, np.s_[:, True])
     with pytest.raises(IndexError):
-        _parse_index_key(v, np.s_[:, [0, 1, 2]])
+        _item_iaxid(v, np.s_[:, [0, 1, 2]])
     
-    # Generally invalid indices.
+    # Indices, invalid for any array of the shape of v.
     with pytest.raises(IndexError):
-        _parse_index_key(v, np.s_["s"])
+        _item_iaxid(v, np.s_["s"])
     with pytest.raises(IndexError):
-        _parse_index_key(v, np.s_[1, :, :, 2, 1])
+        _item_iaxid(v, np.s_[1, :, :, 2, 1])
     with pytest.raises(IndexError):
-        _parse_index_key(v, np.s_[..., ...])
+        _item_iaxid(v, np.s_[..., ...])
     with pytest.raises(IndexError):
-        _parse_index_key(v, np.s_[..., 1, ...])
+        _item_iaxid(v, np.s_[..., 1, ...])
+
+
+def test_setitem():
+    tol = 1e-10
+
+    # Degenerate case - no independence axes.
+
+    v = assparsenormal(normal(size=3))
+    
+    v1 = assparsenormal(normal(0.2, 1))
+    v[1] += 0.5 * v1
+    assert v.iaxes == tuple()
+    assert np.max(np.abs(v.mean() - [0, 0.1, 0])) < tol
+    assert np.max(np.abs(v.cov() - [[1, 0, 0], [0, 1.25, 0], [0, 0, 1]])) < tol
+    assert np.max(np.abs(gp.cov(v, v1) - [0, 0.5, 0])) < tol
+
+    v1 = assparsenormal(normal(0.2, 1, size=3))
+    v[:] = 0.5 * v1
+    assert v.iaxes == tuple()
+    assert np.max(np.abs(v.mean() - [0.1, 0.1, 0.1])) < tol
+    assert np.max(np.abs(gp.cov(v, v1) 
+                         - [[0.5, 0, 0], [0, 0.5, 0], [0, 0, 0.5]])) < tol
+
+    # 1 independence axis.
+
+    # - single integer index. 
+
+    v = iid_repeat(normal(size=(3, 2)), 4, axis=1)  
+    # shape (3, 4, 2), iaxes (1,)
+
+    rs = 2 * np.random.rand(3, 4, 2) - 1
+    ro = 2 * np.random.rand(3, 4, 2) - 1
+    v = ro + v * rs
+
+    vm = v.mean()
+    vv = v.var()
+    vc = gp.cov(v, np.zeros((4, 2)))
+
+    v1 = iid_repeat(normal(0.1, 2, size=(2,)), 4)
+    
+    v[0] = v1
+    vm[0] = v1.mean()
+    vv[0] = v1.var()
+    vc[0, ...] = 2 * np.eye(2).reshape((2, 2, 1))
+
+    assert v.iaxes == (1,)
+    assert np.max(np.abs(v.mean() - vm)) < tol
+    assert np.max(np.abs(v.var() - vv)) < tol
+    assert np.max(np.abs(gp.cov(v, v1) - vc)) < tol
+
+    # - slice and two integer indices.
+
+    v = iid_repeat(normal(size=(3, 2)), 4, axis=1)  
+    # shape (3, 4, 2), iaxes (1,)
+
+    rs = 2 * np.random.rand(3, 4, 2) - 1
+    ro = 2 * np.random.rand(3, 4, 2) - 1
+    v = ro + v * rs
+
+    vm = v.mean()
+    vv = v.var()
+
+    v1 = iid_repeat(normal(0.1, 2, size=(3,)), 4, axis=-1)
+
+    v[1, :, 0] = v1[1, :]
+    vm[1, :, 0] = v1[1, :].mean()
+    vv[1, :, 0] = v1[1, :].var()
+
+    vc = gp.cov(v, np.zeros((4,)))
+    vc[1, 0] = 2
+
+    assert v.iaxes == (1,)
+    assert np.max(np.abs(v.mean() - vm)) < tol
+    assert np.max(np.abs(v.var() - vv)) < tol
+    assert np.max(np.abs(gp.cov(v, v1[1, :]) - vc)) < tol
+
+    # - ellipsis.
+    
+    v[..., 0] = v1
+    vm[..., 0] = v1.mean()
+    vv[..., 0] = v1.var()
+
+    vc = gp.cov(v, np.zeros((3, 4)))
+    vc[:, 0, :, :] = 2 * np.eye(3).reshape((3, 3, 1))
+
+    assert v.iaxes == (1,)
+    assert np.max(np.abs(v.mean() - vm)) < tol
+    assert np.max(np.abs(v.var() - vv)) < tol
+    assert np.max(np.abs(gp.cov(v, v1) - vc)) < tol
+
+    # Setting a trivial value.
+    v = iid_repeat(normal(), 4)
+
+    v[:] = 1
+    assert np.max(np.abs(v.mean() - 1)) < tol
+    assert np.max(np.abs(v.var())) < tol
+
+    # Errors.
+
+    v = iid_repeat(normal(), 4)
+
+    with pytest.raises(IndexError):
+        v[0] = normal()
+
+    # However, a deterministic variable can be assigned using 
+    # the same key as above. This is a strange edge case.
+    v[0] = 1
+
+    assert v.iaxes == (0,)
+    assert np.max(np.abs(v.mean() - [1, 0, 0, 0])) < tol
+    assert np.max(np.abs(v.var() - [0, 1, 1, 1])) < tol
+
+    v = iid_repeat(normal(size=4), 4)
+    v1 = iid_repeat(normal(size=4), 4, axis=1)
+
+    with pytest.raises(ValueError):
+        v[:, :] = v1  # Mismatching iaxes.
 
 
 def test_broadcasting():
