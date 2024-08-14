@@ -227,7 +227,7 @@ def condition(m, a, mc, ac, mask=None):
     v = m + e @ a,
     c = mc + e @ ac,
     
-    where `e` are vectors of elementary independent identically-distributed 
+    where `e` are vectors of independent identically-distributed 
     normal random variables with zero mean and unit variance, `m` and `mc` are
     the mean vectors and `a` and `ac` are the map matrices.  
     

@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 from external.Infer import Infer
 from gprob import hstack, stack
-from gprob.normal_ import normal, cov
+from gprob.random import normal, cov
 from gprob.func import ConditionError
 from utils import random_normal, random_correlate
 
@@ -202,7 +202,7 @@ def test_complex_conditioning():
     assert np.max(np.abs(vrcond.cov() - vcond.cov())) < tol
 
     # Complex mean but real map
-    v.emap.a = v.emap.a.real
+    v.a = v.a.real
     vr = hstack([v.real, v.imag])
 
     vcond = v | vc

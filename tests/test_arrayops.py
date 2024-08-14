@@ -5,7 +5,7 @@ import inspect
 import numpy as np
 import gprob as gp
 
-from gprob.normal_ import Normal
+from gprob.random import Normal
 
 
 def test_cov():
@@ -52,8 +52,8 @@ def test_cov():
 
 def test_fallback_to_normal():
 
-    # Gets the names of all decorated functions following the recipe 
-    # from https://stackoverflow.com/questions/5910703/how-to-get-all-methods-of-a-python-class-with-given-decorator
+    # Gets the names of all functions with the given decorator following 
+    # the recipe from https://stackoverflow.com/questions/5910703/how-to-get-all-methods-of-a-python-class-with-given-decorator
 
     src_lines, _ = inspect.getsourcelines(gp.arrayops)
     func_names = []
@@ -64,8 +64,8 @@ def test_fallback_to_normal():
 
     assert len(func_names) >= 15  # May change in the future.
 
-    excl_names = {"reshape", "moveaxis",  # require extra arguments
-                  "split", "hsplit", "vsplit", "dsplit", 
+    excl_names = {"reshape", "moveaxis", "broadcast_to",  # require arguments
+                  "split", "hsplit", "vsplit", "dsplit",
                   "mean", "var", "cov"  # always produce numerical outputs
                   }
 
@@ -76,7 +76,7 @@ def test_fallback_to_normal():
         f = getattr(gp, fn)
         assert isinstance(f([[1, 2], [2, 3]]), Normal)
 
-    # The separate tests for the cases that require extra input arguments.
+    # The separate tests for the cases that require input arguments.
 
     v = gp.reshape([1, 2, 3, 4], (2, 2))
     assert isinstance(v, Normal)
@@ -84,6 +84,10 @@ def test_fallback_to_normal():
     v = gp.moveaxis([[1], [2], [3], [4]], 0, 1)
     assert isinstance(v, Normal)
     assert v.shape == (1, 4)
+
+    v = gp.broadcast_to([1, 2, 3, 4], (3, 4))
+    assert isinstance(v, Normal)
+    assert v.shape == (3, 4)
 
     v1, v2 = gp.split([1, 2, 3, 4], 2)
     assert isinstance(v1, Normal)

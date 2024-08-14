@@ -4,31 +4,31 @@ from scipy.stats import multivariate_normal as mvn
 from numpy.linalg import LinAlgError
 from numpy.exceptions import ComplexWarning
 from gprob import hstack, vstack, iid_copy, broadcast_to
-from gprob.normal_ import normal, Normal, safer_cholesky, asnormal, cov
+from gprob.random import normal, Normal, safer_cholesky, cov
 from gprob.sparse import iid_repeat
-from utils import random_normal, random_correlate
+from utils import random_normal, random_correlate, asnormal
 
 np.random.seed(0)
 
 
 def test_creation():
     xi = normal()
-    assert (xi.emap.a == np.array([1.])).all()
+    assert (xi.a == np.array([1.])).all()
     assert (xi.b == np.array(0.)).all()
 
     xi = normal(1.3, 4)
-    assert (xi.emap.a == np.array([2.])).all()
+    assert (xi.a == np.array([2.])).all()
     assert (xi.b == np.array(1.3)).all()
 
     xi = normal(0, 4, size=3)
-    assert (xi.emap.a == 2 * np.eye(3)).all()
+    assert (xi.a == 2 * np.eye(3)).all()
     assert (xi.b == np.zeros(3)).all()
 
     with pytest.raises(ValueError):
         normal(0, -4)
     
     xi = normal(0, 0)
-    assert (xi.emap.a == np.array([0.])).all()
+    assert (xi.a == np.array([0.])).all()
     assert (xi.b == np.array(0.)).all()
 
     # Creation from a full-rank real covariance matrix.
@@ -252,7 +252,7 @@ def test_properties():
     v.b = v.b.real
     assert v.iscomplex == True
 
-    v.emap.a = v.emap.a.real
+    v.a = v.a.real
     assert v.iscomplex == False
 
 
@@ -442,7 +442,7 @@ def test_complex_logp():
     sh = (6,)
     xi = random_normal(sh, dtype=np.complex128)
 
-    a = xi.emap.a
+    a = xi.a
     m = xi.mean()
     cov = a.T @ a.conj()
     rel = a.T @ a
@@ -462,7 +462,7 @@ def test_complex_logp():
     xi = random_normal(sh, dtype=np.complex128)
     
     xif = xi.flatten()
-    a = xif.emap.a
+    a = xif.a
     m = xif.mean()
     cov = a.T @ a.conj()
     rel = a.T @ a
@@ -486,7 +486,7 @@ def test_complex_logp():
     x = xi.sample()
 
     m = xi.mean()
-    a = xi.emap.a
+    a = xi.a
     x2 = np.hstack([x.real, x.imag])
     m2 = np.hstack([m.real, m.imag])
     a2 = np.hstack([a.real, a.imag])
@@ -552,11 +552,11 @@ def test_stack():
     assert isinstance(vm, Normal) and len(vm) == 3
 
 
-def test_elementary_ordering():
+def test_latent_ordering():
     # Requires python >= 3.6
 
     def isordered(v: Normal):
-        ed = v.emap.elem
+        ed = v.lat
         return all(ed[k] == i for i, k in enumerate(ed))
     
     # Scalars
@@ -686,7 +686,7 @@ def test_operations():
     # arithmetic operations between normal variables and other types
 
     def isclose(v1, v2, tol=1e-14):
-        return ((np.abs(v1.emap.a - v2.emap.a) < tol).all() 
+        return ((np.abs(v1.a - v2.a) < tol).all() 
                 and (np.abs(v1.b - v2.b) < tol).all())
     
     # 0d-1d
@@ -907,24 +907,24 @@ def test_broadcasting():
     xi2 = xi1 * (-3, -4)
     assert xi2.shape == (2,)
     assert np.abs(xi2.b - (-0.3, -0.4)).max() < tol
-    assert np.abs(xi2.emap.a[0] - (-3, -4)).max() < tol
+    assert np.abs(xi2.a[0] - (-3, -4)).max() < tol
 
     xi = normal(1, 1)**[2, 0]
     assert xi.shape == (2,)
-    assert np.abs(xi.emap.a - np.array([[2., 0.]])).max() < tol
+    assert np.abs(xi.a - np.array([[2., 0.]])).max() < tol
 
     m = np.array([[1, 0], [0, 1], [2, 2]])
     xi1 = Normal(np.array([[1, 0.5], [0, -1]]), np.array([0.3, -0.3]))
     xi2 = xi1 * m
     assert xi2.shape == (3, 2)
     assert np.abs(xi2.b - [[0.3, 0], [0, -0.3], [0.6, -0.6]]).max() < tol
-    for r1, r2 in zip(xi1.emap.a, xi2.emap.a):
+    for r1, r2 in zip(xi1.a, xi2.a):
         assert np.abs(r2 - r1 * m).max() < tol
 
     xi2 = m * xi1
     assert xi2.shape == (3, 2)
     assert np.abs(xi2.b - [[0.3, 0], [0, -0.3], [0.6, -0.6]]).max() < tol
-    for r1, r2 in zip(xi1.emap.a, xi2.emap.a):
+    for r1, r2 in zip(xi1.a, xi2.a):
         assert np.abs(r2 - r1 * m).max() < tol
 
     # random nd shapes
@@ -937,11 +937,11 @@ def test_broadcasting():
 
     xi2 = m + xi1
     assert xi2.shape == sh + (2,)
-    assert xi2.emap.a.shape == (3,) + sh + (2,)
+    assert xi2.a.shape == (3,) + sh + (2,)
     rng = int(np.prod(sh))
-    a2_fl = np.reshape(xi2.emap.a, (3, rng, 2))
+    a2_fl = np.reshape(xi2.a, (3, rng, 2))
     for i in range(rng):
-        assert np.abs(a2_fl[:, i, :] - xi1.emap.a).max() < tol
+        assert np.abs(a2_fl[:, i, :] - xi1.a).max() < tol
 
     # multiplication
     sh = tuple(np.random.randint(1, 4, 9))
@@ -949,12 +949,12 @@ def test_broadcasting():
 
     xi2 = m * xi1
     assert xi2.shape == sh + (2,)
-    assert xi2.emap.a.shape == (3,) + sh + (2,)
+    assert xi2.a.shape == (3,) + sh + (2,)
     rng = int(np.prod(sh))
     m_fl = np.reshape(m, (rng, 2))
-    a2_fl = np.reshape(xi2.emap.a, (3, rng, 2))
+    a2_fl = np.reshape(xi2.a, (3, rng, 2))
     for i in range(rng):
-        assert np.abs(a2_fl[:, i, :] - m_fl[i] * xi1.emap.a).max() < tol
+        assert np.abs(a2_fl[:, i, :] - m_fl[i] * xi1.a).max() < tol
 
     # division
     sh = tuple(np.random.randint(1, 4, 7))
@@ -962,12 +962,12 @@ def test_broadcasting():
 
     xi2 =  xi1 / m
     assert xi2.shape == sh + (2,)
-    assert xi2.emap.a.shape == (3,) + sh + (2,)
+    assert xi2.a.shape == (3,) + sh + (2,)
     rng = int(np.prod(sh))
     m_fl = np.reshape(m, (rng, 2))
-    a2_fl = np.reshape(xi2.emap.a, (3, rng, 2))
+    a2_fl = np.reshape(xi2.a, (3, rng, 2))
     for i in range(rng):
-        assert np.abs(a2_fl[:, i, :] -  xi1.emap.a / m_fl[i]).max() < tol
+        assert np.abs(a2_fl[:, i, :] -  xi1.a / m_fl[i]).max() < tol
 
     # normal-normal operations
 

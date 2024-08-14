@@ -1,10 +1,18 @@
 import numpy as np
 from functools import reduce
-from gprob.normal_ import Normal, asnormal
+from gprob import maps, random, sparse
+
+
+def asnormal(x):
+    return maps.lift(random.Normal, x)
+
+
+def assparsenormal(x):
+    return sparse.lift(sparse.SparseNormal, x)
 
 
 def random_normal(shape, dtype=np.float64):
-    """Generates a normal variable with random mean and elementary map."""
+    """Generates a normal variable with random mean and latent map."""
 
     sz = reduce(lambda x, y: x * y, shape, 1)
 
@@ -25,7 +33,7 @@ def random_normal(shape, dtype=np.float64):
     assert mu.dtype == dtype
     assert a.dtype == dtype
 
-    return Normal(a, mu).reshape(shape)
+    return random.Normal(a, mu).reshape(shape)
 
 
 def random_det_normal(shape, dtype=np.float64):
@@ -52,15 +60,15 @@ def random_det_normal(shape, dtype=np.float64):
 
 
 def random_correlate(vs):
-    # Correlates the input variables by randomly mixing their elementary keys.
-    union_elems = set().union(*list(v.emap.elem.keys() for v in vs))
+    # Correlates the input variables by randomly mixing their latent keys.
+    union_elems = set().union(*list(v.lat.keys() for v in vs))
 
     rng = np.random.default_rng()
 
     for v in vs:
-        new_ind  = rng.choice(list(union_elems), size=len(v.emap.elem), 
+        new_ind  = rng.choice(list(union_elems), size=len(v.lat), 
                               replace=False)
-        v.emap.elem = {i: v.emap.elem[k] for i, k in zip(new_ind, v.emap.elem)}
+        v.lat = {i: v.lat[k] for i, k in zip(new_ind, v.lat)}
     return vs
 
 

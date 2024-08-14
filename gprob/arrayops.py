@@ -1,39 +1,29 @@
 import numpy as np
 
-from . import normal_
-from . import sparse
-
-from .normal_ import Normal
-from .sparse import SparseNormal
+from . import maps
+from .random import Normal
 
 
-MODULE_DICT = {Normal: normal_, SparseNormal: sparse}
-
-
-def resolve_module(seq):
-    """Returns the module corresponding to the highest class 
-    in the sequence `seq`. The classes are ordered according 
-    to `_normal_priority_`, and the default highest is `Normal`."""
-
-    if len(seq) == 1:
-        return MODULE_DICT.get(seq[0].__class__, normal_)
-
-    p = Normal._normal_priority_ - 1
-    obj = max(seq, key=lambda a: getattr(a, "_normal_priority_", p), 
-              default=None)
+def resolve(seq):
+    cs = set([x.__class__ for x in seq if hasattr(x, "_mod")])
+    if len(cs) == 0:
+        return maps, Normal
+    if len(cs) == 1:
+        c = cs.pop()
+        return c._mod, c
     
-    return MODULE_DICT.get(obj.__class__, normal_)
+    raise TypeError(f"Classes {cs} cannot be combined in operations.")  # TODO: expand message
 
 
-def fallback_to_normal(func):
-    def hedged_func(x, *args, **kwargs):
-        try:
-            return func(x, *args, **kwargs)
-        except AttributeError:
-            return func(normal_.asnormal(x), *args, **kwargs)
+def fallback_to_normal(f):
+    def f_(x, *args, **kwargs):
+        if not hasattr(x, f.__name__):
+            x = maps.lift(Normal, x)
+
+        return f(x, *args, **kwargs)
         
-    hedged_func.__name__ = func.__name__
-    return hedged_func
+    f_.__name__ = f.__name__
+    return f_
 
 
 # ---------- probability-related functions ----------
@@ -143,8 +133,8 @@ def cov(*args):
         raise TypeError("The function can accept only one or two input "
                         f"arguments, while {len(args)} arguments are given.")
     
-    mod = resolve_module(args)
-    return mod.cov(*args)
+    mod, cls = resolve(args)
+    return mod.cov(cls, *args)
 
 
 # ---------- array functions ----------
@@ -191,64 +181,68 @@ def trace(x, offset=0, axis1=0, axis2=1):
     return x.trace(offset=offset, axis1=axis1, axis2=axis2)
 
 
+@fallback_to_normal
 def broadcast_to(x, shape):
     """Broadcasts the variable to a new shape."""
-    mod = resolve_module([x])
-    return mod.broadcast_to(x, shape)
+    return x.broadcast_to(shape)
 
 
 def concatenate(arrays, axis=0):
     if len(arrays) == 0:
         raise ValueError("Need at least one array to concatenate.")
-    mod = resolve_module(arrays)
-    return mod.concatenate(arrays, axis)
+    mod, cls = resolve(arrays)
+    arrays = [mod.lift(cls, a) for a in arrays]
+    return mod.concatenate(cls, arrays, axis)
 
 
 def stack(arrays, axis=0):
     if len(arrays) == 0:
         raise ValueError("Need at least one array to stack.")
-    mod = resolve_module(arrays)
-    return mod.stack(arrays, axis)
-
-
-def as_array_seq(arrays_or_scalars):
-    return [x if hasattr(x, "ndim") else np.array(x) for x in arrays_or_scalars]
+    mod, cls = resolve(arrays)
+    arrays = [mod.lift(cls, a) for a in arrays]
+    return mod.stack(cls, arrays, axis)
 
 
 def hstack(arrays):
     if len(arrays) == 0:
         raise ValueError("Need at least one array to stack.")
     
-    arrays = as_array_seq(arrays)
+    mod, cls = resolve(arrays)
+    arrays = [mod.lift(cls, a) for a in arrays]
+    
     arrays = [a.ravel() if a.ndim == 0 else a for a in arrays]
     if arrays[0].ndim == 1:
-        return concatenate(arrays, axis=0)
+        return mod.concatenate(cls, arrays, axis=0)
     
-    return concatenate(arrays, axis=1)
+    return mod.concatenate(cls, arrays, axis=1)
     
 
 def vstack(arrays):
     if len(arrays) == 0:
         raise ValueError("Need at least one array to stack.")
     
-    arrays = as_array_seq(arrays)
+    mod, cls = resolve(arrays)
+    arrays = [mod.lift(cls, a) for a in arrays]
+
     if arrays[0].ndim <= 1:
         arrays = [a.reshape((1, -1)) for a in arrays]
     
-    return concatenate(arrays, axis=0)
+    return mod.concatenate(cls, arrays, axis=0)
 
 
 def dstack(arrays):
     if len(arrays) == 0:
         raise ValueError("Need at least one array to stack.")
     
-    arrays = as_array_seq(arrays)
+    mod, cls = resolve(arrays)
+    arrays = [mod.lift(cls, a) for a in arrays]
+
     if arrays[0].ndim <= 1:
         arrays = [a.reshape((1, -1, 1)) for a in arrays]
     elif arrays[0].ndim == 2:
-        arrays = [a.reshape((*a.shape, 1)) for a in arrays]
+        arrays = [a.reshape(a.shape + (1,)) for a in arrays]
     
-    return concatenate(arrays, axis=2)
+    return mod.concatenate(cls, arrays, axis=2)
 
 
 @fallback_to_normal
@@ -307,50 +301,50 @@ def matmul(op1, op2):
 
 
 def dot(op1, op2):
-    mod = resolve_module([op1, op2])
-    return mod.dot(op1, op2)
+    mod, cls = resolve([op1, op2])
+    return mod.bilinearfunc(cls, "dot", op1, op2)
 
 
 def inner(op1, op2):
-    mod = resolve_module([op1, op2])
-    return mod.inner(op1, op2)
+    mod, cls = resolve([op1, op2])
+    return mod.bilinearfunc(cls, "inner", op1, op2)
 
 
 def outer(op1, op2):
-    mod = resolve_module([op1, op2])
-    return mod.outer(op1, op2)
+    mod, cls = resolve([op1, op2])
+    return mod.bilinearfunc(cls, "outer", op1, op2)
 
 
 def kron(op1, op2):
-    mod = resolve_module([op1, op2])
-    return mod.kron(op1, op2)
+    mod, cls = resolve([op1, op2])
+    return mod.bilinearfunc(cls, "kron", op1, op2)
 
 
 def tensordot(op1, op2, axes=2):
-    mod = resolve_module([op1, op2])
-    return mod.tensordot(op1, op2, axes)
+    mod, cls = resolve([op1, op2])
+    return mod.bilinearfunc(cls, "tensordot", op1, op2, [axes])
 
 
 def einsum(subs, op1, op2):
-    mod = resolve_module([op1, op2])
-    return mod.einsum(subs, op1, op2)
+    mod, cls = resolve([op1, op2])
+    return mod.bilinearfunc(cls, "einsum", op1, op2, pargs=[subs])
 
 
 # ---------- linear and linearized unary array ufuncs ----------
 
 
-def linearized_unary(jmpfunc):
-    if not jmpfunc.__name__.endswith("_jmp"):
+def linearized_unary(jmpf):
+    if not jmpf.__name__.endswith("_jmp"):
         raise ValueError()
     
-    func_name = jmpfunc.__name__[:-4]
-    func = getattr(np, func_name)
+    f_name = jmpf.__name__[:-4]
+    f = getattr(np, f_name)
 
     def flin(x):
-        mod = resolve_module([x])
-        return mod.call_linearized(x, func, jmpfunc)
+        mod, cls = resolve([x])
+        return mod.call_linearized(cls, x, f, jmpf)
     
-    flin.__name__ = func_name
+    flin.__name__ = f_name
     return flin
 
 

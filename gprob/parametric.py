@@ -3,8 +3,8 @@ import numpy as np
 import jax
 from jax import numpy as jnp
 
-from .normal_ import Normal, validate_logp_samples
-from .emaps import complete, ElementaryMap
+from .random import Normal, validate_logp_samples
+from . import maps
 from .func import logp, dlogp, fisher
 
 
@@ -55,17 +55,14 @@ def pnormal(f, input_vs, jit=True):
 
     if isinstance(input_vs, (list, tuple)):
         inbs = tuple(force_float(v.b) for v in input_vs)
-        
-        ems = complete([v.emap for v in input_vs])
-        inas = tuple(em.a for em in ems)
-        elem = ems[0].elem
+        lat, inas = maps.complete(input_vs)
 
-        afun = lambda p: jmp(lambda *v: f(p, v), inbs, inas)
+        afun = lambda p: jmp(lambda *v: f(p, v), inbs, tuple(inas))
         bfun = lambda p: f(p, inbs)
     elif isinstance(input_vs, Normal):
-        elem = input_vs.emap.elem
+        lat = input_vs.lat
         afun = lambda p: jmp(lambda v: f(p, v), (force_float(input_vs.b),),
-                             (input_vs.emap.a,))
+                             (input_vs.a,))
         bfun = lambda p: f(p, input_vs.b)
     else:
         raise ValueError("vs must be a normal variable or a sequence of normal "
@@ -85,27 +82,26 @@ def pnormal(f, input_vs, jit=True):
         bfun = jax.jit(bfun)
         dbfun = jax.jit(dbfun)
 
-    return ParametricNormal(afun, bfun, dafun, dbfun, elem)
+    return ParametricNormal(afun, bfun, dafun, dbfun, lat)
     
 
 class ParametricNormal:
     """Parametric normal random variable produced by a linearized function."""
 
-    __slots__ = ("_afun", "_bfun", "_dafun", "_dbfun", "elem")
+    __slots__ = ("_afun", "_bfun", "_dafun", "_dbfun", "lat")
 
-    def __init__(self, afun, bfun, dafun, dbfun, elem):
-        # ijk... is the array index of the variable, nelem is the number 
-        # of the elementary variables, np is the number of the parameters.
+    def __init__(self, afun, bfun, dafun, dbfun, lat):
+        # ijk... is the array index of the variable, nlat is the number 
+        # of the latent variables, np is the number of the parameters.
 
-        self._afun = afun       # output shape:    nelem x ijk... 
+        self._afun = afun       # output shape:    nlat x ijk... 
         self._bfun = bfun       # output shape:    ijk...
-        self._dafun = dafun     # output shape:    np x nelem x ijk... 
+        self._dafun = dafun     # output shape:    np x nlat x ijk... 
         self._dbfun = dbfun     # output shape:    np x ijk...
-        self.elem = elem
+        self.lat = lat
 
     def __call__(self, p):
-        em = ElementaryMap(self.a(p), self.elem)
-        return Normal(em, self.mean(p))
+        return Normal(self.a(p), self.mean(p), self.lat)
 
     # Note: the private functions produce jax arrays, which have to be 
     # explicitly converted to regular numpy arrays for further calculations.

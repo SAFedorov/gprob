@@ -5,11 +5,11 @@ from numpy.exceptions import AxisError
 from numpy.exceptions import ComplexWarning
 
 import gprob as gp
-from gprob.normal_ import normal, Normal
-from gprob.sparse import (_item_iaxid, iid_repeat, assparsenormal, 
+from gprob.random import normal, Normal
+from gprob.sparse import (_item_iaxid, iid_repeat, _as_sparse,
                           SparseNormal, SparseConditionWarning)
 
-from utils import random_normal, get_message
+from utils import random_normal, get_message, assparsenormal
 
 np.random.seed(0)
 
@@ -26,30 +26,26 @@ def test_construction():
 
     m = [[1, 2, 3], [4, 5, 6]]
     fcv = m + normal()
-    v = SparseNormal(fcv, (1, None))
+    v = _as_sparse(SparseNormal(fcv.a, fcv.b, fcv.lat), (1, None))
     assert v.iaxes == (0,)
     assert np.max(np.abs(v.var() - np.ones((2, 3)))) < tol
     assert np.max(np.abs(v.mean() - m)) < tol
-
-    # A non-normal input as the kernel.
-    with pytest.raises(TypeError):
-        SparseNormal(m, (1, None))
     
     # A non-tuple iaxid.
     with pytest.raises(ValueError):
-        SparseNormal(fcv, [1, None])
+        _as_sparse(SparseNormal(fcv.a, fcv.b, fcv.lat), [1, None])
 
     # Wrong size of iaxid.
     with pytest.raises(ValueError):
-        SparseNormal(fcv, (1, None, None))
+        _as_sparse(SparseNormal(fcv.a, fcv.b, fcv.lat), (1, None, None))
     with pytest.raises(ValueError):
-        SparseNormal(fcv, tuple())
+        _as_sparse(SparseNormal(fcv.a, fcv.b, fcv.lat), tuple())
 
     # Wrong content in iaxid.
     with pytest.raises(ValueError):
-        SparseNormal(fcv, (1, 0))
+        _as_sparse(SparseNormal(fcv.a, fcv.b, fcv.lat), (1, 0))
     with pytest.raises(ValueError):
-        SparseNormal(fcv, (True, False))
+        _as_sparse(SparseNormal(fcv.a, fcv.b, fcv.lat), (True, False))
 
 
 def test_iid_repeat():
@@ -523,7 +519,7 @@ def test_cov():
     v2_ = normal(size=(n,))
     v_ = v1_ + v2_
 
-    c1_ = np.diagonal(2 * gp.normal_.cov(v_ * r1, v1_ * r2))
+    c1_ = np.diagonal(2 * gp.random.cov(v_ * r1, v1_ * r2))
     assert c1.shape == c1_.shape
     assert np.max(np.abs(c1 - c1_)) < tol
 
@@ -1032,8 +1028,8 @@ def test_cumsum():
         assert np.all(vout.mean() == np.cumsum(v.mean(), axis=ax))
 
         vvs = v.fcv.cumsum(axis=ax)
-        assert np.all(vvs.emap.a == vout.fcv.emap.a)
-        assert np.all(vvs.emap.elem == vout.fcv.emap.elem)
+        assert np.all(vvs.a == vout.fcv.a)
+        assert np.all(vvs.lat == vout.fcv.lat)
 
     # Independence axes are not allowed.
     with pytest.raises(ValueError):
@@ -1600,8 +1596,8 @@ def test_sum():
         assert np.all(vout.mean() == mean_ref)
 
         vvs = v.fcv.sum(axis=ax)
-        assert np.all(vvs.emap.a == vout.fcv.emap.a)
-        assert np.all(vvs.emap.elem == vout.fcv.emap.elem)
+        assert np.all(vvs.a == vout.fcv.a)
+        assert np.all(vvs.lat == vout.fcv.lat)
 
         vout = v.sum(axis=ax, keepdims=True)
         mean_ref = np.sum(v.mean(), axis=ax, keepdims=True)
@@ -1610,8 +1606,8 @@ def test_sum():
         assert np.all(vout.mean() == mean_ref)
 
         vvs = v.fcv.sum(axis=ax, keepdims=True)
-        assert np.all(vvs.emap.a == vout.fcv.emap.a)
-        assert np.all(vvs.emap.elem == vout.fcv.emap.elem)
+        assert np.all(vvs.a == vout.fcv.a)
+        assert np.all(vvs.lat == vout.fcv.lat)
 
     assert v[:, :, None].sum(axis=2).shape == v.shape
     assert v[:, :, None].sum(axis=2).iaxes == v.iaxes
@@ -2189,12 +2185,12 @@ def test_einsum():
         assert v1.shape == v2.shape
         assert v1.iaxes == v2.iaxes
 
-        if len(v1.fcv.emap.a) > 0:
-            assert np.max(np.abs(v1.fcv.emap.a - v2.fcv.emap.a)) < tol
+        if len(v1.fcv.a) > 0:
+            assert np.max(np.abs(v1.fcv.a - v2.fcv.a)) < tol
         else:
-            assert len(v2.fcv.emap.a) == 0
+            assert len(v2.fcv.a) == 0
         
-        assert v1.fcv.emap.elem == v2.fcv.emap.elem
+        assert v1.fcv.lat == v2.fcv.lat
         assert np.max(np.abs(v1.mean() - v2.mean())) < tol
 
     # Tests against matrix multiplication.
@@ -2355,13 +2351,13 @@ def _check_w_scalar_operand(sv, func_name="dot"):
         sv_ = getattr(gp, func_name)(sv, 2.)
         mean_ref = getattr(np, func_name)(sv.mean(), 2.)
         assert sv_.shape == mean_ref.shape
-        assert np.max(np.abs(sv_.fcv.emap.a - 2 * sv.fcv.emap.a)) < tol
+        assert np.max(np.abs(sv_.fcv.a - 2 * sv.fcv.a)) < tol
         assert np.max(np.abs(sv_.mean() - 2 * sv.mean())) < tol
 
         sv_ = getattr(gp, func_name)(2., sv)
         mean_ref = getattr(np, func_name)(2., sv.mean())
         assert sv_.shape == mean_ref.shape
-        assert np.max(np.abs(sv_.fcv.emap.a - 2 * sv.fcv.emap.a)) < tol
+        assert np.max(np.abs(sv_.fcv.a - 2 * sv.fcv.a)) < tol
         assert np.max(np.abs(sv_.mean() - 2 * sv.mean())) < tol
 
 

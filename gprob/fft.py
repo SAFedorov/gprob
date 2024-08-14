@@ -1,4 +1,4 @@
-from .arrayops import resolve_module
+from .arrayops import resolve
 
 
 def fft(x, n=None, axis=-1, norm=None):
@@ -26,7 +26,7 @@ def ihfft(x, n=None, axis=-1, norm=None):
 
 
 def _fftfunc(name, x, n, axis, norm):
-    mod = resolve_module([x])
+    mod = resolve([x])
     return mod.fftfunc(name, x, n, axis, norm)
 
 
@@ -63,5 +63,5 @@ def irfftn(x, s=None, axes=None, norm=None):
 
 
 def _fftfunc_n(name, x, s, axes, norm):
-    mod = resolve_module([x])
+    mod = resolve([x])
     return mod.fftfunc_n(name, x, s, axes, norm)

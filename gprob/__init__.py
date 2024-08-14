@@ -1,6 +1,6 @@
 from . import fft
 from . import func
-from .normal_ import Normal, normal, asnormal 
+from .random import Normal, normal
     
 from .arrayops import (iid_copy, mean, var, cov, 
     broadcast_to, stack, hstack, vstack, dstack, concatenate,

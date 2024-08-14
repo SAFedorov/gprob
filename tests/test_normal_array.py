@@ -5,7 +5,7 @@ import pytest
 
 np.random.seed(0)
 
-import gprob.emaps as emaps
+import gprob.maps as maps
 from gprob import (normal,
                    stack, hstack, vstack, dstack, concatenate,
                    split, hsplit, vsplit, dsplit,
@@ -66,8 +66,8 @@ def _test_array_func(f, *args, test_shapes=None, test_dtype=np.float64,
         vin = random_normal(sh, test_dtype)
         vout = f(vin, *args, **kwargs)
 
-        assert vin.emap.a.shape[1:] == vin.b.shape
-        assert vout.emap.a.shape[1:] == vout.b.shape
+        assert vin.a.shape[1:] == vin.b.shape
+        assert vout.a.shape[1:] == vout.b.shape
 
         refmean = npf(vin.b, *args, **kwargs)
         assert vout.b.shape == refmean.shape
@@ -77,9 +77,9 @@ def _test_array_func(f, *args, test_shapes=None, test_dtype=np.float64,
         dt = refmean.dtype
         tol = 10 * np.finfo(dt).eps
 
-        assert vout.emap.a.dtype == dt
+        assert vout.a.dtype == dt
 
-        for arin, arout in zip(vin.emap.a, vout.emap.a):
+        for arin, arout in zip(vin.a, vout.a):
             aref = npf(arin, *args, **kwargs)
             assert arout.shape == aref.shape
             assert np.allclose(arout, aref, rtol=tol, atol=tol * np.max(np.abs(arin)))
@@ -88,9 +88,9 @@ def _test_array_func(f, *args, test_shapes=None, test_dtype=np.float64,
         vin = random_det_normal(sh, test_dtype)
         vout = f(vin, *args, **kwargs)
 
-        assert vin.emap.a.size == 0
-        assert vin.emap.a.shape[1:] == vin.b.shape
-        assert vout.emap.a.shape[1:] == vout.b.shape
+        assert vin.a.size == 0
+        assert vin.a.shape[1:] == vin.b.shape
+        assert vout.a.shape[1:] == vout.b.shape
 
         refmean = npf(vin.b, *args, **kwargs)
         assert vout.b.shape == refmean.shape
@@ -346,9 +346,9 @@ def _test_array_func2(f, op1_shape=None, op2_shape=None, *args, **kwargs):
     dt = refmean.dtype
     tol = 10 * np.finfo(dt).eps
 
-    assert vout.emap.a.dtype == dt
+    assert vout.a.dtype == dt
 
-    for arin, arout in zip(vin.emap.a, vout.emap.a):
+    for arin, arout in zip(vin.a, vout.a):
         aref = npf(*args, arin, op2, **kwargs)
         assert arout.shape == aref.shape
 
@@ -366,9 +366,9 @@ def _test_array_func2(f, op1_shape=None, op2_shape=None, *args, **kwargs):
     assert vout.b.dtype == refmean.dtype
     assert np.all(vout.b == refmean)
 
-    assert vout.emap.a.dtype == refmean.dtype
+    assert vout.a.dtype == refmean.dtype
 
-    for arin, arout in zip(vin.emap.a, vout.emap.a):
+    for arin, arout in zip(vin.a, vout.a):
         aref = npf(*args, op1, arin, **kwargs)
         assert arout.shape == aref.shape
 
@@ -386,14 +386,15 @@ def _test_array_func2(f, op1_shape=None, op2_shape=None, *args, **kwargs):
     assert vout.b.dtype == refmean.dtype
     assert np.max(vout.b - refmean) < atol
 
-    assert vout.emap.a.dtype == refmean.dtype
+    assert vout.a.dtype == refmean.dtype
 
     vref = (f(*args, vin1, vin2.b, **kwargs) 
             + f(*args, vin1.b, (vin2 - vin2.b), **kwargs))
 
-    atol = 2 * tol * max(1, np.max(np.abs(vref.emap.a)))
+    atol = 2 * tol * max(1, np.max(np.abs(vref.a)))
 
-    assert np.max(vout.emap.a - vref.emap.a) < atol
+    assert vout.lat == vref.lat
+    assert np.max(vout.a - vref.a) < atol
 
     # Both variables are deterministic promoted to Normal.
 
@@ -408,8 +409,8 @@ def _test_array_func2(f, op1_shape=None, op2_shape=None, *args, **kwargs):
     assert vout.b.dtype == refmean.dtype
     assert np.max(vout.b - refmean) < atol
 
-    assert vout.emap.a.size == 0
-    assert vout.emap.a.dtype == refmean.dtype
+    assert vout.a.size == 0
+    assert vout.a.dtype == refmean.dtype
 
 
 def test_multiply():
@@ -596,8 +597,8 @@ def _test_array_method(name, *args, test_shapes=None, **kwargs):
         vin = random_normal(sh)
         vout = getattr(vin, name)(*args, **kwargs)
 
-        assert vin.emap.a.shape[1:] == vin.b.shape
-        assert vout.emap.a.shape[1:] == vout.b.shape
+        assert vin.a.shape[1:] == vin.b.shape
+        assert vout.a.shape[1:] == vout.b.shape
 
         refmean = getattr(vin.b, name)(*args, **kwargs)
         assert vout.b.shape == refmean.shape
@@ -607,9 +608,9 @@ def _test_array_method(name, *args, test_shapes=None, **kwargs):
         dt = vout.b.dtype
         tol = 10 * np.finfo(dt).eps
 
-        assert vout.emap.a.dtype == dt
+        assert vout.a.dtype == dt
 
-        for arin, arout in zip(vin.emap.a, vout.emap.a):
+        for arin, arout in zip(vin.a, vout.a):
             aref = getattr(arin, name)(*args, **kwargs)
             assert arout.shape == aref.shape
 
@@ -639,7 +640,7 @@ def _test_concat_func(f, *args, test_shapes=None, vins_list=None, **kwargs):
             vins_list += [vins_max[:n] for n in ns]
             
             # Adds special cases of two inputs with different numbers of 
-            # the elementary variables, because there are separate evaluation
+            # the latent variables, because there are separate evaluation
             # branches for the optimization of those.
             vins2 = random_correlate([random_normal(sh) for _ in range(2)])
             vins2[0] = vins2[0] + np.random.rand(*sh) * normal(0.1, 0.9)
@@ -663,38 +664,38 @@ def _test_concat_func(f, *args, test_shapes=None, vins_list=None, **kwargs):
             vins_list += [vins4]
 
             # A case to check the optimization branch for two operands, 
-            # where the elementary variables are the same.
+            # where the latent variables are the same.
             vin = random_normal(sh, dtype=np.complex64)
-            assert vin.real.emap.elem is vin.imag.emap.elem
+            assert vin.real.lat is vin.imag.lat
             vins_list += [[vin.real, vin.imag], [vin.imag, vin.imag]]
 
             # A strange case where the variables have identical lists 
-            # of elementary variables, which are not the same object.
+            # of latent variables, which are not the same object.
             vin_imag_c = copy.deepcopy(vin.imag)
-            assert vin.real.emap.elem is not vin_imag_c.emap.elem
-            assert vin.real.emap.elem == vin_imag_c.emap.elem
+            assert vin.real.lat is not vin_imag_c.lat
+            assert vin.real.lat == vin_imag_c.lat
             vins_list += [[vin.real, vin_imag_c]]
 
     # Tests the function for all input lists.
     for vins in vins_list:
         vout = f(vins, *args, **kwargs)
 
-        assert all(vin.emap.a.shape[1:] == vin.b.shape for vin in vins)
-        assert vout.emap.a.shape[1:] == vout.b.shape
+        assert all(vin.a.shape[1:] == vin.b.shape for vin in vins)
+        assert vout.a.shape[1:] == vout.b.shape
 
         assert np.all(vout.b == npf([vin.b for vin in vins], *args, **kwargs))
-        assert vout.emap.a.dtype == vout.b.dtype
+        assert vout.a.dtype == vout.b.dtype
 
-        vins_ext = emaps.complete([vin.emap for vin in vins])
-        # Now the testing silently relies on the fact that emaps.complete
-        # produces in the same order of the elementary random variables 
-        # as emaps.concatenate or emaps.stack.
+        lat, ains_ext = maps.complete(vins)
+        # Now the testing silently relies on the fact that maps.complete
+        # produces in the same order of the latent random variables 
+        # as maps.concatenate or maps.stack.
 
-        assert len(vins_ext[0].elem) == len(vout.emap.elem)
+        assert lat == vout.lat
 
-        for i in range(len(vout.emap.a)):
-            arins = [vin.a[i] for vin in vins_ext]
-            arout = vout.emap.a[i]
+        for i in range(len(vout.a)):
+            arins = [a[i] for a in ains_ext]
+            arout = vout.a[i]
             aref = npf(arins, *args, **kwargs)
             assert arout.shape == aref.shape
             assert np.all(arout == aref)
@@ -794,11 +795,11 @@ def _test_split_func(f, test_shapes="1dmin", test_axis=None, **kwargs):
                 assert vout.b.shape == refmean.shape
                 assert np.all(vout.b == refmean)
 
-                assert vout.emap.a.dtype == refmean.dtype
+                assert vout.a.dtype == refmean.dtype
 
-            for i in range(len(vin.emap.a)):
-                arin = vin.emap.a[i]
-                arouts = [vout.emap.a[i] for vout in vouts]
+            for i in range(len(vin.a)):
+                arin = vin.a[i]
+                arouts = [vout.a[i] for vout in vouts]
                 arefs = npf(arin, *args, **kwargs)
 
                 for arout, aref in zip(arouts, arefs):
@@ -832,7 +833,7 @@ def test_dtype_promotion():
 
     # Real types
     v1 = random_normal(sh)
-    v1.emap.a = v1.emap.a.astype(np.float16)
+    v1.a = v1.a.astype(np.float16)
     v1.b = v1.b.astype(np.float16)
 
     v2 = random_normal(sh, dtype=np.float32)
@@ -848,73 +849,73 @@ def test_dtype_promotion():
     
     for f in funcs:
         v12 = f([v1, v2])
-        assert v12.emap.a.dtype == np.float32
+        assert v12.a.dtype == np.float32
         assert v12.b.dtype == np.float32
 
         v21 = f([v2, v1])
-        assert v21.emap.a.dtype == np.float32
+        assert v21.a.dtype == np.float32
         assert v21.b.dtype == np.float32
 
         v12 = f([v1, v2])
-        assert v12.emap.a.dtype == np.float32
+        assert v12.a.dtype == np.float32
         assert v12.b.dtype == np.float32
 
         v55 = f([v5, v5])
-        assert v55.emap.a.dtype == np.complex64
+        assert v55.a.dtype == np.complex64
         assert v55.b.dtype == np.complex64
 
         v56 = f([v5, v6])
-        assert v56.emap.a.dtype == np.complex128
+        assert v56.a.dtype == np.complex128
         assert v56.b.dtype == np.complex128
 
         v15 = f([v1, v5])
-        assert v15.emap.a.dtype == np.complex64
+        assert v15.a.dtype == np.complex64
         assert v15.b.dtype == np.complex64
 
         v53 = f([v5, v3])
-        assert v53.emap.a.dtype == np.complex128
+        assert v53.a.dtype == np.complex128
         assert v53.b.dtype == np.complex128
 
     for f in [stack, concatenate]:
         v1_ = f([v1])
-        assert v1_.emap.a.dtype == np.float16
+        assert v1_.a.dtype == np.float16
         assert v1_.b.dtype == np.float16
 
         v123 = f([v1, v2, v3])
-        assert v123.emap.a.dtype == np.float64
+        assert v123.a.dtype == np.float64
         assert v123.b.dtype == np.float64
 
         v5_ = f([v5])
-        assert v5_.emap.a.dtype == np.complex64
+        assert v5_.a.dtype == np.complex64
         assert v5_.b.dtype == np.complex64
 
         v564 = f([v5, v6, v3])
-        assert v564.emap.a.dtype == np.complex128
+        assert v564.a.dtype == np.complex128
         assert v564.b.dtype == np.complex128
 
-    emap_lists = [[v1.emap, v5.emap], [v5.emap, v1.emap], 
-                  [v1.emap, v5.emap, v3.emap]]
+    map_lists = [[v1, v5], [v5, v1], 
+                 [v1, v5, v3]]
     
-    for eml in emap_lists:
-        eml_ = emaps.complete(eml)
-        for em_, em in zip(eml_, eml):
-            assert em_.a.dtype == em.a.dtype
+    for ml in map_lists:
+        _, as_ = maps.complete(ml)
+        for a, m in zip(as_, ml):
+            assert a.dtype == m.a.dtype
 
 
 def _assert_normals_close(v1, v2):
     assert v1.shape == v2.shape
     assert v1.b.shape == v2.b.shape
     assert v1.b.dtype == v2.b.dtype
-    assert v1.emap.a.shape == v2.emap.a.shape
-    assert v1.emap.a.dtype == v2.emap.a.dtype
+    assert v1.a.shape == v2.a.shape
+    assert v1.a.dtype == v2.a.dtype
 
     rtolb = 100 * np.finfo(v1.b.dtype).eps
     assert np.allclose(v1.b, v2.b, 
                        rtol=rtolb, atol=rtolb * np.max(np.abs(v1.b)))
 
-    rtola = 100 * np.finfo(v1.emap.a.dtype).eps
-    assert np.allclose(v1.emap.a, v2.emap.a, 
-                       rtol=rtola, atol=rtola * np.max(np.abs(v1.emap.a)))
+    rtola = 100 * np.finfo(v1.a.dtype).eps
+    assert np.allclose(v1.a, v2.a, 
+                       rtol=rtola, atol=rtola * np.max(np.abs(v1.a)))
     
 
 def test_divide():
