@@ -5,7 +5,7 @@ import pytest
 
 np.random.seed(0)
 
-import gprob.maps as maps
+from gprob import maps
 from gprob import (normal,
                    stack, hstack, vstack, dstack, concatenate,
                    split, hsplit, vsplit, dsplit,
@@ -931,3 +931,38 @@ def test_divide():
             ar = np.random.rand(*sh2)
 
             _assert_normals_close(divide(v, ar), multiply(v, 1/ar))
+
+
+def test_heterogeneous_ops():
+    tol = 1e-8
+
+    x = normal(0, 0.05)  # int mean and float var
+    y = normal(1, 0.05)  # int mean and float var
+
+    z = x + y
+
+    assert np.abs(z.mean() - 1) < tol
+    assert np.abs(z.var() - 0.1) < tol
+
+    z = stack([x, y])
+
+    assert np.max(np.abs(z.mean() - [0, 1])) < tol
+    assert np.max(np.abs(z.var() - [0.05, 0.05])) < tol
+
+    z = stack([normal(0, 0.05), normal(1, 0.05), normal(2, 0.05)])
+
+    assert np.max(np.abs(z.mean() - [0, 1, 2])) < tol
+    assert np.max(np.abs(z.var() - [0.05, 0.05, 0.05])) < tol
+
+    z = concatenate([normal(0, 0.05, size=(1,)), 
+                     normal(1, 0.05, size=(1,))])
+
+    assert np.max(np.abs(z.mean() - [0, 1])) < tol
+    assert np.max(np.abs(z.var() - [0.05, 0.05])) < tol
+
+    z = concatenate([normal(0, 0.05, size=(1,)), 
+                     normal(1, 0.05, size=(1,)),
+                     normal(2, 0.05, size=(1,))])
+
+    assert np.max(np.abs(z.mean() - [0, 1, 2])) < tol
+    assert np.max(np.abs(z.var() - [0.05, 0.05, 0.05])) < tol

@@ -115,11 +115,11 @@ class LatentMap:
         if swapped:
             op1, op2 = op2, op1
 
-        vsh = b.shape
-        a = np.zeros((len(lat),) + vsh, b.dtype)
-        a[:len(op1.lat)] = _unsq(op1.a, len(vsh))
+        a = np.zeros((len(lat),) + b.shape, 
+                     dtype=np.promote_types(op1.a.dtype, op2.a.dtype))
+        a[:len(op1.lat)] = _unsq(op1.a, b.ndim)
         idx = [lat[k] for k in op2.lat]
-        a[idx] += _unsq(op2.a, len(vsh))
+        a[idx] += _unsq(op2.a, b.ndim)
 
         return self.__class__(a, b, lat)
     
@@ -488,7 +488,8 @@ def concatenate(cls, arrays, axis=0):
 
     if len(arrays) > 2:
         union_lat = latent.uunion(*[x.lat for x in arrays])
-        a = np.zeros((len(union_lat),) + b.shape, b.dtype)
+        dtype = np.result_type(*[x.a for x in arrays])
+        a = np.zeros((len(union_lat),) + b.shape, dtype)
         n1 = 0
         for i, x in enumerate(arrays):
             idx = [union_lat[k] for k in x.lat]
@@ -511,7 +512,8 @@ def concatenate(cls, arrays, axis=0):
         op1, op2 = op2, op1
         jidx1, jidx2 = jidx2, jidx1
     
-    a = np.zeros((len(union_lat),) + b.shape, b.dtype)
+    a = np.zeros((len(union_lat),) + b.shape, 
+                 np.promote_types(op1.a.dtype, op2.a.dtype))
     a[:len(op1.lat), *jidx1] = op1.a
     idx = [union_lat[k] for k in op2.lat]
     a[idx, *jidx2] = op2.a
@@ -537,8 +539,8 @@ def stack(cls, arrays, axis=0):
 
     if len(arrays) > 2:
         union_lat = latent.uunion(*[x.lat for x in arrays])
-
-        a = np.zeros((len(union_lat),) + b.shape, b.dtype)
+        dtype = np.result_type(*[x.a for x in arrays])
+        a = np.zeros((len(union_lat),) + b.shape, dtype)
         for i, x in enumerate(arrays):
             idx = [union_lat[k] for k in x.lat]
             a[idx, *base_jidx, i] = x.a
@@ -555,7 +557,8 @@ def stack(cls, arrays, axis=0):
         op1, op2 = op2, op1
         j1, j2 = j2, j1
     
-    a = np.zeros((len(union_lat),) + b.shape, b.dtype)
+    a = np.zeros((len(union_lat),) + b.shape, 
+                 np.promote_types(op1.a.dtype, op2.a.dtype))
     a[:len(op1.lat), *base_jidx, j1] = op1.a
     idx = [union_lat[k] for k in op2.lat]
     a[idx, *base_jidx, j2] = op2.a
