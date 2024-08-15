@@ -116,11 +116,6 @@ def test_linear_regression():
     ab = (a & b) | cond
     jointd = hstack([a, b, *mn]) | cond
 
-    print(mfull.Sigma)
-    print("-")
-    print(jointd.a)
-    print("---")
-    print(jointd.cov())
     assert np.max(np.abs(mfull.Sigma - jointd.cov())) < tol
     assert np.max(np.abs(mfull.b[:, 0] - jointd.mean())) < tol
     assert np.max(np.abs(mab.Sigma - ab.cov())) < tol
