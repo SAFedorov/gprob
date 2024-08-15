@@ -3,8 +3,7 @@ import numpy as np
 import jax
 from jax import numpy as jnp
 
-from .random import Normal, validate_logp_samples
-from . import maps
+from .normal_ import Normal, complete, validate_logp_samples
 from .func import logp, dlogp, fisher
 
 
@@ -55,7 +54,7 @@ def pnormal(f, input_vs, jit=True):
 
     if isinstance(input_vs, (list, tuple)):
         inbs = tuple(force_float(v.b) for v in input_vs)
-        lat, inas = maps.complete(input_vs)
+        lat, inas = complete(input_vs)
 
         afun = lambda p: jmp(lambda *v: f(p, v), inbs, tuple(inas))
         bfun = lambda p: f(p, inbs)

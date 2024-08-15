@@ -4,7 +4,7 @@ from scipy.stats import multivariate_normal as mvn
 from numpy.linalg import LinAlgError
 from numpy.exceptions import ComplexWarning
 from gprob import hstack, vstack, iid_copy, broadcast_to
-from gprob.random import normal, Normal, safer_cholesky, cov
+from gprob.normal_ import normal, Normal, safer_cholesky, cov
 from gprob.sparse import iid_repeat
 from utils import random_normal, random_correlate, asnormal
 

@@ -1,15 +1,22 @@
+from importlib import import_module
 from functools import reduce
 from operator import mul
 
 import numpy as np
 from numpy.linalg import LinAlgError
 
-from . import maps
-from . import func
+from .maps import (LatentMap, complete, lift, match_, concatenate, stack, 
+    call_linearized, fftfunc, fftfunc_n, bilinearfunc, einsum01, einsum10,
+    inner01, inner10, dot01, dot10, outer01, outer10, kron01, kron10, 
+    complete_tensordot_axes, tensordot01, tensordot10)
+
+from .func import condition, logp
 
 
-class Normal(maps.LatentMap):
+class Normal(LatentMap):
     """Array of normal random variables."""
+
+    _mod = import_module(__name__)
 
     def __repr__(self):
         return print_(self)
@@ -71,16 +78,16 @@ class Normal(maps.LatentMap):
                 or if a mask is given with degenerate observations.
         """
         if isinstance(observations, dict):
-            obs = [maps.lift(Normal, k-v) for k, v in observations.items()]
+            obs = [lift(Normal, k-v) for k, v in observations.items()]
         else:
-            obs = [maps.lift(Normal, observations)]
+            obs = [lift(Normal, observations)]
 
         if not obs:
             return self
 
         if self.iscomplex:
             # Doubles the dimension preserving the triangular structure.
-            self_r = maps.stack(Normal, [self.real, self.imag], axis=-1)
+            self_r = stack(Normal, [self.real, self.imag], axis=-1)
         else:
             self_r = self
 
@@ -92,7 +99,7 @@ class Normal(maps.LatentMap):
                 obs_r.append(c)
 
         if mask is None:
-            cond = maps.concatenate(Normal, [c.ravel() for c in obs_r])
+            cond = concatenate(Normal, [c.ravel() for c in obs_r])
         else:
             # Concatenates the conditions preserving the element order along 
             # the 0th axis, and expands the mask to the right shape.
@@ -106,7 +113,7 @@ class Normal(maps.LatentMap):
                                  "dimension to be compatible with masking.")
 
             obs_r = [c.reshape((c.shape[0], -1)) for c in obs_r]
-            cond = maps.concatenate(Normal, obs_r, axis=1).ravel()
+            cond = concatenate(Normal, obs_r, axis=1).ravel()
 
             k = sum(c.shape[1] for c in obs_r)
             l = reduce(mul, self_r.shape[1:], 1)
@@ -116,9 +123,9 @@ class Normal(maps.LatentMap):
             mask = mask.reshape((ms[0] * k, ms[1] * l))
 
         self_r = self_r.ravel()
-        lat, [av, ac] = maps.complete((self_r, cond))
+        lat, [av_r, ac] = complete([self_r, cond])
 
-        b, a = func.condition(self_r.b, av, cond.b, ac, mask)
+        b, a = condition(self_r.b, av_r, cond.b, ac, mask)
 
         if self.iscomplex:
             # Converting back to complex.
@@ -126,7 +133,7 @@ class Normal(maps.LatentMap):
             b = b[0::2] + 1j * b[1::2]
 
         # Shaping back.
-        a = np.reshape(a, (a.shape[0],) + self.shape)
+        a = np.reshape(a, (len(lat),) + self.shape)
         b = np.reshape(b, self.shape)
 
         return Normal(a, b, lat)
@@ -243,7 +250,7 @@ class Normal(maps.LatentMap):
             x = x.astype(x.real.dtype)  # Casts to real with throwing a warning.
         
         cov = a.T @ a 
-        return func.logp(x, m, cov)
+        return logp(x, m, cov)
 
 
 def print_(x, extra_attrs=tuple()):
@@ -389,17 +396,17 @@ def safer_cholesky(x):
     return ltri
 
 
-def cov(cls, *args):
+def cov(*args):
     """The normal implementation of the covariance. The function 
     expects `args` to have strictly one or two elements."""
 
-    args = [maps.lift(Normal, arg) for arg in args]
+    args = [lift(Normal, arg) for arg in args]
     
     if len(args) == 1:
         return args[0].cov()
     
     # The remaining case is len(args) == 2.
     x, y = args
-    _, [ax, ay] = maps.complete([x.ravel(), y.ravel()])  # TODO: is it a good way of doing it? Use einsum maybe?
+    _, [ax, ay] = complete([x.ravel(), y.ravel()])  # TODO: is it a good way of doing it? Use einsum maybe?
     cov2d = ax.T @ ay.conj()
     return cov2d.reshape(x.shape + y.shape)

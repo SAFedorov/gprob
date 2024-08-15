@@ -20,7 +20,7 @@ class LatentMap:
 
     __slots__ = ("a", "b", "lat")
     __array_ufunc__ = None
-    _mod = import_module(__name__)  # TODO: replace with _ops class -----------------------------------
+    _mod = import_module(__name__)
 
     def __init__(self, a, b, lat=None):  # change to __new__, otherwise SparseNormal will not be able to use the validations
         if a.shape[1:] != b.shape:
@@ -428,6 +428,25 @@ def complete(ops): # TODO : update docs, ---------------------------------------
         return lat, [extend_a(op1, lat), pad_a(op2, lat)]
     
     return lat, [pad_a(op1, lat), extend_a(op2, lat)]
+    
+    
+def lift(cls, x):
+    """Converts `x` to a varaible of class `cls`. If `x` is such a variable 
+    already, returns it unchanged. If the conversion cannot be done, 
+    raises a `TypeError`."""
+
+    if x.__class__ is cls:
+        return x
+
+    b = np.asanyarray(x)
+    if b.dtype.kind in NUMERIC_ARRAY_KINDS:
+        a = np.zeros((0,) + b.shape, dtype=b.dtype)
+        return cls(a, b, dict())
+    elif b.ndim != 0:
+        return cls._mod.stack(cls, [cls._mod.lift(cls, v) for v in x])
+    
+    raise TypeError(f"The variable of type '{x.__class__.__name__}' "
+                    f"cannot be promoted to type '{cls.__name__}'.")
 
 
 def match_(cls, x):
@@ -449,25 +468,127 @@ def match_(cls, x):
         return x_, True
 
     return cls._mod.lift(cls, x), False
-    
-    
-def lift(cls, x):
-    """Converts `x` to a varaible of class `cls`. If `x` is such a variable 
-    already, returns it unchanged. If the conversion cannot be done, 
-    raises a `TypeError`."""
 
-    if x.__class__ is cls:
-        return x
 
-    b = np.asanyarray(x)
-    if b.dtype.kind in NUMERIC_ARRAY_KINDS:
-        a = np.zeros((0,) + b.shape, dtype=b.dtype)
-        return cls(a, b, dict())
-    elif b.ndim != 0:
-        return cls._mod.stack(cls, [cls._mod.lift(cls, v) for v in x])  # TODO: I don't think it will work when stack is from this module ...
+def concatenate(cls, arrays, axis=0):
+    b = np.concatenate([x.b for x in arrays], axis=axis)
+
+    axis = axis if axis >= 0 else b.ndim + axis
+
+    if len(arrays) == 1:
+        return arrays[0]
+    elif len(arrays) == 2 and arrays[0].lat is arrays[1].lat:
+        # An optimization targeting uses like concatenate([x.real, x.imag]).
+        op1, op2 = arrays
+        a = np.concatenate([op1.a, op2.a], axis=axis+1)
+        return cls(a, b, op1.lat)
+
+    dims = [x.a.shape[axis+1] for x in arrays]
+    base_jidx = (slice(None),) * axis
+
+    if len(arrays) > 2:
+        union_lat = latent.uunion(*[x.lat for x in arrays])
+        a = np.zeros((len(union_lat),) + b.shape, b.dtype)
+        n1 = 0
+        for i, x in enumerate(arrays):
+            idx = [union_lat[k] for k in x.lat]
+            n2 = n1 + dims[i]
+            a[idx, *base_jidx, n1: n2] = x.a
+            n1 = n2
+
+        return cls(a, b, union_lat)
     
-    raise TypeError(f"The variable of type '{x.__class__.__name__}' "
-                    f"cannot be promoted to type '{cls.__name__}'.")
+    # The rest is an optimization for the general case of two operands.
+    op1, op2 = arrays
+
+    # Indices along the variable dimension.
+    jidx1 = base_jidx + (slice(None, dims[0]),)
+    jidx2 = base_jidx + (slice(-dims[1], None),)
+
+    union_lat, swapped = latent.ounion(op1.lat, op2.lat)
+
+    if swapped:
+        op1, op2 = op2, op1
+        jidx1, jidx2 = jidx2, jidx1
+    
+    a = np.zeros((len(union_lat),) + b.shape, b.dtype)
+    a[:len(op1.lat), *jidx1] = op1.a
+    idx = [union_lat[k] for k in op2.lat]
+    a[idx, *jidx2] = op2.a
+
+    return cls(a, b, union_lat)
+
+
+def stack(cls, arrays, axis=0):
+    # Essentially a copy of `concatenate`, with slightly less overhead.
+
+    b = np.stack([x.b for x in arrays], axis=axis)
+
+    axis = axis if axis >= 0 else b.ndim + axis
+    base_jidx = (slice(None),) * axis
+
+    if len(arrays) == 1:
+        return arrays[0][*base_jidx, None]
+    elif len(arrays) == 2 and arrays[0].lat is arrays[1].lat:
+        # An optimization targeting uses like stack([x.real, x.imag]).
+        op1, op2 = arrays
+        a = np.stack([op1.a, op2.a], axis=axis+1)
+        return cls(a, b, op1.lat)
+
+    if len(arrays) > 2:
+        union_lat = latent.uunion(*[x.lat for x in arrays])
+
+        a = np.zeros((len(union_lat),) + b.shape, b.dtype)
+        for i, x in enumerate(arrays):
+            idx = [union_lat[k] for k in x.lat]
+            a[idx, *base_jidx, i] = x.a
+
+        return cls(a, b, union_lat)
+    
+    # The rest is an optimization for the general case of two operands.
+    op1, op2 = arrays
+    j1, j2 = 0, 1
+
+    union_lat, swapped = latent.ounion(op1.lat, op2.lat)
+
+    if swapped:
+        op1, op2 = op2, op1
+        j1, j2 = j2, j1
+    
+    a = np.zeros((len(union_lat),) + b.shape, b.dtype)
+    a[:len(op1.lat), *base_jidx, j1] = op1.a
+    idx = [union_lat[k] for k in op2.lat]
+    a[idx, *base_jidx, j2] = op2.a
+
+    return cls(a, b, union_lat)
+
+
+def call_linearized(cls, x, func, jmpfunc):
+    x = cls._mod.lift(cls, x)
+    b = func(x.b)
+    delta = jmpfunc(x.b, b, x.delta)
+    return delta + b
+
+
+def fftfunc(cls, name, x, n, axis, norm):
+    x = cls._mod.lift(cls, x)
+
+    func = getattr(np.fft, name)
+    b = func(x.b, n, axis, norm)
+    a = func(x.a, n, _axes_a([axis])[0], norm)
+    return x.__class__(a, b, x.lat)
+
+
+def fftfunc_n(cls, name, x, s, axes, norm):
+    x = cls._mod.lift(cls, x)
+
+    if axes is None:
+        axes = list(range(x.ndim))
+
+    func = getattr(np.fft, name)
+    b = func(x.b, s, axes, norm)
+    a = func(x.a, s, _axes_a(axes), norm)
+    return x.__class__(a, b, x.lat)
 
 
 # ---------- bilinear functions ----------
@@ -592,127 +713,3 @@ def tensordot10(cls, x, y, axes):
     a_ = np.tensordot(x, y.a, axes=(axes1, _axes_a(axes2)))
     a = np.moveaxis(a_, -y.ndim - 1 + len(axes2), 0)
     return cls(a, b, y.lat)
-
-
-# ---------- array functions ----------
-
-
-def fftfunc(cls, name, x, n, axis, norm):
-    x = cls._mod.lift(cls, x)
-
-    func = getattr(np.fft, name)
-    b = func(x.b, n, axis, norm)
-    a = func(x.a, n, _axes_a([axis])[0], norm)
-    return x.__class__(a, b, x.lat)
-
-
-def fftfunc_n(cls, name, x, s, axes, norm):
-    x = cls._mod.lift(cls, x)
-
-    if axes is None:
-        axes = list(range(x.ndim))
-
-    func = getattr(np.fft, name)
-    b = func(x.b, s, axes, norm)
-    a = func(x.a, s, _axes_a(axes), norm)
-    return x.__class__(a, b, x.lat)
-
-
-def call_linearized(cls, x, f, jmpf):
-    x = cls._mod.lift(cls, x)
-    b = f(x.b)
-    delta = jmpf(x.b, b, x.delta)
-    return delta + b
-
-
-def concatenate(cls, arrays, axis=0):
-    b = np.concatenate([x.b for x in arrays], axis=axis)
-
-    axis = axis if axis >= 0 else b.ndim + axis
-
-    if len(arrays) == 1:
-        return arrays[0]
-    elif len(arrays) == 2 and arrays[0].lat is arrays[1].lat:
-        # An optimization targeting uses like concatenate([x.real, x.imag]).
-        op1, op2 = arrays
-        a = np.concatenate([op1.a, op2.a], axis=axis+1)
-        return cls(a, b, op1.lat)
-
-    dims = [x.a.shape[axis+1] for x in arrays]
-    base_jidx = (slice(None),) * axis
-
-    if len(arrays) > 2:
-        union_lat = latent.uunion(*[x.lat for x in arrays])
-        a = np.zeros((len(union_lat),) + b.shape, b.dtype)
-        n1 = 0
-        for i, x in enumerate(arrays):
-            idx = [union_lat[k] for k in x.lat]
-            n2 = n1 + dims[i]
-            a[idx, *base_jidx, n1: n2] = x.a
-            n1 = n2
-
-        return cls(a, b, union_lat)
-    
-    # The rest is an optimization for the general case of two operands.
-    op1, op2 = arrays
-
-    # Indices along the variable dimension.
-    jidx1 = base_jidx + (slice(None, dims[0]),)
-    jidx2 = base_jidx + (slice(-dims[1], None),)
-
-    union_lat, swapped = latent.ounion(op1.lat, op2.lat)
-
-    if swapped:
-        op1, op2 = op2, op1
-        jidx1, jidx2 = jidx2, jidx1
-    
-    a = np.zeros((len(union_lat),) + b.shape, b.dtype)
-    a[:len(op1.lat), *jidx1] = op1.a
-    idx = [union_lat[k] for k in op2.lat]
-    a[idx, *jidx2] = op2.a
-
-    return cls(a, b, union_lat)
-
-
-def stack(cls, arrays, axis=0):
-    # Essentially a copy of `concatenate`, with slightly less overhead.
-
-    b = np.stack([x.b for x in arrays], axis=axis)
-
-    axis = axis if axis >= 0 else b.ndim + axis
-    base_jidx = (slice(None),) * axis
-
-    if len(arrays) == 1:
-        return arrays[0][*base_jidx, None]
-    elif len(arrays) == 2 and arrays[0].lat is arrays[1].lat:
-        # An optimization targeting uses like stack([x.real, x.imag]).
-        op1, op2 = arrays
-        a = np.stack([op1.a, op2.a], axis=axis+1)
-        return cls(a, b, op1.lat)
-
-    if len(arrays) > 2:
-        union_lat = latent.uunion(*[x.lat for x in arrays])
-
-        a = np.zeros((len(union_lat),) + b.shape, b.dtype)
-        for i, x in enumerate(arrays):
-            idx = [union_lat[k] for k in x.lat]
-            a[idx, *base_jidx, i] = x.a
-
-        return cls(a, b, union_lat)
-    
-    # The rest is an optimization for the general case of two operands.
-    op1, op2 = arrays
-    j1, j2 = 0, 1
-
-    union_lat, swapped = latent.ounion(op1.lat, op2.lat)
-
-    if swapped:
-        op1, op2 = op2, op1
-        j1, j2 = j2, j1
-    
-    a = np.zeros((len(union_lat),) + b.shape, b.dtype)
-    a[:len(op1.lat), *base_jidx, j1] = op1.a
-    idx = [union_lat[k] for k in op2.lat]
-    a[idx, *base_jidx, j2] = op2.a
-
-    return cls(a, b, union_lat)

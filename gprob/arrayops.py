@@ -1,13 +1,13 @@
 import numpy as np
 
-from . import maps
-from .random import Normal
+from . import normal_
+from .normal_ import Normal, lift
 
 
 def resolve(seq):
     cs = set([x.__class__ for x in seq if hasattr(x, "_mod")])
     if len(cs) == 0:
-        return maps, Normal
+        return normal_, Normal
     if len(cs) == 1:
         c = cs.pop()
         return c._mod, c
@@ -15,15 +15,15 @@ def resolve(seq):
     raise TypeError(f"Classes {cs} cannot be combined in operations.")  # TODO: expand message
 
 
-def fallback_to_normal(f):
-    def f_(x, *args, **kwargs):
-        if not hasattr(x, f.__name__):
-            x = maps.lift(Normal, x)
+def fallback_to_normal(func):
+    def func_(x, *args, **kwargs):
+        if not hasattr(x, func.__name__):
+            x = lift(Normal, x)
 
-        return f(x, *args, **kwargs)
+        return func(x, *args, **kwargs)
         
-    f_.__name__ = f.__name__
-    return f_
+    func_.__name__ = func.__name__
+    return func_
 
 
 # ---------- probability-related functions ----------
@@ -133,8 +133,8 @@ def cov(*args):
         raise TypeError("The function can accept only one or two input "
                         f"arguments, while {len(args)} arguments are given.")
     
-    mod, cls = resolve(args)
-    return mod.cov(cls, *args)
+    mod, _ = resolve(args)
+    return mod.cov(*args)
 
 
 # ---------- array functions ----------
@@ -191,7 +191,7 @@ def concatenate(arrays, axis=0):
     if len(arrays) == 0:
         raise ValueError("Need at least one array to concatenate.")
     mod, cls = resolve(arrays)
-    arrays = [mod.lift(cls, a) for a in arrays]
+    arrays = [mod.lift(cls, x) for x in arrays]
     return mod.concatenate(cls, arrays, axis)
 
 
@@ -199,7 +199,7 @@ def stack(arrays, axis=0):
     if len(arrays) == 0:
         raise ValueError("Need at least one array to stack.")
     mod, cls = resolve(arrays)
-    arrays = [mod.lift(cls, a) for a in arrays]
+    arrays = [mod.lift(cls, x) for x in arrays]
     return mod.stack(cls, arrays, axis)
 
 
@@ -208,9 +208,9 @@ def hstack(arrays):
         raise ValueError("Need at least one array to stack.")
     
     mod, cls = resolve(arrays)
-    arrays = [mod.lift(cls, a) for a in arrays]
+    arrays = [mod.lift(cls, x) for x in arrays]
     
-    arrays = [a.ravel() if a.ndim == 0 else a for a in arrays]
+    arrays = [x.ravel() if x.ndim == 0 else x for x in arrays]
     if arrays[0].ndim == 1:
         return mod.concatenate(cls, arrays, axis=0)
     
@@ -222,10 +222,10 @@ def vstack(arrays):
         raise ValueError("Need at least one array to stack.")
     
     mod, cls = resolve(arrays)
-    arrays = [mod.lift(cls, a) for a in arrays]
+    arrays = [mod.lift(cls, x) for x in arrays]
 
     if arrays[0].ndim <= 1:
-        arrays = [a.reshape((1, -1)) for a in arrays]
+        arrays = [x.reshape((1, -1)) for x in arrays]
     
     return mod.concatenate(cls, arrays, axis=0)
 
@@ -235,12 +235,12 @@ def dstack(arrays):
         raise ValueError("Need at least one array to stack.")
     
     mod, cls = resolve(arrays)
-    arrays = [mod.lift(cls, a) for a in arrays]
+    arrays = [mod.lift(cls, x) for x in arrays]
 
     if arrays[0].ndim <= 1:
-        arrays = [a.reshape((1, -1, 1)) for a in arrays]
+        arrays = [x.reshape((1, -1, 1)) for x in arrays]
     elif arrays[0].ndim == 2:
-        arrays = [a.reshape(a.shape + (1,)) for a in arrays]
+        arrays = [x.reshape(x.shape + (1,)) for x in arrays]
     
     return mod.concatenate(cls, arrays, axis=2)
 
@@ -271,9 +271,6 @@ def dsplit(x, indices_or_sections):
     if x.ndim < 3:
         raise ValueError("dsplit only works on arrays of 3 or more dimensions")
     return split(x, indices_or_sections, axis=2)
-
-
-#  ---------- bilinear functions ----------
 
 
 def add(op1, op2):
@@ -328,9 +325,6 @@ def tensordot(op1, op2, axes=2):
 def einsum(subs, op1, op2):
     mod, cls = resolve([op1, op2])
     return mod.bilinearfunc(cls, "einsum", op1, op2, pargs=[subs])
-
-
-# ---------- linear and linearized unary array ufuncs ----------
 
 
 def linearized_unary(jmpf):

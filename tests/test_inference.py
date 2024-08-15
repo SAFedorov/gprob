@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 from external.Infer import Infer
 from gprob import hstack, stack
-from gprob.random import normal, cov
+from gprob.normal_ import normal, cov
 from gprob.func import ConditionError
 from utils import random_normal, random_correlate
 
@@ -116,10 +116,15 @@ def test_linear_regression():
     ab = (a & b) | cond
     jointd = hstack([a, b, *mn]) | cond
 
-    assert (np.abs(mfull.Sigma - jointd.cov()) < tol).all()
-    assert (np.abs(mfull.b[:, 0] - jointd.mean()) < tol).all()
-    assert (np.abs(mab.Sigma - ab.cov()) < tol).all()
-    assert (np.abs(mab.b[:, 0] - ab.mean()) < tol).all()
+    print(mfull.Sigma)
+    print("-")
+    print(jointd.a)
+    print("---")
+    print(jointd.cov())
+    assert np.max(np.abs(mfull.Sigma - jointd.cov())) < tol
+    assert np.max(np.abs(mfull.b[:, 0] - jointd.mean())) < tol
+    assert np.max(np.abs(mab.Sigma - ab.cov())) < tol
+    assert np.max(np.abs(mab.b[:, 0] - ab.mean())) < tol
 
     # Comparison to a vectorized calculation using this package
 

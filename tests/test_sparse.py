@@ -5,7 +5,7 @@ from numpy.exceptions import AxisError
 from numpy.exceptions import ComplexWarning
 
 import gprob as gp
-from gprob.random import normal, Normal
+from gprob.normal_ import normal, Normal
 from gprob.sparse import (_item_iaxid, iid_repeat, _as_sparse,
                           SparseNormal, SparseConditionWarning)
 
@@ -519,7 +519,7 @@ def test_cov():
     v2_ = normal(size=(n,))
     v_ = v1_ + v2_
 
-    c1_ = np.diagonal(2 * gp.random.cov(v_ * r1, v1_ * r2))
+    c1_ = np.diagonal(2 * gp.normal_.cov(v_ * r1, v1_ * r2))
     assert c1.shape == c1_.shape
     assert np.max(np.abs(c1 - c1_)) < tol
 

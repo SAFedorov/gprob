@@ -5,7 +5,7 @@ import inspect
 import numpy as np
 import gprob as gp
 
-from gprob.random import Normal
+from gprob.normal_ import Normal
 
 
 def test_cov():

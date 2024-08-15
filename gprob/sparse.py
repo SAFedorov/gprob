@@ -7,9 +7,10 @@ import numpy as np
 from numpy.linalg import LinAlgError
 from numpy.exceptions import AxisError
 
-from . import random
+from . import normal_
+from .normal_ import (Normal, complete, match_, complete_tensordot_axes,
+                      validate_logp_samples, print_)
 from .external import einsubs
-from . import maps
 
 
 def iid_repeat(x, nrep=1, axis=0):
@@ -25,7 +26,7 @@ def iid_repeat(x, nrep=1, axis=0):
         A sparse normal random variable with `axis` being an independence axis.
     """
 
-    x = lift(SparseNormal, x).iid_copy()  # TODO: it would be really nice to write SparseNormal.lift(x)
+    x = lift(SparseNormal, x).iid_copy()
     
     axis = _normalize_axis(axis, x.ndim + 1)
 
@@ -40,7 +41,7 @@ def iid_repeat(x, nrep=1, axis=0):
     return _as_sparse(x[idx].broadcast_to(new_shape), iaxid)
 
 
-class SparseNormal(random.Normal):
+class SparseNormal(Normal):
     """Array of block-independent normal random variables."""
 
     __slots__ = ("_iaxid",)  
@@ -83,7 +84,7 @@ class SparseNormal(random.Normal):
                         "be converted to numpy arrays.")
     
     def __repr__(self):
-        return random.print_(self, extra_attrs=("iaxes",))
+        return print_(self, extra_attrs=("iaxes",))
     
     def __neg__(self):
         return _as_sparse(super().__neg__(), self._iaxid)
@@ -109,7 +110,7 @@ class SparseNormal(random.Normal):
         return _as_sparse(x, iaxid)
 
     def __matmul__(self, other):
-        other, isnumeric = maps.match_(self.__class__, other)
+        other, isnumeric = match_(self.__class__, other)
 
         if not isnumeric:
             raise ValueError("Bilinear operations between two sparse normal "
@@ -134,7 +135,7 @@ class SparseNormal(random.Normal):
         return _as_sparse(x, iaxid)
 
     def __rmatmul__(self, other):
-        other, isnumeric = maps.match_(self.__class__, other)
+        other, isnumeric = match_(self.__class__, other)
 
         if not isnumeric:
             raise ValueError("Bilinear operations between two sparse normal "
@@ -179,7 +180,7 @@ class SparseNormal(random.Normal):
         return _as_sparse(x, iaxid)
     
     def __setitem__(self, key, value):
-        value, isnumeric = maps.match_(self.__class__, value)
+        value, isnumeric = match_(self.__class__, value)
 
         if not isnumeric:
             iaxid = _item_iaxid(self, key)
@@ -443,7 +444,7 @@ class SparseNormal(random.Normal):
 
         # Combines the observations in one and completes them w.r.t. self.
         cond = concatenate(SparseNormal, obs_flat, axis=-1)
-        lat, [av, ac] = maps.complete([self_fl, cond])
+        lat, [av, ac] = complete([self_fl, cond])
 
         t_ax = tuple(range(1, niax+1)) + (0, -1)
 
@@ -485,7 +486,7 @@ class SparseNormal(random.Normal):
             cond_a = cond_a[..., :n] + 1j * cond_a[..., n:]
             cond_m = cond_m[..., :n] + 1j * cond_m[..., n:]
 
-        fcv = random.Normal(cond_a, cond_m, lat)  
+        fcv = Normal(cond_a, cond_m, lat)  
         # A proxy variable to perform transposition.
 
         dense_sh = tuple([n for n, i in zip(self.shape, self._iaxid) if not i])
@@ -619,7 +620,7 @@ class SparseNormal(random.Normal):
         """
 
         delta_x = x - self.mean()
-        random.validate_logp_samples(self, delta_x)
+        validate_logp_samples(self, delta_x)
 
         if self.iscomplex:
             delta_x = np.hstack([delta_x.real, delta_x.imag])
@@ -897,7 +898,7 @@ def _item_iaxid(x, key):
     return tuple([None if ax is None else x._iaxid[ax] for ax in out_axs])
     
 
-def cov(cls, *args):  # TODO: remove cls ---------------------------------------------------------------
+def cov(*args):
     """The sparse implementation of the covariance. The function 
     expects `args` to have strictly one or two elements."""
 
@@ -1003,7 +1004,7 @@ def cov(cls, *args):  # TODO: remove cls ---------------------------------------
     in_symb2.insert(0, elem_symb)
     
     subs = f"{"".join(in_symb1)},{"".join(in_symb2)}->{"".join(out_symb)}"
-    _, [ax, ay] = maps.complete([x, y])
+    _, [ax, ay] = complete([x, y])
     return np.einsum(subs, ax, ay.conj())
 
 
@@ -1017,14 +1018,11 @@ def lift(cls, x):
     if x.__class__ is cls:
         return x
     
-    if x.__class__ is random.Normal:
+    if x.__class__ is Normal:
         x = SparseNormal(x.a, x.b)
     else:
-        x = maps.lift(cls, x)
+        x = normal_.lift(cls, x)
     return _as_sparse(x, (None,) * x.ndim)
-
-
-# ---------- array functions ----------
 
 
 def concatenate(cls, arrays, axis=0):
@@ -1035,13 +1033,25 @@ def concatenate(cls, arrays, axis=0):
         raise ValueError("Concatenation along independence axes "
                          "is not allowed.")
     
-    return _as_sparse(maps.concatenate(cls, arrays, axis), iaxid)
+    return _as_sparse(normal_.concatenate(cls, arrays, axis), iaxid)
 
 
 def stack(cls, arrays, axis=0):
     iaxid = _validate_iaxid(arrays)
     iaxid = iaxid[:axis] + (None,) + iaxid[axis:]
-    return _as_sparse(maps.stack(cls, arrays, axis), iaxid)
+    return _as_sparse(normal_.stack(cls, arrays, axis), iaxid)
+
+
+def call_linearized(cls, x, f, jmpf):
+    return _as_sparse(normal_.call_linearized(cls, x, f, jmpf), x._iaxid)
+
+
+def fftfunc(cls, name, x, n, axis, norm):
+    raise NotImplementedError
+
+
+def fftfunc_n(cls, name, x, s, axes, norm):
+    raise NotImplementedError
 
 
 def _check_independence(x, op_axes, n):
@@ -1056,14 +1066,14 @@ def _check_independence(x, op_axes, n):
     
 
 def bilinearfunc(cls, name, x, y, args=tuple(), pargs=tuple()):
-    x, x_is_numeric = maps.match_(cls, x)
-    y, y_is_numeric = maps.match_(cls, y)
+    x, x_is_numeric = match_(cls, x)
+    y, y_is_numeric = match_(cls, y)
 
     if not x_is_numeric and not y_is_numeric:
         raise ValueError("Bilinear operations between two sparse normal "
                          "variables are not supported.")
     
-    return maps.bilinearfunc(cls, name, x, y, args, pargs)
+    return normal_.bilinearfunc(cls, name, x, y, args, pargs)
 
 
 def _einsum_out_iaxid(x, insubs, outsubs):
@@ -1084,7 +1094,7 @@ def einsum01(cls, subs, x, y):
     subs = f"{insu1},{insu2}->{outsu}"
 
     iaxid = _einsum_out_iaxid(x, insu1, outsu)
-    return _as_sparse(maps.einsum01(cls, subs, x, y), iaxid)
+    return _as_sparse(normal_.einsum01(cls, subs, x, y), iaxid)
 
 
 def einsum10(cls, subs, x, y):
@@ -1093,7 +1103,7 @@ def einsum10(cls, subs, x, y):
     subs = f"{insu1},{insu2}->{outsu}"
 
     iaxid = _einsum_out_iaxid(y, insu2, outsu)
-    return _as_sparse(maps.einsum10(cls, subs, x, y), iaxid)
+    return _as_sparse(normal_.einsum10(cls, subs, x, y), iaxid)
 
 
 def inner01(cls, x, y):
@@ -1104,7 +1114,7 @@ def inner01(cls, x, y):
     _check_independence(x, op_axes, 1)
 
     iaxid = x._iaxid[:-1] + (None,) * (y.ndim - 1)
-    return _as_sparse(maps.inner01(cls, x, y), iaxid)
+    return _as_sparse(normal_.inner01(cls, x, y), iaxid)
     
 
 def inner10(cls, x, y):
@@ -1115,7 +1125,7 @@ def inner10(cls, x, y):
     _check_independence(x, op_axes, 2)
 
     iaxid = (None,) * (x.ndim - 1) + y._iaxid[:-1]
-    return _as_sparse(maps.inner10(cls, x, y), iaxid)
+    return _as_sparse(normal_.inner10(cls, x, y), iaxid)
 
 
 def dot01(cls, x, y):
@@ -1126,7 +1136,7 @@ def dot01(cls, x, y):
     _check_independence(x, op_axes, 1)
 
     iaxid = x._iaxid[:-1] + (None,) * (y.ndim - 1)
-    return _as_sparse(maps.dot01(cls, x, y), iaxid)
+    return _as_sparse(normal_.dot01(cls, x, y), iaxid)
 
 
 def dot10(cls, x, y):
@@ -1139,54 +1149,42 @@ def dot10(cls, x, y):
     iaxid = list(y._iaxid)
     iaxid.pop(op_axes[0])
     iaxid = (None,) * (x.ndim - 1) + tuple(iaxid)
-    return _as_sparse(maps.dot01(cls, x, y), iaxid)
+    return _as_sparse(normal_.dot01(cls, x, y), iaxid)
 
 
 def outer01(cls, x, y):
-    return _as_sparse(maps.outer01(cls, x, y), x._iaxid + (None,))
+    return _as_sparse(normal_.outer01(cls, x, y), x._iaxid + (None,))
 
 
 def outer10(cls, x, y):
-    return _as_sparse(maps.outer10(cls, x, y), (None,) + y._iaxid)
+    return _as_sparse(normal_.outer10(cls, x, y), (None,) + y._iaxid)
 
 
 def kron01(cls, x, y):
     ndim = max(x.ndim, y.ndim)  # ndim of the result.
     iaxid = (None,) * (ndim - x.ndim) + x._iaxid
-    return _as_sparse(maps.kron01(cls, x, y), iaxid)
+    return _as_sparse(normal_.kron01(cls, x, y), iaxid)
 
 
 def kron10(cls, x, y):
     ndim = max(x.ndim, y.ndim)  # ndim of the result.
     iaxid = (None,) * (ndim - y.ndim) + y._iaxid
-    return _as_sparse(maps.kron10(cls, x, y), iaxid)
+    return _as_sparse(normal_.kron10(cls, x, y), iaxid)
 
 
 def tensordot01(cls, x, y, axes):
-    axes1, axes2 = maps.complete_tensordot_axes(axes)
+    axes1, axes2 = complete_tensordot_axes(axes)
     _check_independence(x, axes1, 1)
 
     iaxid = tuple([b for i, b in enumerate(x._iaxid) if i not in axes1])
     iaxid = iaxid + (None,) * (y.ndim - len(axes2))
-    return _as_sparse(maps.tensordot01(cls, x, y, (axes1, axes2)), iaxid)
+    return _as_sparse(normal_.tensordot01(cls, x, y, (axes1, axes2)), iaxid)
 
 
 def tensordot10(cls, x, y, axes):
-    axes1, axes2 = maps.complete_tensordot_axes(axes)
+    axes1, axes2 = complete_tensordot_axes(axes)
     _check_independence(y, axes2, 2)
 
     iaxid = tuple([b for i, b in enumerate(y._iaxid) if i not in axes2])
     iaxid = (None,) * (x.ndim - len(axes1)) + iaxid
-    return _as_sparse(maps.tensordot10(cls, x, y, (axes1, axes2)), iaxid)
-
-
-def fftfunc(cls, name, x, n, axis, norm):
-    raise NotImplementedError
-
-
-def fftfunc_n(cls, name, x, s, axes, norm):
-    raise NotImplementedError
-
-
-def call_linearized(cls, x, f, jmpf):
-    return _as_sparse(maps.call_linearized(cls, x, f, jmpf), x._iaxid)
+    return _as_sparse(normal_.tensordot10(cls, x, y, (axes1, axes2)), iaxid)

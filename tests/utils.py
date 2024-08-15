@@ -1,10 +1,10 @@
 import numpy as np
 from functools import reduce
-from gprob import maps, random, sparse
+from gprob import maps, normal_, sparse
 
 
 def asnormal(x):
-    return maps.lift(random.Normal, x)
+    return maps.lift(normal_.Normal, x)
 
 
 def assparsenormal(x):
@@ -33,7 +33,7 @@ def random_normal(shape, dtype=np.float64):
     assert mu.dtype == dtype
     assert a.dtype == dtype
 
-    return random.Normal(a, mu).reshape(shape)
+    return normal_.Normal(a, mu).reshape(shape)
 
 
 def random_det_normal(shape, dtype=np.float64):
