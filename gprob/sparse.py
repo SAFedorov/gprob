@@ -483,16 +483,14 @@ class SparseNormal(Normal):
             cond_a = cond_a[..., :n] + 1j * cond_a[..., n:]
             cond_m = cond_m[..., :n] + 1j * cond_m[..., n:]
 
-        fcv = Normal(cond_a, cond_m, lat)  
-        # A proxy variable to perform transposition.
+        fcv = SparseNormal(cond_a, cond_m, lat)
 
         dense_sh = tuple([n for n, i in zip(self.shape, self._iaxid) if not i])
         fcv = fcv.reshape(fcv.shape[:niax] + dense_sh)
         t_ax = tuple([i[0] for i in sorted(enumerate(s_sparse_ax + s_dense_ax), 
                                            key=lambda x:x[1])])
-        fcv = fcv.transpose(t_ax)
 
-        return _as_sparse(SparseNormal(fcv.a, fcv.b, fcv.lat), self._iaxid)  # TODO: Is there a way of doing it without a proxy?
+        return _as_sparse(fcv.transpose(t_ax), self._iaxid)
 
     def cov(self):
         """Covariance, generalizing `<outer((x-<x>), (x-<x>)^H)>`, 
