@@ -8,7 +8,7 @@ from numpy.linalg import LinAlgError
 from numpy.exceptions import AxisError
 
 from . import normal_
-from .normal_ import (Normal, complete, match_, complete_tensordot_axes,
+from .normal_ import (Normal, complete, lift, match_, complete_tensordot_axes,
                       validate_logp_samples, print_)
 from .external import einsubs
 
@@ -26,19 +26,14 @@ def iid_repeat(x, nrep=1, axis=0):
         A sparse normal random variable with `axis` being an independence axis.
     """
 
-    x = lift(SparseNormal, x).iid_copy()
+    y = lift(SparseNormal, x).iid_copy()
     
-    axis = _normalize_axis(axis, x.ndim + 1)
+    axis = _normalize_axis(axis, y.ndim + 1)
+    sh1 = y.shape[:axis] + (1,) + y.shape[axis:]
+    sh2 = y.shape[:axis] + (nrep,) + y.shape[axis:]
 
-    iaxid = x._iaxid[:axis] + (x._niax + 1,) + x._iaxid[axis:]
-
-    # Index that adds a new axis.
-    idx = [slice(None, None, None)] * x.ndim
-    idx.insert(axis, None)
-    idx = tuple(idx)
-
-    new_shape = x.shape[:axis] + (nrep,) + x.shape[axis:]
-    return _as_sparse(x[idx].broadcast_to(new_shape), iaxid)
+    iaxid = y._iaxid[:axis] + (y._niax + 1,) + y._iaxid[axis:]
+    return _as_sparse(y.reshape(sh1).broadcast_to(sh2), iaxid)
 
 
 class SparseNormal(Normal):
@@ -51,6 +46,10 @@ class SparseNormal(Normal):
     # axes, and `None`s at the positions corresponding to regular axes.
 
     _mod = import_module(__name__)
+
+    def __init__(self, a, b, lat=None):
+        super().__init__(a, b, lat)
+        self._iaxid = (None,) * b.ndim
     
     @property
     def delta(self):
@@ -1020,17 +1019,6 @@ class SparseConditionWarning(RuntimeWarning):
     """The warning issued when a condition is skipped during 
     the conditioning of a sparse variable."""
     pass
-
-
-def lift(cls, x):
-    if x.__class__ is cls:
-        return x
-    
-    if x.__class__ is Normal:
-        x = SparseNormal(x.a, x.b)
-    else:
-        x = normal_.lift(cls, x)
-    return _as_sparse(x, (None,) * x.ndim)
 
 
 def concatenate(cls, arrays, axis=0):

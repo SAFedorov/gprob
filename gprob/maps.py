@@ -430,12 +430,15 @@ def lift(cls, x):
 
     if x.__class__ is cls:
         return x
+    
+    if issubclass(cls, x.__class__):
+        return cls(x.a, x.b, x.lat)
 
-    b = np.asanyarray(x)
-    if b.dtype.kind in NUMERIC_ARRAY_KINDS:
-        a = np.zeros((0,) + b.shape, dtype=b.dtype)
-        return cls(a, b, dict())
-    elif b.ndim != 0:
+    x_ = np.asanyarray(x)
+    if x_.dtype.kind in NUMERIC_ARRAY_KINDS:
+        a = np.zeros((0,) + x_.shape, dtype=x_.dtype)
+        return cls(a, x_, dict())
+    elif x_.ndim != 0:
         return cls._mod.stack(cls, [cls._mod.lift(cls, v) for v in x])
     
     raise TypeError(f"The variable of type '{x.__class__.__name__}' "
