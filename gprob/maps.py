@@ -595,27 +595,24 @@ def fftfunc_n(cls, name, x, s, axes, norm):
 
 
 # ---------- bilinear functions ----------
-# 10: numeric, map
-# 01: map, numeric
-# TODO: 01 and 10 clashes with the notations for derivatives in parametric module, also there are non-bilinear functions below this line
 
 
 def bilinearfunc(cls, name, x, y, args=tuple(), pargs=tuple()):
     x, x_is_numeric = match_(cls, x)
     y, y_is_numeric = match_(cls, y)
 
-    if x_is_numeric and not y_is_numeric:
-        return getattr(cls._mod, name + "10")(cls, *pargs, x, y, *args)
-    elif y_is_numeric and not x_is_numeric:
-        return getattr(cls._mod, name + "01")(cls, *pargs, x, y, *args)
+    if not x_is_numeric and y_is_numeric:
+        return getattr(cls._mod, name + "_1")(cls, *pargs, x, y, *args)
+    elif x_is_numeric and not y_is_numeric:
+        return getattr(cls._mod, name + "_2")(cls, *pargs, x, y, *args)
     elif x_is_numeric and y_is_numeric:
-        return getattr(np, name)(*pargs, x, y, *args)  # TODO: lift? --------------------------------
+        return getattr(np, name)(*pargs, x, y, *args)
 
-    return (getattr(cls._mod, name + "01")(cls, *pargs, x, y.b, *args) 
-            + getattr(cls._mod, name + "10")(cls, *pargs, x.b, y.delta, *args))
+    return (getattr(cls._mod, name + "_1")(cls, *pargs, x, y.b, *args) 
+            + getattr(cls._mod, name + "_2")(cls, *pargs, x.b, y.delta, *args))
 
 
-def einsum01(cls, subs, x, y):
+def einsum_1(cls, subs, x, y):
     (xsubs, ysubs), outsubs = einsubs.parse(subs, (x.shape, y.shape))
 
     b = np.einsum(subs, x.b, y)
@@ -623,7 +620,7 @@ def einsum01(cls, subs, x, y):
     return cls(a, b, x.lat)
 
 
-def einsum10(cls, subs, x, y):
+def einsum_2(cls, subs, x, y):
     (xsubs, ysubs), outsubs = einsubs.parse(subs, (x.shape, y.shape))
 
     b = np.einsum(subs, x, y.b)
@@ -631,7 +628,7 @@ def einsum10(cls, subs, x, y):
     return cls(a, b, y.lat)
 
 
-def inner01(cls, x, y):
+def inner_1(cls, x, y):
     if x.ndim == 0 or y.ndim == 0:
         return x * y
     
@@ -640,7 +637,7 @@ def inner01(cls, x, y):
     return cls(a, b, x.lat)
 
 
-def inner10(cls, x, y):
+def inner_2(cls, x, y):
     if x.ndim == 0 or y.ndim == 0:
         return x * y
     
@@ -649,7 +646,7 @@ def inner10(cls, x, y):
     return cls(a, b, y.lat)
 
 
-def dot01(cls, x, y):
+def dot_1(cls, x, y):
     if x.ndim == 0 or y.ndim == 0:
         return x * y
     
@@ -658,7 +655,7 @@ def dot01(cls, x, y):
     return cls(a, b, x.lat)
 
 
-def dot10(cls, x, y):
+def dot_2(cls, x, y):
     if x.ndim == 0 or y.ndim == 0:
         return x * y
     
@@ -671,25 +668,25 @@ def dot10(cls, x, y):
     return cls(a, b, y.lat)
 
 
-def outer01(cls, x, y):
+def outer_1(cls, x, y):
     b = np.outer(x.b, y)
     a = np.einsum("ij, k -> ijk", x.a2d, y.ravel())
     return cls(a, b, x.lat)
 
 
-def outer10(cls, x, y):
+def outer_2(cls, x, y):
     b = np.outer(x, y.b)
     a = np.einsum("k, ij -> ikj", x.ravel(), y.a2d)
     return cls(a, b, y.lat)
 
 
-def kron01(cls, x, y):
+def kron_1(cls, x, y):
     b = np.kron(x.b, y)
     a = np.kron(_unsq(x.a, y.ndim), y)
     return cls(a, b, x.lat)
 
 
-def kron10(cls, x, y):
+def kron_2(cls, x, y):
     b = np.kron(x, y.b)
     a = np.kron(x, _unsq(y.a, x.ndim))
     return cls(a, b, y.lat)
@@ -708,14 +705,14 @@ def complete_tensordot_axes(axes):
     return axes
 
 
-def tensordot01(cls, x, y, axes):
+def tensordot_1(cls, x, y, axes):
     b = np.tensordot(x.b, y, axes)
     axes1, axes2 = complete_tensordot_axes(axes)
     a = np.tensordot(x.a, y, axes=(_axes_a(axes1), axes2))
     return cls(a, b, x.lat)
 
 
-def tensordot10(cls, x, y, axes):
+def tensordot_2(cls, x, y, axes):
     b = np.tensordot(x, y.b, axes)
     axes1, axes2 = complete_tensordot_axes(axes)
     a_ = np.tensordot(x, y.a, axes=(axes1, _axes_a(axes2)))

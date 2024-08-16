@@ -1096,25 +1096,25 @@ def _einsum_out_iaxid(x, insubs, outsubs):
     return tuple([iaxid[insubs.find(c)] for c in outsubs])
 
 
-def einsum01(cls, subs, x, y):
+def einsum_1(cls, subs, x, y):
     # Converts the subscripts to an explicit form.
     (insu1, insu2), outsu = einsubs.parse(subs, (x.shape, y.shape))
     subs = f"{insu1},{insu2}->{outsu}"
 
     iaxid = _einsum_out_iaxid(x, insu1, outsu)
-    return _as_sparse(normal_.einsum01(cls, subs, x, y), iaxid)
+    return _as_sparse(normal_.einsum_1(cls, subs, x, y), iaxid)
 
 
-def einsum10(cls, subs, x, y):
+def einsum_2(cls, subs, x, y):
     # Converts the subscripts to an explicit form.
     (insu1, insu2), outsu = einsubs.parse(subs, (x.shape, y.shape))
     subs = f"{insu1},{insu2}->{outsu}"
 
     iaxid = _einsum_out_iaxid(y, insu2, outsu)
-    return _as_sparse(normal_.einsum10(cls, subs, x, y), iaxid)
+    return _as_sparse(normal_.einsum_2(cls, subs, x, y), iaxid)
 
 
-def inner01(cls, x, y):
+def inner_1(cls, x, y):
     if x.ndim == 0 or y.ndim == 0:
         return x * y
     
@@ -1122,10 +1122,10 @@ def inner01(cls, x, y):
     _check_independence(x, op_axes, 1)
 
     iaxid = x._iaxid[:-1] + (None,) * (y.ndim - 1)
-    return _as_sparse(normal_.inner01(cls, x, y), iaxid)
+    return _as_sparse(normal_.inner_1(cls, x, y), iaxid)
     
 
-def inner10(cls, x, y):
+def inner_2(cls, x, y):
     if x.ndim == 0 or y.ndim == 0:
         return x * y
     
@@ -1133,10 +1133,10 @@ def inner10(cls, x, y):
     _check_independence(y, op_axes, 2)
 
     iaxid = (None,) * (x.ndim - 1) + y._iaxid[:-1]
-    return _as_sparse(normal_.inner10(cls, x, y), iaxid)
+    return _as_sparse(normal_.inner_2(cls, x, y), iaxid)
 
 
-def dot01(cls, x, y):
+def dot_1(cls, x, y):
     if x.ndim == 0 or y.ndim == 0:
         return x * y
     
@@ -1144,10 +1144,10 @@ def dot01(cls, x, y):
     _check_independence(x, op_axes, 1)
 
     iaxid = x._iaxid[:-1] + (None,) * (y.ndim - 1)
-    return _as_sparse(normal_.dot01(cls, x, y), iaxid)
+    return _as_sparse(normal_.dot_1(cls, x, y), iaxid)
 
 
-def dot10(cls, x, y):
+def dot_2(cls, x, y):
     if x.ndim == 0 or y.ndim == 0:
         return x * y
     
@@ -1157,46 +1157,46 @@ def dot10(cls, x, y):
     iaxid = list(y._iaxid)
     iaxid.pop(op_axes[0])
     iaxid = (None,) * (x.ndim - 1) + tuple(iaxid)
-    return _as_sparse(normal_.dot10(cls, x, y), iaxid)
+    return _as_sparse(normal_.dot_2(cls, x, y), iaxid)
 
 
-def outer01(cls, x, y):
+def outer_1(cls, x, y):
     x, y = x.ravel(), y.ravel()
-    return _as_sparse(normal_.outer01(cls, x, y), x._iaxid + (None,))
+    return _as_sparse(normal_.outer_1(cls, x, y), x._iaxid + (None,))
 
 
-def outer10(cls, x, y):
+def outer_2(cls, x, y):
     x, y = x.ravel(), y.ravel()
-    return _as_sparse(normal_.outer10(cls, x, y), (None,) + y._iaxid)
+    return _as_sparse(normal_.outer_2(cls, x, y), (None,) + y._iaxid)
 
 
-def kron01(cls, x, y):
+def kron_1(cls, x, y):
     ndim = max(x.ndim, y.ndim)  # ndim of the result.
     iaxid = (None,) * (ndim - x.ndim) + x._iaxid
-    return _as_sparse(normal_.kron01(cls, x, y), iaxid)
+    return _as_sparse(normal_.kron_1(cls, x, y), iaxid)
 
 
-def kron10(cls, x, y):
+def kron_2(cls, x, y):
     ndim = max(x.ndim, y.ndim)  # ndim of the result.
     iaxid = (None,) * (ndim - y.ndim) + y._iaxid
-    return _as_sparse(normal_.kron10(cls, x, y), iaxid)
+    return _as_sparse(normal_.kron_2(cls, x, y), iaxid)
 
 
-def tensordot01(cls, x, y, axes):
+def tensordot_1(cls, x, y, axes):
     axes1, axes2 = complete_tensordot_axes(axes)
     axes1 = _normalize_axes(axes1, x.ndim)
     _check_independence(x, axes1, 1)
 
     iaxid = tuple([b for i, b in enumerate(x._iaxid) if i not in axes1])
     iaxid = iaxid + (None,) * (y.ndim - len(axes2))
-    return _as_sparse(normal_.tensordot01(cls, x, y, (axes1, axes2)), iaxid)
+    return _as_sparse(normal_.tensordot_1(cls, x, y, (axes1, axes2)), iaxid)
 
 
-def tensordot10(cls, x, y, axes):
+def tensordot_2(cls, x, y, axes):
     axes1, axes2 = complete_tensordot_axes(axes)
     axes2 = _normalize_axes(axes2, y.ndim)
     _check_independence(y, axes2, 2)
 
     iaxid = tuple([b for i, b in enumerate(y._iaxid) if i not in axes2])
     iaxid = (None,) * (x.ndim - len(axes1)) + iaxid
-    return _as_sparse(normal_.tensordot10(cls, x, y, (axes1, axes2)), iaxid)
+    return _as_sparse(normal_.tensordot_2(cls, x, y, (axes1, axes2)), iaxid)

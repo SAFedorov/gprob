@@ -6,9 +6,9 @@ import numpy as np
 from numpy.linalg import LinAlgError
 
 from .maps import (LatentMap, complete, lift, match_, concatenate, stack, 
-    call_linearized, fftfunc, fftfunc_n, bilinearfunc, einsum01, einsum10,
-    inner01, inner10, dot01, dot10, outer01, outer10, kron01, kron10, 
-    complete_tensordot_axes, tensordot01, tensordot10)
+    call_linearized, fftfunc, fftfunc_n, bilinearfunc, einsum_1, einsum_2,
+    inner_1, inner_2, dot_1, dot_2, outer_1, outer_2, kron_1, kron_2, 
+    complete_tensordot_axes, tensordot_1, tensordot_2)
 
 from .func import condition, logp
 
