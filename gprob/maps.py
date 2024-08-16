@@ -22,7 +22,7 @@ class LatentMap:
     __array_ufunc__ = None
     _mod = import_module(__name__)
 
-    def __init__(self, a, b, lat=None):  # change to __new__, otherwise SparseNormal will not be able to use the validations
+    def __init__(self, a, b, lat=None):
         if a.shape[1:] != b.shape:
             raise ValueError(f"The shapes of the map ({a.shape}) and "
                              f"the mean ({b.shape}) do not agree.")
@@ -94,13 +94,6 @@ class LatentMap:
             return self.__class__(a, b, self.lat)
 
         b = self.b + other.b
-
-        if len(other.lat) == 0:
-            # An optimization for the addition of empty maps that emerge  TODO: remove the case?---------------------
-            # when constants are elevated to random variables.
-
-            a = self.a if self.shape == b.shape else _broadcast(self.a, b.shape)
-            return self.__class__(a, b, self.lat)
 
         if self.lat is other.lat:
             # An optimization primarily made to speed up in-place 
