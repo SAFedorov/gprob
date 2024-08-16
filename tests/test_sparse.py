@@ -7,7 +7,7 @@ from numpy.exceptions import ComplexWarning
 import gprob as gp
 from gprob.normal_ import normal, Normal
 from gprob.sparse import (_item_iaxid, iid_repeat, _as_sparse,
-                          SparseNormal, SparseConditionWarning)
+                          SparseNormal, SparseConditionWarning, lift)
 
 from utils import random_normal, get_message, assparsenormal
 
@@ -53,6 +53,35 @@ def test_construction():
         _as_sparse(SparseNormal(fcv.a, fcv.b, fcv.lat), (1, 0))
     with pytest.raises(ValueError):
         _as_sparse(SparseNormal(fcv.a, fcv.b, fcv.lat), (True, False))
+
+
+def test_type_lifting():
+    x = lift(SparseNormal, 1)
+    assert isinstance(x, SparseNormal)
+    assert x.shape == tuple()
+    assert x.iaxes == tuple()
+    assert x._iaxid == tuple()
+
+    x = lift(SparseNormal, np.ones(shape=(3, 2, 1)))
+    assert isinstance(x, SparseNormal)
+    assert x.shape == (3, 2, 1)
+    assert x.iaxes == tuple()
+    assert x._iaxid == (None, None, None)
+
+    x = lift(SparseNormal, normal())
+    assert isinstance(x, SparseNormal)
+    assert x.shape == tuple()
+    assert x.iaxes == tuple()
+    assert x._iaxid == tuple()
+
+    x = lift(SparseNormal, normal(size=(3, 2, 1)))
+    assert isinstance(x, SparseNormal)
+    assert x.shape == (3, 2, 1)
+    assert x.iaxes == tuple()
+    assert x._iaxid == (None, None, None)
+
+    x = iid_repeat(normal(), 3)
+    assert lift(SparseNormal, x) is x
 
 
 def test_iid_repeat():
