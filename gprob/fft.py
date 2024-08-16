@@ -26,8 +26,9 @@ def ihfft(x, n=None, axis=-1, norm=None):
 
 
 def _fftfunc(name, x, n, axis, norm):
-    mod = resolve([x])
-    return mod.fftfunc(name, x, n, axis, norm)
+    mod, cls = resolve([x])
+    x = cls._mod.lift(cls, x)
+    return mod.fftfunc(cls, name, x, n, axis, norm)
 
 
 def fft2(x, s=None, axes=(-2, -1), norm=None):
@@ -63,5 +64,6 @@ def irfftn(x, s=None, axes=None, norm=None):
 
 
 def _fftfunc_n(name, x, s, axes, norm):
-    mod = resolve([x])
-    return mod.fftfunc_n(name, x, s, axes, norm)
+    mod, cls = resolve([x])
+    x = cls._mod.lift(cls, x)
+    return mod.fftfunc_n(cls, name, x, s, axes, norm)

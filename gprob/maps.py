@@ -574,24 +574,20 @@ def call_linearized(cls, x, func, jmpfunc):
 
 
 def fftfunc(cls, name, x, n, axis, norm):
-    x = cls._mod.lift(cls, x)
-
     func = getattr(np.fft, name)
     b = func(x.b, n, axis, norm)
     a = func(x.a, n, _axes_a([axis])[0], norm)
-    return x.__class__(a, b, x.lat)
+    return cls(a, b, x.lat)
 
 
 def fftfunc_n(cls, name, x, s, axes, norm):
-    x = cls._mod.lift(cls, x)
-
     if axes is None:
         axes = list(range(x.ndim))
 
     func = getattr(np.fft, name)
     b = func(x.b, s, axes, norm)
     a = func(x.a, s, _axes_a(axes), norm)
-    return x.__class__(a, b, x.lat)
+    return cls(a, b, x.lat)
 
 
 # ---------- bilinear functions ----------
