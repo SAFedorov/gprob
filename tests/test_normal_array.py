@@ -934,6 +934,8 @@ def test_divide():
 
 
 def test_heterogeneous_ops():
+    # Heterogeneous variables have mean and variance with different data types.
+
     tol = 1e-8
 
     x = normal(0, 0.05)  # int mean and float var

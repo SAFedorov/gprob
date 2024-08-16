@@ -21,6 +21,13 @@ def dense_to_sparse_cov(cov, iaxes):
     return cov
 
 
+def fcv(v):
+    """Produces a fully-correlated normal variable out of a sparse normal 
+    variable `v`."""
+    
+    return Normal(v.a, v.b, v.lat)
+
+
 def test_construction():
     tol = 1e-8
 
@@ -1021,15 +1028,18 @@ def test_cumsum():
     v = iid_repeat(iid_repeat(normal(size=(4, 5)), 2, axis=1), 3, axis=1)
     # v.shape is (4, 3, 2, 5), v.iaxes are (1, 2)
 
+    assert v.shape == (4, 3, 2, 5)
+    assert v.iaxes == (1, 2)
+
     for ax in [0, 3, -1, -4]:
         vout = v.cumsum(axis=ax)
         assert vout.shape == v.shape
         assert vout.iaxes == v.iaxes
         assert np.all(vout.mean() == np.cumsum(v.mean(), axis=ax))
 
-        vvs = v.fcv.cumsum(axis=ax)
-        assert np.all(vvs.a == vout.fcv.a)
-        assert np.all(vvs.lat == vout.fcv.lat)
+        vvs = fcv(v).cumsum(axis=ax)
+        assert np.all(vvs.a == vout.a)
+        assert np.all(vvs.lat == vout.lat)
 
     # Independence axes are not allowed.
     with pytest.raises(ValueError):
@@ -1595,9 +1605,9 @@ def test_sum():
         assert vout.iaxes == iax
         assert np.all(vout.mean() == mean_ref)
 
-        vvs = v.fcv.sum(axis=ax)
-        assert np.all(vvs.a == vout.fcv.a)
-        assert np.all(vvs.lat == vout.fcv.lat)
+        vvs = fcv(v).sum(axis=ax)
+        assert np.all(vvs.a == vout.a)
+        assert np.all(vvs.lat == vout.lat)
 
         vout = v.sum(axis=ax, keepdims=True)
         mean_ref = np.sum(v.mean(), axis=ax, keepdims=True)
@@ -1605,9 +1615,9 @@ def test_sum():
         assert vout.iaxes == v.iaxes
         assert np.all(vout.mean() == mean_ref)
 
-        vvs = v.fcv.sum(axis=ax, keepdims=True)
-        assert np.all(vvs.a == vout.fcv.a)
-        assert np.all(vvs.lat == vout.fcv.lat)
+        vvs = fcv(v).sum(axis=ax, keepdims=True)
+        assert np.all(vvs.a == vout.a)
+        assert np.all(vvs.lat == vout.lat)
 
     assert v[:, :, None].sum(axis=2).shape == v.shape
     assert v[:, :, None].sum(axis=2).iaxes == v.iaxes
@@ -1969,7 +1979,7 @@ def test_concatenate():
 
     v = iid_repeat(normal(size=(1,)), 7)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError):
         gp.concatenate([v, normal(size=(7, 1))], axis=1)
         # Concatenation of regular and sparse normal variables is never possible 
         # because regular variables do not have independence axes.
@@ -2027,7 +2037,7 @@ def test_stack():
 
     v = iid_repeat(normal(size=(1,)), 7)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError):
         gp.stack([v, normal(size=(7, 1))], axis=1)
         # Stacking of regular and sparse normal variables is never possible 
         # because regular variables do not have independence axes.
@@ -2159,7 +2169,7 @@ def test_matmul():
     v2 = iid_repeat(iid_repeat(random_normal((5, 1)), 7), 4)
     # shape (4, 7, 5, 1), iaxes (0, 1)
 
-    v2.fcv += v1.fcv[0, 0, 0, 0]  # for establishing correlation.
+    v2 += v1[:, :, 0, 0, None, None]  # for establishing correlation.
 
     w = v1 @ v2
     assert w.shape == (4, 7, 3, 1)
@@ -2185,12 +2195,12 @@ def test_einsum():
         assert v1.shape == v2.shape
         assert v1.iaxes == v2.iaxes
 
-        if len(v1.fcv.a) > 0:
-            assert np.max(np.abs(v1.fcv.a - v2.fcv.a)) < tol
+        if len(v1.a) > 0:
+            assert np.max(np.abs(v1.a - v2.a)) < tol
         else:
-            assert len(v2.fcv.a) == 0
+            assert len(v2.a) == 0
         
-        assert v1.fcv.lat == v2.fcv.lat
+        assert v1.lat == v2.lat
         assert np.max(np.abs(v1.mean() - v2.mean())) < tol
 
     # Tests against matrix multiplication.
@@ -2351,13 +2361,13 @@ def _check_w_scalar_operand(sv, func_name="dot"):
         sv_ = getattr(gp, func_name)(sv, 2.)
         mean_ref = getattr(np, func_name)(sv.mean(), 2.)
         assert sv_.shape == mean_ref.shape
-        assert np.max(np.abs(sv_.fcv.a - 2 * sv.fcv.a)) < tol
+        assert np.max(np.abs(sv_.a - 2 * sv.a)) < tol
         assert np.max(np.abs(sv_.mean() - 2 * sv.mean())) < tol
 
         sv_ = getattr(gp, func_name)(2., sv)
         mean_ref = getattr(np, func_name)(2., sv.mean())
         assert sv_.shape == mean_ref.shape
-        assert np.max(np.abs(sv_.fcv.a - 2 * sv.fcv.a)) < tol
+        assert np.max(np.abs(sv_.a - 2 * sv.a)) < tol
         assert np.max(np.abs(sv_.mean() - 2 * sv.mean())) < tol
 
 

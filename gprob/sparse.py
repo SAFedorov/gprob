@@ -280,9 +280,9 @@ class SparseNormal(Normal):
 
         if x.size == 0:
             # The transformation of independence axes for zero-size variables 
-            # cannot be determined unambiguously, so we always assume that 
-            # the transformed variable has no independence axes.
-            return SparseNormal(x, (None,) * x.ndim)
+            # cannot be determined unambiguously. By our convention,
+            # the result of such transformation has no independence axes.
+            return _as_sparse(x, (None,) * x.ndim)
 
         new_dim = 0
 
@@ -624,7 +624,7 @@ class SparseNormal(Normal):
 
         if self.iscomplex:
             delta_x = np.hstack([delta_x.real, delta_x.imag])
-            self = SparseNormal._stack([self.real, self.imag])
+            self = stack(SparseNormal, [self.real, self.imag])
         elif np.iscomplexobj(delta_x):
             # Casts to real with a warning.
             delta_x = delta_x.astype(delta_x.real.dtype)
@@ -634,7 +634,7 @@ class SparseNormal(Normal):
         if self.ndim == niax:
             # Scalar dense subspace.
 
-            sigmasq = np.einsum("i..., i... -> ...", self.fcv.a, self.fcv.a)
+            sigmasq = np.einsum("i..., i... -> ...", self.a, self.a)
             llk = -0.5 * (delta_x**2 / sigmasq + np.log(2 * np.pi * sigmasq))
             return np.sum(llk, axis=tuple(range(-self.ndim, 0)))
         
@@ -760,8 +760,10 @@ def _validate_iaxid(seq):
     """
 
     ndim = max(np.ndim(x) for x in seq)
-    seq = [x for x in seq if hasattr(x, "_iaxid")]
-    iaxids = set((None,) * (ndim - x.ndim) + x._iaxid for x in seq)
+
+    # The set of iaxes excluding those of deterministic variables.
+    iaxids = set((None,) * (ndim - x.ndim) + x._iaxid 
+                 for x in seq if hasattr(x, "nlat") and x.nlat != 0)
 
     if len(iaxids) == 0:
         return (None,) * ndim
@@ -947,8 +949,17 @@ def cov(*args):
 
     # The remaining case is len(args) == 2.
     x, y = args
+
+    if x.nlat == 0 and y.nlat == 0:
+        # It is not allowed for both inputs to be deterministic 
+        # because the independence axes cannot be determined.
+
+        # This case should never be reached under normal circumstances, 
+        # because two constants are dispatched to the dense 
+        # implementation of covariance.
+        raise ValueError
     
-    # If either x or y is deterministic, a zero result is returned.
+    # If one of x and y is deterministic, a zero result is returned.
 
     if x.nlat == 0:
         dense_shape_y = [s for b, s in zip(y._iaxid, y.shape) if not b]
