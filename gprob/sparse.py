@@ -113,8 +113,7 @@ class SparseNormal(Normal):
         other, isnumeric = match_(self.__class__, other)
 
         if not isnumeric:
-            raise ValueError("Bilinear operations between two sparse normal "
-                             "variables are not supported.")
+            return self @ other.b + self.b @ other.delta
         
         x = super().__matmul__(other)
         
@@ -138,8 +137,7 @@ class SparseNormal(Normal):
         other, isnumeric = match_(self.__class__, other)
 
         if not isnumeric:
-            raise ValueError("Bilinear operations between two sparse normal "
-                             "variables are not supported.")
+            return self @ other.b + self.b @ other.delta
         
         x = super().__rmatmul__(other)
         
@@ -678,7 +676,7 @@ class SparseNormal(Normal):
 
 
 def _as_sparse(x, iaxid):
-    """Assigns `iaxid` to `x`, thereby initializing it as a sparse variable.
+    """Assigns `iaxid` to `x`, thereby initializing `x` as a sparse variable.
     Returns `x`."""
 
     if not isinstance(iaxid, tuple):
@@ -686,9 +684,8 @@ def _as_sparse(x, iaxid):
                              f"of type {type(iaxid)}.")
         
     if len(iaxid) != x.ndim:
-        raise ValueError(f"The size of iaxid ({len(iaxid)}) does not "
-                         "match the number of the dimensions "
-                         f"of the variable ({x.ndim}).")
+        raise ValueError(f"The size of iaxid ({len(iaxid)}) does not match "
+                         f"the dimension number of the variable ({x.ndim}).")
     
     if not all([i is None or i for i in iaxid]):
         raise ValueError("iaxid can contain only Nones and integers "
@@ -1081,8 +1078,8 @@ def bilinearfunc(cls, name, x, y, args=tuple(), pargs=tuple()):
     y, y_is_numeric = match_(cls, y)
 
     if not x_is_numeric and not y_is_numeric:
-        raise ValueError("Bilinear operations between two sparse normal "
-                         "variables are not supported.")
+        raise ValueError(f"{name} operation between two sparse normal "
+                         "variables is not supported.")
     
     return normal_.bilinearfunc(cls, name, x, y, args, pargs)
 
@@ -1133,7 +1130,7 @@ def inner10(cls, x, y):
         return x * y
     
     op_axes = (-1,)
-    _check_independence(x, op_axes, 2)
+    _check_independence(y, op_axes, 2)
 
     iaxid = (None,) * (x.ndim - 1) + y._iaxid[:-1]
     return _as_sparse(normal_.inner10(cls, x, y), iaxid)
@@ -1160,14 +1157,16 @@ def dot10(cls, x, y):
     iaxid = list(y._iaxid)
     iaxid.pop(op_axes[0])
     iaxid = (None,) * (x.ndim - 1) + tuple(iaxid)
-    return _as_sparse(normal_.dot01(cls, x, y), iaxid)
+    return _as_sparse(normal_.dot10(cls, x, y), iaxid)
 
 
 def outer01(cls, x, y):
+    x, y = x.ravel(), y.ravel()
     return _as_sparse(normal_.outer01(cls, x, y), x._iaxid + (None,))
 
 
 def outer10(cls, x, y):
+    x, y = x.ravel(), y.ravel()
     return _as_sparse(normal_.outer10(cls, x, y), (None,) + y._iaxid)
 
 
@@ -1185,6 +1184,7 @@ def kron10(cls, x, y):
 
 def tensordot01(cls, x, y, axes):
     axes1, axes2 = complete_tensordot_axes(axes)
+    axes1 = _normalize_axes(axes1, x.ndim)
     _check_independence(x, axes1, 1)
 
     iaxid = tuple([b for i, b in enumerate(x._iaxid) if i not in axes1])
@@ -1194,6 +1194,7 @@ def tensordot01(cls, x, y, axes):
 
 def tensordot10(cls, x, y, axes):
     axes1, axes2 = complete_tensordot_axes(axes)
+    axes2 = _normalize_axes(axes2, y.ndim)
     _check_independence(y, axes2, 2)
 
     iaxid = tuple([b for i, b in enumerate(y._iaxid) if i not in axes2])

@@ -3453,7 +3453,23 @@ def test_tensordot():
     assert np.max(np.abs(v_.mean() - mean_ref)) < tol
     assert np.max(np.abs(v_.var() - var_ref)) < tol
 
+    v_ = gp.tensordot(v, x, axes=((-3, -1), (-2, 0)))
+    mean_ref = np.tensordot(v.mean(), x, axes=((0, 2), (1, 0)))
+    var_ref = np.tensordot(v.var(), x**2, axes=((0, 2), (1, 0)))
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (0,)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - var_ref)) < tol
+
     v_ = gp.tensordot(x, v, axes=((1, 0), (0, 2)))
+    mean_ref = np.tensordot(x, v.mean(), axes=((1, 0), (0, 2)))
+    var_ref = np.tensordot(x**2, v.var(), axes=((1, 0), (0, 2)))
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (1,)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - var_ref)) < tol
+
+    v_ = gp.tensordot(x, v, axes=((-2, -3), (-3, -1)))
     mean_ref = np.tensordot(x, v.mean(), axes=((1, 0), (0, 2)))
     var_ref = np.tensordot(x**2, v.var(), axes=((1, 0), (0, 2)))
     assert v_.shape == mean_ref.shape
@@ -3576,11 +3592,11 @@ def test_and():
 
     tol = 1e-10
 
-    v = normal() & assparsenormal(normal())
-    assert isinstance(v, SparseNormal)
+    with pytest.raises(TypeError):
+        v = normal() & assparsenormal(0)
 
-    v = assparsenormal(normal()) & normal()
-    assert isinstance(v, SparseNormal)
+    with pytest.raises(TypeError):
+        v = assparsenormal(0) & normal()
 
     nv1 = normal() + 0.2
     nv2 = nv1 - 0.5 * normal()

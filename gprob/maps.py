@@ -696,6 +696,11 @@ def kron10(cls, x, y):
 
 
 def complete_tensordot_axes(axes):
+    """Converts `axes` to an explicit form compatible with `numpy.tensordot` 
+    function. If `axes` is a sequence, the function returns it unchanged, 
+    and if `axes` is an integer `n`, it returns a tuple of lists
+    `([-n, -n + 1, ..., -1], [0, 1, ..., n-1])`."""
+
     try:
         iter(axes)
     except Exception:
