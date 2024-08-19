@@ -86,7 +86,10 @@ class LatentMap:
         return self.__class__(-self.a, -self.b, self.lat)
 
     def __add__(self, other):
-        other, isnumeric = match_(self.__class__, other)
+        try:
+            other, isnumeric = match_(self.__class__, other)
+        except TypeError:
+            return NotImplemented
 
         if isnumeric:
             b = self.b + other
@@ -120,14 +123,21 @@ class LatentMap:
         return self.__add__(other)
     
     def __sub__(self, other):
-        other, _ = match_(self.__class__, other)
+        try:
+            other, _ = match_(self.__class__, other)
+        except TypeError:
+            return NotImplemented
+        
         return self.__add__(-other)
     
     def __rsub__(self, other):
         return (-self).__add__(other)
 
     def __mul__(self, other):
-        other, isnumeric = match_(self.__class__, other)
+        try:
+            other, isnumeric = match_(self.__class__, other)
+        except TypeError:
+            return NotImplemented
 
         if isnumeric:
             b = self.b * other
@@ -146,7 +156,10 @@ class LatentMap:
         return self.__mul__(other)
     
     def __truediv__(self, other):
-        other, isnumeric = match_(self.__class__, other)
+        try:
+            other, isnumeric = match_(self.__class__, other)
+        except TypeError:
+            return NotImplemented
 
         if isnumeric:
             b = self.b / other
@@ -163,7 +176,10 @@ class LatentMap:
         return self.__class__(a, b, lat)
     
     def __rtruediv__(self, other):
-        other, isnumeric = match_(self.__class__, other)
+        try:
+            other, isnumeric = match_(self.__class__, other)
+        except TypeError:
+            return NotImplemented
 
         if isnumeric:
             b = other / self.b
@@ -174,7 +190,10 @@ class LatentMap:
         return other / self
 
     def __matmul__(self, other):
-        other, isnumeric = match_(self.__class__, other)
+        try:
+            other, isnumeric = match_(self.__class__, other)
+        except TypeError:
+            return NotImplemented
 
         if isnumeric:
             b = self.b @ other
@@ -186,7 +205,10 @@ class LatentMap:
         return self @ other.b + self.b @ other.delta
 
     def __rmatmul__(self, other):
-        other, isnumeric = match_(self.__class__, other)
+        try:
+            other, isnumeric = match_(self.__class__, other)
+        except TypeError:
+            return NotImplemented
 
         if isnumeric:
             b = other @ self.b
@@ -200,7 +222,10 @@ class LatentMap:
         return other @ self.b + other.b @ self.delta
     
     def __pow__(self, other):
-        other, isnumeric = match_(self.__class__, other)
+        try:
+            other, isnumeric = match_(self.__class__, other)
+        except TypeError:
+            return NotImplemented
 
         if isnumeric:
             b = self.b ** other
@@ -216,7 +241,10 @@ class LatentMap:
         return b + d1 + d2
 
     def __rpow__(self, other):
-        other, isnumeric = match_(self.__class__, other)
+        try:
+            other, isnumeric = match_(self.__class__, other)
+        except TypeError:
+            return NotImplemented
 
         if isnumeric:
             # x^y = <x>^<y> + dy ln(<x>) <x>^<y>

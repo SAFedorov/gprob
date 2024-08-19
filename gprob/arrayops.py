@@ -26,7 +26,7 @@ def fallback_to_normal(func):
     return func_
 
 
-# ---------- probability-related functions ----------
+# ---------- probability functions ----------
 
 
 @fallback_to_normal
