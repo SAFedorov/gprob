@@ -1,3 +1,5 @@
+import operator
+
 import pytest
 import itertools
 import numpy as np
@@ -6,7 +8,7 @@ from numpy.exceptions import ComplexWarning
 
 import gprob as gp
 from gprob.normal_ import normal, Normal
-from gprob.sparse import (_item_iaxid, iid_repeat, _as_sparse,
+from gprob.sparse import (_item_iaxid, iid_repeat, _finalize,
                           SparseNormal, SparseConditionWarning, lift)
 
 from utils import random_normal, get_message, assparsenormal
@@ -33,29 +35,29 @@ def test_construction():
 
     m = [[1, 2, 3], [4, 5, 6]]
     fcv = m + normal()
-    v = _as_sparse(SparseNormal(fcv.a, fcv.b, fcv.lat), (1, None))
+    v = _finalize(SparseNormal(fcv.a, fcv.b, fcv.lat), (1, None))
     assert v.iaxes == (0,)
     assert np.max(np.abs(v.var() - np.ones((2, 3)))) < tol
     assert np.max(np.abs(v.mean() - m)) < tol
     
     # A non-tuple iaxid.
     with pytest.raises(ValueError):
-        _as_sparse(SparseNormal(fcv.a, fcv.b, fcv.lat), [1, None])
+        _finalize(SparseNormal(fcv.a, fcv.b, fcv.lat), [1, None])
 
     # Wrong size of iaxid.
     with pytest.raises(ValueError):
-        _as_sparse(SparseNormal(fcv.a, fcv.b, fcv.lat), (1, None, None))
+        _finalize(SparseNormal(fcv.a, fcv.b, fcv.lat), (1, None, None))
     with pytest.raises(ValueError):
-        _as_sparse(SparseNormal(fcv.a, fcv.b, fcv.lat), tuple())
+        _finalize(SparseNormal(fcv.a, fcv.b, fcv.lat), tuple())
 
     # Wrong content in iaxid.
     with pytest.raises(ValueError):
-        _as_sparse(SparseNormal(fcv.a, fcv.b, fcv.lat), (1, 0))
+        _finalize(SparseNormal(fcv.a, fcv.b, fcv.lat), (1, 0))
     with pytest.raises(ValueError):
-        _as_sparse(SparseNormal(fcv.a, fcv.b, fcv.lat), (True, False))
+        _finalize(SparseNormal(fcv.a, fcv.b, fcv.lat), (True, False))
 
 
-def test_type_lifting():
+def test_lift():
     x = lift(SparseNormal, 1)
     assert isinstance(x, SparseNormal)
     assert x.shape == tuple()
@@ -82,6 +84,102 @@ def test_type_lifting():
 
     x = iid_repeat(normal(), 3)
     assert lift(SparseNormal, x) is x
+
+
+def test_implicit_type_lifting():
+    class DummyNormal(SparseNormal):
+        pass
+
+    x = normal(1, 2)
+    x1 = normal(1, 2, size=(2, 2))
+
+    y = assparsenormal(normal(3, 0.1))
+    y1 = assparsenormal(normal(3, 0.1, size=(2, 2)))
+    
+    z = DummyNormal(y.a, y.b, y.lat)
+    z1 = DummyNormal(y1.a, y1.b, y1.lat)
+
+    ops = [operator.add, operator.sub, operator.mul, 
+           operator.truediv, operator.pow]
+
+    for op in ops:
+        v = op(x, y)
+        assert isinstance(v, SparseNormal)
+        assert v.iaxes == tuple()
+        assert v.mean() ==  op(x.mean(), y.mean())
+
+        v = op(y, x)
+        assert isinstance(v, SparseNormal)
+        assert v.iaxes == tuple()
+        assert v.mean() ==  op(y.mean(), x.mean())
+
+        v = op(x, z)
+        assert isinstance(v, DummyNormal)
+        assert v.iaxes == tuple()
+        assert v.mean() ==  op(x.mean(), z.mean())
+
+        v = op(z, x)
+        assert isinstance(v, DummyNormal)
+        assert v.iaxes == tuple()
+        assert v.mean() ==  op(z.mean(), x.mean())
+
+        v = op(y, z)
+        assert isinstance(v, DummyNormal)
+        assert v.iaxes == tuple()
+        assert v.mean() ==  op(y.mean(), z.mean())
+
+        v = op(z, y)
+        assert isinstance(v, DummyNormal)
+        assert v.iaxes == tuple()
+        assert v.mean() ==  op(z.mean(), y.mean())
+
+        v = op(x1, y)
+        assert isinstance(v, SparseNormal)
+        assert v.iaxes == tuple()
+        assert len(v._iaxid) == v.ndim
+        assert v.shape == x1.shape
+        assert np.all(v.mean() ==  op(x1.mean(), y.mean()))
+
+        v = op(y, x1)
+        assert isinstance(v, SparseNormal)
+        assert v.iaxes == tuple()
+        assert len(v._iaxid) == v.ndim
+        assert v.shape == x1.shape
+        assert np.all(v.mean() ==  op(y.mean(), x1.mean()))
+
+        v = op(y1, z)
+        assert isinstance(v, DummyNormal)
+        assert v.iaxes == tuple()
+        assert len(v._iaxid) == v.ndim
+        assert v.shape == y1.shape
+        assert np.all(v.mean() ==  op(y1.mean(), y.mean()))
+
+        v = op(z, y1)
+        assert isinstance(v, DummyNormal)
+        assert v.iaxes == tuple()
+        assert len(v._iaxid) == v.ndim
+        assert v.shape == y1.shape
+        assert np.all(v.mean() ==  op(z.mean(), y1.mean()))
+
+    v = y1 @ x1
+    assert isinstance(v, SparseNormal)
+    assert v.iaxes == tuple()
+    assert len(v._iaxid) == v.ndim
+
+    v = x1 @ y1
+    assert isinstance(v, SparseNormal)
+    assert v.iaxes == tuple()
+    assert len(v._iaxid) == v.ndim
+
+    v = z1 @ y1
+    assert isinstance(v, DummyNormal)
+    assert v.iaxes == tuple()
+    assert len(v._iaxid) == v.ndim
+
+    v = y1 @ z1
+    assert isinstance(v, DummyNormal)
+    assert v.iaxes == tuple()
+    assert len(v._iaxid) == v.ndim
 
 
 def test_iid_repeat():
@@ -3601,19 +3699,13 @@ def test_doc_string_sync():
 
 
 def test_array_conversion():
-    # The conversion of sparse normal variables to numpy arrays is 
-    # not supported. The sparse axes cannot be indexed, and it makes 
-    # the default conversion method of numpy.array() silently yield 
-    # an empty array.
+    # The conversion of sparse normal variables to a numpy array 
+    # must yield an array of object type.
 
     v = iid_repeat(normal(), 3)
 
-    with pytest.raises(TypeError):
-        np.array(v)
-    with pytest.raises(TypeError):
-        np.asarray(v)
-    with pytest.raises(TypeError):
-        np.multiply(v, 3)
+    assert np.array(v).dtype == np.object_
+    assert np.asarray(v).dtype == np.object_
 
 
 def test_and():
@@ -3621,11 +3713,13 @@ def test_and():
 
     tol = 1e-10
 
-    with pytest.raises(TypeError):
-        v = normal() & assparsenormal(0)
+    v = normal() & assparsenormal(0)
+    assert isinstance(v, SparseNormal)
+    assert v.iaxes == tuple()
 
-    with pytest.raises(TypeError):
-        v = assparsenormal(0) & normal()
+    v = assparsenormal(0) & normal()
+    assert isinstance(v, SparseNormal)
+    assert v.iaxes == tuple()
 
     nv1 = normal() + 0.2
     nv2 = nv1 - 0.5 * normal()

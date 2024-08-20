@@ -74,13 +74,13 @@ class SparseNormal(Normal):
         return len(self._iaxid) - self._iaxid.count(None)
     
     def __array__(self):
-        # By default, the application of numpy.array() to a sparse variable 
-        # can silently return an empty array, because such variables cannot 
-        # be iterated over along their independence axes. As such a behavior 
-        # can be confusing, conversion to numpy arrays is disallowed.
-
-        raise TypeError(f"{self.__class__.__name__} variables cannot "
-                        "be converted to numpy arrays.")
+        # The application of default numpy.array() to a sparse variable 
+        # can silently return an empty array of numeric type, because sparse 
+        # variables cannot be iterated over along their independence axes. 
+    
+        x = np.empty(1, dtype=np.object_)
+        x[0] = self
+        return x.reshape(tuple())
     
     def __repr__(self):
         return print_(self, extra_attrs=("iaxes",))
@@ -177,7 +177,7 @@ class SparseNormal(Normal):
     
     def __setitem__(self, key, value):
         try:
-            other, isnumeric = match_(self.__class__, value)
+            value, isnumeric = match_(self.__class__, value)
         except TypeError:
             return NotImplemented
 
@@ -763,7 +763,7 @@ def _validate_iaxid(seq):
 
     # The set of iaxes excluding those of deterministic variables.
     iaxids = set((None,) * (ndim - x.ndim) + x._iaxid 
-                 for x in seq if hasattr(x, "nlat") and x.nlat != 0)  # TODO: Won't work for something like [sparse_var]
+                 for x in seq if hasattr(x, "_iaxid") and x.nlat != 0)  # TODO: Won't work for something like [sparse_var]
 
     if len(iaxids) == 0:
         return (None,) * ndim
