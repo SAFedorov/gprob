@@ -59,7 +59,7 @@ class LatentMap:
     
     @property
     def real(self):
-        return self.__class__(self.a.real, self.b.real, self.lat)  # TODO: Change to _updated_copy to avoid code duplication in sparse ------- 
+        return self.__class__(self.a.real, self.b.real, self.lat)
     
     @property
     def imag(self):
@@ -375,9 +375,6 @@ class LatentMap:
         return [self.__class__(a, b, self.lat) for a, b in zip(as_, bs)]
     
     def broadcast_to(self, shape):
-        if self.shape == shape:  # TODO: remove this optimization after checking that it is not critical ----
-            return self
-        
         b = np.broadcast_to(self.b, shape)
         a = _broadcast(self.a, shape)
         return self.__class__(a, b, self.lat)
@@ -404,14 +401,20 @@ def _broadcast(a, shape):
     return np.broadcast_to(_unsq(a, len(shape)), (a.shape[0],) + shape)
 
 
-def complete(ops): # TODO : update docs, ---------------------------------------------------------
-    """Extends the maps to the union of their latent variables."""
+def complete(seq):
+    """Extends the transformation arrays of each latent map in 
+    the sequence `seq` to the union of their latent variables.
+    
+    Returns:
+        `(union_lat, [a1, a2, ...])`, where `union_lat` is a combined dictionary 
+        of latent variables, and `[a1, a2, ...]` is a list of new map arrays
+        for each map in `seq` extended to `union_lat` by zero padding.
+    """
 
     def extend_a(x, new_lat):
         """Extends the map `x` to a new list of latent variables `new_lat` by
         adding zero entries. All the existing variables from `x.lat` must
-        be present in `new_lat` (in arbitrary order), 
-        otherwise the function will fail."""
+        be present in `new_lat` (in arbitrary order)."""
         
         new_shape = (len(new_lat),) + x.a.shape[1:]
         new_a = np.zeros(new_shape, dtype=x.a.dtype)
@@ -421,24 +424,22 @@ def complete(ops): # TODO : update docs, ---------------------------------------
 
     def pad_a(x, new_lat):
         """Extends the map `x` to a new list of latent variables `new_lat` by
-        adding zero entries. This function assumes that `new_lat` contains 
-        all the existing variables from `x.lat` in the same order
-        in the beginning, and therefore the map should be just padded 
-        with an appropriate number of zeros."""
+        padding. `new_lat` must start from the variables of `x.lat`,
+        arranged in the same order as they appear in x.lat."""
 
         new_a = np.zeros((len(new_lat),) + x.a.shape[1:], dtype=x.a.dtype)
         new_a[:len(x.lat)] = x.a        
         return new_a
 
-    if len(ops) == 1:
-        return ops[0].lat, [ops[0].a]
+    if len(seq) == 1:
+        return seq[0].lat, [seq[0].a]
     
-    if len(ops) > 2:
-        lat = latent.uunion(*[x.lat for x in ops])
-        return lat, [extend_a(op, lat) for op in ops]
+    if len(seq) > 2:
+        lat = latent.uunion(*[x.lat for x in seq])
+        return lat, [extend_a(op, lat) for op in seq]
 
     # The rest is an optimization for the case of two operands.
-    op1, op2 = ops
+    op1, op2 = seq
 
     if op1.lat is op2.lat:
         return op1.lat, [op1.a, op2.a]
@@ -662,7 +663,7 @@ def inner_2(cls, x, y):
         return x * y
     
     b = np.inner(x, y.b)
-    a = np.moveaxis(np.inner(x, y.a), x.ndim - 1, 0)  # TODO: change to einsum? --------------------
+    a = np.moveaxis(np.inner(x, y.a), x.ndim - 1, 0)
     return cls(a, b, y.lat)
 
 
