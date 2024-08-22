@@ -1,24 +1,22 @@
 import numpy as np
 
 from . import normal_
-from .normal_ import Normal, lift
+from . import sparse
+from .normal_ import Normal
+from .sparse import SparseNormal
 
 
 def resolve(seq):
-    cs = set([x.__class__ for x in seq if hasattr(x, "_mod")])
-    if len(cs) == 0:
-        return normal_, Normal
-    if len(cs) == 1:
-        c = cs.pop()
-        return c._mod, c
+    if any([x.__class__ is SparseNormal for x in seq]):
+        return sparse, SparseNormal
     
-    raise TypeError(f"Classes {cs} cannot be combined in operations.")  # TODO: expand message
+    return normal_, Normal
 
 
 def fallback_to_normal(func):
     def func_(x, *args, **kwargs):
         if not hasattr(x, func.__name__):
-            x = lift(Normal, x)
+            x = normal_.lift(Normal, x)
 
         return func(x, *args, **kwargs)
         

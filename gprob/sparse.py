@@ -78,7 +78,7 @@ class SparseNormal(Normal):
         # can silently return an empty array of numeric type, because sparse 
         # variables cannot be iterated over along their independence axes. 
     
-        x = np.empty(1, dtype=np.object_)
+        x = np.empty(1, dtype=np.object_)    # TODO: figure out a more elegant way of doing this ------------------------
         x[0] = self
         return x.reshape(tuple())
     
@@ -759,11 +759,12 @@ def _validate_iaxid(seq):
         `iaxid` of the final shape for the broadcasted arrays.
     """
 
-    ndim = max(np.ndim(x) for x in seq)
+    seq = [x if hasattr(x, "_iaxid") else lift(SparseNormal, x) for x in seq]
+    ndim = max(x.ndim for x in seq)
 
     # The set of iaxes excluding those of deterministic variables.
     iaxids = set((None,) * (ndim - x.ndim) + x._iaxid 
-                 for x in seq if hasattr(x, "_iaxid") and x.nlat != 0)  # TODO: Won't work for something like [sparse_var]
+                 for x in seq if x.nlat != 0)
 
     if len(iaxids) == 0:
         return (None,) * ndim

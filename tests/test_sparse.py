@@ -99,10 +99,10 @@ def test_implicit_type_lifting():
     z = DummyNormal(y.a, y.b, y.lat)
     z1 = DummyNormal(y1.a, y1.b, y1.lat)
 
-    ops = [operator.add, operator.sub, operator.mul, 
-           operator.truediv, operator.pow]
+    elementwise_ops = [operator.add, operator.sub, operator.mul, 
+                       operator.truediv, operator.pow]
 
-    for op in ops:
+    for op in elementwise_ops:
         v = op(x, y)
         assert isinstance(v, SparseNormal)
         assert v.iaxes == tuple()
@@ -180,6 +180,16 @@ def test_implicit_type_lifting():
     assert isinstance(v, DummyNormal)
     assert v.iaxes == tuple()
     assert len(v._iaxid) == v.ndim
+
+    x = normal()
+    y = iid_repeat(normal(), 3)
+
+    for op in elementwise_ops:
+        with pytest.raises(ValueError):
+            op(x, y)
+
+        with pytest.raises(ValueError):
+            op(y, x)
 
 
 def test_iid_repeat():
@@ -2106,15 +2116,22 @@ def test_concatenate():
 
     v = iid_repeat(normal(size=(1,)), 7)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(ValueError):
         gp.concatenate([v, normal(size=(7, 1))], axis=1)
-        # Concatenation of regular and sparse normal variables is never possible 
-        # because regular variables do not have independence axes.
+        # In most cases, the concatenation of regular and sparse variables 
+        # is not possible because of the mismatch of independence axes.
 
     # Concatenation with numeric arrays, however, is possible.
     v_ = gp.concatenate([v, np.ones((7, 1))], axis=1)
     assert v_.shape == (7, 2)
     assert v_.iaxes == (0,)
+
+    # Also concatenation of lifted sparse and normal variables is possible.
+    v = assparsenormal(normal(size=(3, 4)))
+    v_ = gp.concatenate([v, normal(size=(3, 7))], axis=1)
+    assert isinstance(v_, SparseNormal)
+    assert v_.shape == (3, 11)
+    assert v_.iaxes == tuple()
 
 
 def test_stack():
@@ -2164,15 +2181,22 @@ def test_stack():
 
     v = iid_repeat(normal(size=(1,)), 7)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(ValueError):
         gp.stack([v, normal(size=(7, 1))], axis=1)
-        # Stacking of regular and sparse normal variables is never possible 
-        # because regular variables do not have independence axes.
+        # In most cases, the stacking of regular and sparse normal variables 
+        # is not possible because of the mismatch of independence axes.
 
     # Concatenation with numeric arrays, however, is possible.
     v_ = gp.stack([v, np.ones((7, 1))], axis=1)
     assert v_.shape == (7, 2, 1)
     assert v_.iaxes == (0,)
+
+    # Also stacking of lifted sparse and normal variables is possible.
+    v = assparsenormal(normal(size=(3, 4)))
+    v_ = gp.stack([v, normal(size=(3, 4))], axis=1)
+    assert isinstance(v_, SparseNormal)
+    assert v_.shape == (3, 2, 4)
+    assert v_.iaxes == tuple()
 
 
 def test_matmul():
