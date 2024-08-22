@@ -72,10 +72,6 @@ class LatentMap:
     @property
     def iscomplex(self):
         return (np.iscomplexobj(self.a) or np.iscomplexobj(self.b))
-    
-    @property
-    def a2d(self):
-        return np.ascontiguousarray(self.a.reshape((self.nlat, self.size)))  # TODO: is this property actually needed? -------------------
 
     def __len__(self):
         if self.ndim == 0:
@@ -329,7 +325,7 @@ class LatentMap:
         b = self.b.ravel(order=order)
 
         if order == "C":
-            return self.__class__(self.a2d, b, self.lat)
+            return self.__class__(a2d(self), b, self.lat)
         elif order == "F":
             a = self.a.reshape((self.nlat, b.size), order="F")
             return self.__class__(np.asfortranarray(a), b, self.lat)
@@ -395,6 +391,10 @@ def _unsq(a, ndim):
     sh = list(a.shape)
     sh[1:1] = [1] * dn
     return a.reshape(sh)
+
+
+def a2d(x):
+    return np.ascontiguousarray(x.a.reshape((x.nlat, x.size)))
 
 
 def _broadcast(a, shape):
@@ -691,13 +691,13 @@ def dot_2(cls, x, y):
 
 def outer_1(cls, x, y):
     b = np.outer(x.b, y)
-    a = np.einsum("ij, k -> ijk", x.a2d, y.ravel())
+    a = np.einsum("ij, k -> ijk", a2d(x), y.ravel())
     return cls(a, b, x.lat)
 
 
 def outer_2(cls, x, y):
     b = np.outer(x, y.b)
-    a = np.einsum("k, ij -> ikj", x.ravel(), y.a2d)
+    a = np.einsum("k, ij -> ikj", x.ravel(), a2d(y))
     return cls(a, b, y.lat)
 
 

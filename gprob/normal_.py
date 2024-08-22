@@ -8,7 +8,7 @@ from numpy.linalg import LinAlgError
 from .maps import (LatentMap, complete, lift, match_, concatenate, stack, 
     call_linearized, fftfunc, fftfunc_n, bilinearfunc, einsum_1, einsum_2,
     inner_1, inner_2, dot_1, dot_2, outer_1, outer_2, kron_1, kron_2, 
-    complete_tensordot_axes, tensordot_1, tensordot_2)
+    complete_tensordot_axes, tensordot_1, tensordot_2, a2d)
 
 from .func import condition, logp
 
@@ -188,7 +188,7 @@ class Normal(LatentMap):
             True
         """
 
-        a = self.a2d
+        a = a2d(self)
         cov2d = a.T @ a.conj()
         return cov2d.reshape(self.shape * 2)
     
@@ -225,9 +225,8 @@ class Normal(LatentMap):
         else:
             nshape = (n,)
         
-        a = self.a2d
-        r = np.random.normal(size=(*nshape, a.shape[0]))
-        return (r @ a + self.b.ravel()).reshape((*nshape, *self.shape))
+        r = np.random.normal(size=nshape + (self.nlat,))
+        return (r @ a2d(self) + self.b.ravel()).reshape(nshape + self.shape)
     
     def logp(self, x):
         """Log likelihood of a sample.
@@ -248,7 +247,7 @@ class Normal(LatentMap):
         x = x.reshape(x.shape[0: (x.ndim - self.ndim)] + (self.size,))
 
         m = self.b.ravel()
-        a = self.a2d
+        a = a2d(self)
         if self.iscomplex:
             # Converts to real by doubling the space size.
             x = np.hstack([x.real, x.imag])
