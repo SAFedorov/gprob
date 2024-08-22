@@ -142,11 +142,7 @@ class LatentMap:
 
         # Linearized product  x * y = <x><y> + <y>dx + <x>dy,
         # for  x = <x> + dx  and  y = <y> + dy.
-
-        b = self.b * other.b
-        lat, [sa, oa] = complete([self, other])
-        a = _unsq(sa, b.ndim) * other.b + _unsq(oa, b.ndim) * self.b
-        return self.__class__(a, b, lat)
+        return self * other.b + other.delta * self.b
     
     def __rmul__(self, other):
         return self.__mul__(other)
@@ -164,12 +160,7 @@ class LatentMap:
 
         # Linearized fraction  x/y = <x>/<y> + dx/<y> - dy<x>/<y>^2,
         # for  x = <x> + dx  and  y = <y> + dy.
-
-        b = self.b / other.b
-        lat, [sa, oa] = complete([self, other])
-        a = (_unsq(sa, b.ndim) / other.b 
-             + _unsq(oa, b.ndim) * ((-self.b) / other.b**2))
-        return self.__class__(a, b, lat)
+        return self / other.b + other.delta * (-self.b / other.b**2)
     
     def __rtruediv__(self, other):
         try:

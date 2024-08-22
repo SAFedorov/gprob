@@ -414,6 +414,6 @@ def cov(*args):
     
     # The remaining case is len(args) == 2.
     x, y = args
-    _, [ax, ay] = complete([x.ravel(), y.ravel()])  # TODO: is it a good way of doing it? Use einsum maybe?
+    _, [ax, ay] = complete([x.ravel(), y.ravel()])
     cov2d = ax.T @ ay.conj()
     return cov2d.reshape(x.shape + y.shape)
