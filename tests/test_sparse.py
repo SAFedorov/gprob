@@ -3723,6 +3723,7 @@ def test_doc_string_sync():
 
 
 def test_array_conversion():
+    # A test for __array__ method.
     # The conversion of sparse normal variables to a numpy array 
     # must yield an array of object type.
 

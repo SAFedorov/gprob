@@ -77,10 +77,8 @@ class SparseNormal(Normal):
         # The application of default numpy.array() to a sparse variable 
         # can silently return an empty array of numeric type, because sparse 
         # variables cannot be iterated over along their independence axes. 
-    
-        x = np.empty(1, dtype=np.object_)    # TODO: figure out a more elegant way of doing this ------------------------
-        x[0] = self
-        return x.reshape(tuple())
+        
+        return np.fromiter([self], np.object_).reshape(tuple())
     
     def __repr__(self):
         return print_(self, extra_attrs=("iaxes",))
