@@ -443,6 +443,20 @@ def test_matmul():
         _test_array_func2(matmul, (5, 3) + sh, (5, 1) + sh + (7,))
         _test_array_func2(matmul, (5, 1, 3, 2) + sh, (5, 3, 1) + sh + (2,))
 
+    # No matrix multiplication by scalars.
+
+    x = normal(size=(2, 3))
+    y = np.array(2.)
+
+    with pytest.raises(ValueError):
+        x @ y
+    with pytest.raises(ValueError):
+        y @ x
+    with pytest.raises(ValueError):
+        matmul(x, y)
+    with pytest.raises(ValueError):
+        matmul(y, x)
+
 
 def test_dot():
     for sh in _gts(1):

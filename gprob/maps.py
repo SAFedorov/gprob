@@ -54,7 +54,7 @@ class LatentMap:
         return len(self.lat)
     
     @property
-    def delta(self):  # TODO: add tests for this in test_property -------------------------------------------
+    def delta(self):
         return self.__class__(self.a, np.zeros_like(self.b), self.lat)
     
     @property

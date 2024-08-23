@@ -11,7 +11,36 @@ from utils import random_normal, random_correlate, asnormal
 np.random.seed(0)
 
 
+def test_construction():
+    v = Normal(np.array([1]), np.array(0))
+    assert v.nlat == 1
+
+    a = np.ones(shape=(8, 2, 3))
+    b = np.ones(shape=(2, 3))
+
+    v = Normal(a, b)
+    assert v.nlat == 8
+
+    v1 = Normal(v.a, v.b, v.lat)
+    assert v1.lat is v.lat
+
+    # Mismatching latent dimension of a and the number of latent ids.
+    with pytest.raises(ValueError):
+        Normal(np.ones(shape=(7, 2, 3)), b, v.lat)
+
+    # Mismatching variable shapes in a and b.
+    with pytest.raises(ValueError):
+        Normal(a, np.ones(shape=(3, 3)))
+
+    # The shapes must match exactly, broadcastable shapes are not allowed.
+    with pytest.raises(ValueError):
+        Normal(a, np.ones(shape=(3,)))
+
+
 def test_creation():
+    # tests for normal() function, which is the main way how a user can create
+    # normal variables.
+
     xi = normal()
     assert (xi.a == np.array([1.])).all()
     assert (xi.b == np.array(0.)).all()
@@ -236,6 +265,18 @@ def test_properties():
     v = random_normal((3, 4))
     for pn in prop_names:
         assert getattr(v, pn) == getattr(v.mean(), pn)
+
+    # nlat
+    assert v.nlat == len(v.lat)
+    assert v.nlat == len(v.a)
+
+    # delta property
+    tol = 1e-10
+    vd = v.delta
+    assert isinstance(vd, Normal)
+    assert vd.lat == v.lat
+    assert np.max(np.abs(vd.mean())) < tol
+    assert np.max(np.abs(vd.var() - v.var())) < tol 
 
     # Checks the complex flag.
 

@@ -349,6 +349,18 @@ def test_properties():
 
         assert np.max(np.abs(vr.var() + vi.var() - v.var())) < tol
 
+    # nlat
+    assert vc.nlat == len(vc.lat)
+    assert vc.nlat == len(vc.a)
+
+    # delta property
+    v = vc
+    vd = v.delta
+    assert isinstance(vd, SparseNormal)
+    assert vd.lat == v.lat
+    assert np.max(np.abs(vd.mean())) < tol
+    assert np.max(np.abs(vd.var() - v.var())) < tol 
+
 
 def test_getitem():
     v = iid_repeat(iid_repeat(normal(size=(4, 5)), 2, axis=1), 3, axis=1)
