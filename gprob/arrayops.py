@@ -140,52 +140,230 @@ def cov(*args):
 
 @fallback_to_normal
 def diagonal(x, offset=0, axis1=0, axis2=1):
+    """Extracts a diagonal from a multi-dimensional random variable.
+
+    Args:
+        x (random variable): 
+            The input array random variable from which the diagonal is 
+            to be extracted.
+        offset (int): 
+            The offset of the diagonal from the main diagonal.
+        axis1 (int): 
+            The first axis along which the diagonal should be taken.
+        axis2 (int): 
+            The second axis along which the diagonal should be taken.
+
+    Returns:
+        A new random variable consisting of the extracted diagonal elements.
+
+    Note:
+        This function is similar to `numpy.diagonal`.
+    """
     return x.diagonal(offset=offset, axis1=axis1, axis2=axis2)
 
 
 @fallback_to_normal
 def sum(x, axis=None, keepdims=False):
+    """Computes the sum of all elements of a random variable along an axis 
+    or axes.
+
+    Args:
+        x (random variable): 
+            The input array random variable whose elements are to be summed.
+        axis (int, tuple of int, or None): 
+            Axis or axes along which to sum the elements. 
+            - If `None`, the function sums all elements.
+            - If a tuple of integers, the function sums over multiple axes.
+        keepdims (bool): 
+            If `True`, the reduced axes are retained in the output as dimensions 
+            with size one. This enables the result to broadcast correctly 
+            against the input array.
+
+    Returns:
+        A new random variable representing the result of the summation. 
+        The output variable has the same dimensions as the input, except 
+        the summation axes are removed unless `keepdims` is `True`.
+
+    Note:
+        This function is similar to `numpy.sum`.
+    """
     return x.sum(axis=axis, keepdims=keepdims)
 
 
 @fallback_to_normal
 def cumsum(x, axis=None):
+    """Computes the cumulative sum of elements of a random variable.
+
+    Args:
+        x (random variable): 
+            The input array random variable.
+        axis (int or None): 
+            Axis along which the cumulative sum is computed. If `None`, 
+            the the cumsum is computed over the flattened array.
+
+    Returns:
+        A new random variable representing the result of the cumulative 
+        summation. The output variable has the same dimensions as the input.
+
+    Note:
+        This function is similar to `numpy.cumsum`.
+    """
     return x.cumsum(axis=axis)
 
 
 @fallback_to_normal
 def moveaxis(x, source, destination):
+    """Moves an axis of a random variable to a new position.
+
+    Args:
+        x (random variable): 
+            The input array random variable whose axis is to be moved.
+        source (int): 
+            The original position of the axis to move.
+        destination (int): 
+            The destination position of the axis to move.
+
+    Returns:
+        A new random variable whose axes are transformed with respect to 
+        the original. The remaining axes keep their original order.
+
+    Note:
+        This function is similar to `numpy.moveaxis`,
+        except for the lack of support of multiple source and destination axes.
+    """
     return x.moveaxis(source, destination)
 
 
 @fallback_to_normal
 def ravel(x, order="C"):
+    """Flattens a random variable while ensuring that the underying latent map 
+    is stored contiguously in the memory.
+
+    Args:
+        x (random variable): 
+            The input array random variable to be flattened.
+        order (str): 
+            The order in which the input array elements are read.
+            - 'C': C-style row-major order.
+            - 'F': Fortran-style column-major order.
+
+    Returns:
+        A new one-dimensional random variable containing all the elements of 
+        the input variable in the specified order.
+
+    Note:
+        This function is similar to `numpy.ravel`.
+    """
     return x.ravel(order=order)
 
 
 @fallback_to_normal
 def reshape(x, newshape, order="C"):
-    """Gives a new shape to an array."""
+    """Gives a new shape to a random variable.
+
+    Args:
+        x (random variable): 
+            The input array random variable to be reshaped.
+        newshape (tuple of int): 
+            The new shape for the array. One dimension can be set to `-1` 
+            to infer its size from the total size of the array and 
+            its other dimensions.
+        order (str): 
+            The order in which the array elements are read.
+            - 'C': C-style row-major order.
+            - 'F': Fortran-style column-major order.
+
+    Returns:
+        A new random variable with the specified shape and order.
+
+    Note:
+        This function is similar to `numpy.reshape`.
+    """
     return x.reshape(newshape, order=order)
 
 
 @fallback_to_normal
 def transpose(x, axes=None):
+    """Permutes the axes of a random variable.
+
+    Args:
+        x (random variable): 
+            The input array random variable to be transposed.
+        axes (tuple of int or None): 
+            The desired order of the axes. If `None`, the axes order 
+            is reversed.
+
+    Returns:
+        A new random variable with the axes in the new order.
+
+    Note:
+        This function is similar to `numpy.transpose`.
+    """
     return x.transpose(axes=axes)
 
 
 @fallback_to_normal
 def trace(x, offset=0, axis1=0, axis2=1):
+    """Calculates the sum of the diagonal elements of a random variable.
+
+    Args:
+        x (random variable): 
+            The input array random variable.
+        offset (int): 
+            The offset of the diagonal to be summed from the main diagonal.
+        axis1 (int): 
+            The first axis along which the diagonal should be summed.
+        axis2 (int): 
+            The second axis along which the diagonal should be summed.
+
+    Returns:
+        A new random variable, consisting of the sum(s) of the diagonal 
+        elements with respect to the specified axes.
+
+    Note:
+        This function is similar to `numpy.trace`.
+    """
     return x.trace(offset=offset, axis1=axis1, axis2=axis2)
 
 
 @fallback_to_normal
 def broadcast_to(x, shape):
-    """Broadcasts the variable to a new shape."""
+    """Broadcasts a random variable to a new shape.
+
+    Args:
+        x (random variable): 
+            The input array random variable to be broadcast.
+        shape (tuple of int): 
+            The desired shape to broadcast the random variable to.
+
+    Returns:
+        A new random variable with the specified shape consisting of duplicates
+        of the input variable.
+
+    Note:
+        This function is similar to `numpy.broadcast_to`.
+    """
     return x.broadcast_to(shape)
 
 
 def concatenate(arrays, axis=0):
+    """Joins a sequence of array random variables along an existing axis.
+    
+    Args:
+        arrays (sequence of random variables):
+            The input variables to be joined. The shapes of the variables
+            must agree except for the size along the concatenation axis.
+        axis (int):
+            The axis along which the variables are to be joined.
+
+    Returns:
+        A new random variable of the type corresponding to the highest type 
+        present in `arrays`.
+
+    Note:
+        This function is similar to `numpy.concatenate`.
+    """
+
     if len(arrays) == 0:
         raise ValueError("Need at least one array to concatenate.")
     mod, cls = resolve(arrays)
@@ -194,6 +372,24 @@ def concatenate(arrays, axis=0):
 
 
 def stack(arrays, axis=0):
+    """Joins a sequence of array random variables along a new axis.
+    
+    Args:
+        arrays (sequence of random variables):
+            The input variables to be joined. All variables must have 
+            the same shape.
+        axis (int):
+            The axis number in the output array along which the variables 
+            are to be stacked.
+
+    Returns:
+        A new random variable of the type corresponding to the highest type 
+        present in `arrays`.
+
+    Note:
+        This function is similar to `numpy.stack`.
+    """
+
     if len(arrays) == 0:
         raise ValueError("Need at least one array to stack.")
     mod, cls = resolve(arrays)
@@ -202,6 +398,20 @@ def stack(arrays, axis=0):
 
 
 def hstack(arrays):
+    """Joins a sequence of array random variables horizontally.
+
+    Args:
+        arrays (sequence of random variables):
+            The input variables to be joined.
+
+    Returns:
+        A new random variable of the type corresponding to the highest type 
+        present in `arrays`.
+    
+    Note:
+        This function is similar to `numpy.hstack`.
+    """
+    
     if len(arrays) == 0:
         raise ValueError("Need at least one array to stack.")
     
@@ -216,6 +426,20 @@ def hstack(arrays):
     
 
 def vstack(arrays):
+    """Joins a sequence of array random variables vertically.
+
+    Args:
+        arrays (sequence of random variables):
+            The input variables to be joined.
+
+    Returns:
+        A new random variable of the type corresponding to the highest type 
+        present in `arrays`.
+    
+    Note:
+        This function is similar to `numpy.vstack`.
+    """
+
     if len(arrays) == 0:
         raise ValueError("Need at least one array to stack.")
     
@@ -229,6 +453,21 @@ def vstack(arrays):
 
 
 def dstack(arrays):
+    """Joins a sequence of array random variables along their depth 
+    (third axis).
+
+    Args:
+        arrays (sequence of random variables):
+            The input variables to be joined.
+
+    Returns:
+        A new random variable of the type corresponding to the highest type 
+        present in `arrays`.
+    
+    Note:
+        This function is similar to `numpy.dstack`.
+    """
+
     if len(arrays) == 0:
         raise ValueError("Need at least one array to stack.")
     
@@ -244,14 +483,51 @@ def dstack(arrays):
 
 
 @fallback_to_normal
-def split(x, indices_or_sections, axis=0):   
+def split(x, indices_or_sections, axis=0): 
+    """Splits a random variable along an axis.
+
+    Args:
+        x (random variable): 
+            The input variable to be split.
+        indices_or_sections (int or sequence of int):
+            - If an integer, n, the input variable is to be divided along `axis`
+              into n equal pieces.
+            - If a sequence of sorted integers, its entries indicate where 
+              along `axis` the input variable is to be split.
+        axis (int):
+            The axis along which the variable is to be split.
+
+    Returns:
+        A list of new random variables into which the input variable is split.
+    
+    Note:
+        This function is similar to `numpy.split`.
+    """  
     return x.split(indices_or_sections=indices_or_sections, axis=axis)
 
 
 @fallback_to_normal
 def hsplit(x, indices_or_sections):
+    """Splits a random variable horizontally.
+
+    Args:
+        x (random variable): 
+            The input variable to be split.
+        indices_or_sections (int or sequence of int):
+            - If an integer, n, the input variable is to be divided 
+              into n equal pieces.
+            - If a sequence of sorted integers, its entries indicate where 
+              the input variable is to be split. 
+
+    Returns:
+        A list of new random variables into which the input variable is split.
+    
+    Note:
+        This function is similar to `numpy.hsplit`.
+    """
+
     if x.ndim < 1:
-        raise ValueError("hsplit only works on arrays of 1 or more dimensions")
+        raise ValueError("hsplit only works on arrays of 1 or more dimensions.")
     if x.ndim == 1:
         return split(x, indices_or_sections, axis=0)
     return split(x, indices_or_sections, axis=1)
@@ -259,70 +535,246 @@ def hsplit(x, indices_or_sections):
 
 @fallback_to_normal
 def vsplit(x, indices_or_sections):
+    """Splits a random variable vertically.
+
+    Args:
+        x (random variable): 
+            The input variable to be split.
+        indices_or_sections (int or sequence of int):
+            - If an integer, n, the input variable is to be divided 
+              into n equal pieces.
+            - If a sequence of sorted integers, its entries indicate where 
+              the input variable is to be split.  
+
+    Returns:
+        A list of new random variables into which the input variable is split.
+    
+    Note:
+        This function is similar to `numpy.vsplit`.
+    """
+
     if x.ndim < 2:
-        raise ValueError("vsplit only works on arrays of 2 or more dimensions")
+        raise ValueError("vsplit only works on arrays of 2 or more dimensions.")
     return split(x, indices_or_sections, axis=0)
 
 
 @fallback_to_normal
 def dsplit(x, indices_or_sections):
+    """Splits a random variable along the depth (third axis).
+
+    Args:
+        x (random variable): 
+            The input variable to be split.
+        indices_or_sections (int or sequence of int):
+            - If an integer, n, the input variable is to be divided 
+              into n equal pieces.
+            - If a sequence of sorted integers, its entries indicate where 
+              the input variable is to be split.  
+
+    Returns:
+        A list of new random variables into which the input variable is split.
+    
+    Note:
+        This function is similar to `numpy.dsplit`.
+    """
+
     if x.ndim < 3:
-        raise ValueError("dsplit only works on arrays of 3 or more dimensions")
+        raise ValueError("dsplit only works on arrays of 3 or more dimensions.")
     return split(x, indices_or_sections, axis=2)
 
 
-def add(op1, op2):
-    return op1 + op2
+def add(x, y):
+    return x + y
 
 
-def subtract(op1, op2):
-    return op1 - op2
+def subtract(x, y):
+    return x - y
 
 
-def multiply(op1, op2):
-    return op1 * op2
+def multiply(x, y):
+    return x * y
 
 
-def divide(op1, op2):
-    return op1 / op2
+def divide(x, y):
+    return x / y
 
 
-def power(op1, op2):
-    return op1 ** op2
+def power(x, y):
+    return x ** y
 
 
-def matmul(op1, op2):
-    return op1 @ op2
+def matmul(x, y):
+    """Performs matrix multiplication between a random variable and 
+    a numeric array, or linearized matrix multiplication between 
+    two random variables. The dimensions of both operands must be 
+    greater than 0.
+
+    Args:
+        x (numeric array or random variable): 
+            The first operand.
+        y (numeric array or random variable): 
+            The second operand.
+
+    Returns:
+        A new random variable resulting from the matrix multiplication 
+        of `x` and `y`.
+
+    Note:
+        This function is similar to `numpy.matmul`, and follows the same rules 
+        regarding the shapes of the input and output variables.
+    """
+    return x @ y
 
 
-def dot(op1, op2):
-    mod, cls = resolve([op1, op2])
-    return mod.bilinearfunc(cls, "dot", op1, op2)
+def dot(x, y):
+    """Calculates the dot product between a random variable and 
+    a numeric array, or linearized dot product between two random variables.
+
+    Args:
+        x (numeric array or random variable): 
+            The first operand.
+        y (numeric array or random variable): 
+            The second operand.
+
+    Returns:
+        A new random variable resulting from the dot product of `x` and `y`.
+
+    Note:
+        This function is similar to `numpy.dot`, and follows the same rules 
+        regarding the shapes of the input and output variables.
+    """
+
+    mod, cls = resolve([x, y])
+    return mod.bilinearfunc(cls, "dot", x, y)
 
 
-def inner(op1, op2):
-    mod, cls = resolve([op1, op2])
-    return mod.bilinearfunc(cls, "inner", op1, op2)
+def inner(x, y):
+    """Calculates the inner product between a random variable and 
+    a numeric array, or linearized inner product between two random variables.
+
+    Args:
+        x (numeric array or random variable): 
+            The first operand.
+        y (numeric array or random variable): 
+            The second operand.
+
+    Returns:
+        A new random variable resulting from the inner product of `x` and `y`.
+
+    Note:
+        This function is similar to `numpy.inner`, and follows the same rules 
+        regarding the shapes of the input and output variables.
+    """
+
+    mod, cls = resolve([x, y])
+    return mod.bilinearfunc(cls, "inner", x, y)
 
 
-def outer(op1, op2):
-    mod, cls = resolve([op1, op2])
-    return mod.bilinearfunc(cls, "outer", op1, op2)
+def outer(x, y):
+    """Calculates the outer product between a random variable and 
+    a numeric array, or linearized outer product between two random variables.
+
+    Args:
+        x (numeric array or random variable): 
+            The first operand.
+        y (numeric array or random variable): 
+            The second operand.
+
+    Returns:
+        A new random variable resulting from the outer product of `x` and `y`.
+
+    Note:
+        This function is similar to `numpy.outer`, and follows the same rules 
+        regarding the shapes of the input and output variables.
+    """
+
+    mod, cls = resolve([x, y])
+    return mod.bilinearfunc(cls, "outer", x, y)
 
 
-def kron(op1, op2):
-    mod, cls = resolve([op1, op2])
-    return mod.bilinearfunc(cls, "kron", op1, op2)
+def kron(x, y):
+    """Calculates the Kronecker product between a random variable and 
+    a numeric array, or linearized Kronecker product between two 
+    random variables.
+
+    Args:
+        x (numeric array or random variable): 
+            The first operand.
+        y (numeric array or random variable): 
+            The second operand.
+
+    Returns:
+        A new random variable resulting from the Kronecker product 
+        of `x` and `y`.
+
+    Note:
+        This function is similar to `numpy.kron`, and follows the same rules 
+        regarding the shapes of the variables and the arrangement of elements.
+    """
+
+    mod, cls = resolve([x, y])
+    return mod.bilinearfunc(cls, "kron", x, y)
 
 
-def tensordot(op1, op2, axes=2):
-    mod, cls = resolve([op1, op2])
-    return mod.bilinearfunc(cls, "tensordot", op1, op2, [axes])
+def tensordot(x, y, axes=2):
+    """Calculates the tensor dot product between a random variable and a numeric 
+    array, or linearized tensor dot product between two random variables.
+    
+    The tensor dot product is the sum of the elements of `x` and `y` 
+    along the selected axes.
+
+    Args:
+        x (numeric array or random variable): 
+            The first operand.
+        y (numeric array or random variable): 
+            The second operand.
+        axes (int or tuple of two sequences of int):
+            The axes to be summed over.
+            - If an integer, n, the sum is to be taken over the last n axes
+              of `x` and the first n axes of `y`.
+            - If two sequences of int of the same length, the indices of axes 
+              to be summed are picked from those sequences.
+            In all cases, the axes in the pairs to be summed over must have 
+            the same lengths.
+
+    Returns:
+        A new random variable resulting from the tensor dot product 
+        of `x` and `y`.
+
+    Note:
+        This function is similar to `numpy.tensordot`, and follows the same 
+        rules regarding the shapes of the input and output variables.
+    """
+
+    mod, cls = resolve([x, y])
+    return mod.bilinearfunc(cls, "tensordot", x, y, [axes])
 
 
-def einsum(subs, op1, op2):
-    mod, cls = resolve([op1, op2])
-    return mod.bilinearfunc(cls, "einsum", op1, op2, pargs=[subs])
+def einsum(subs, x, y):
+    """Performs the Einstein summation between a random variable and a numeric 
+    array, or linearized Einstein summation between two random variables.
+
+    Args:
+        subs (str):
+            The subscripts that define the axes of `x` and `y` to be summed 
+            over and the axes arrangement of the output. See `numpy.einsum`
+            for more details.
+        x (random variable or numeric array): 
+            The first input operand.
+        y (random variable or numeric array): 
+            The second input operand.
+
+    Returns:
+        A new random variable resulting from the Einstein summation 
+        of `x` and `y` according to the subscripts.
+
+    Note:
+        This function is similar to `numpy.einsum` and follows the same rules 
+        regarding the subscripts and the variable shapes.
+    """
+
+    mod, cls = resolve([x, y])
+    return mod.bilinearfunc(cls, "einsum", x, y, pargs=[subs])
 
 
 def linearized_unary(jmpf):
