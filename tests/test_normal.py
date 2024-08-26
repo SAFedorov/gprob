@@ -3,8 +3,8 @@ import numpy as np
 from scipy.stats import multivariate_normal as mvn
 from numpy.linalg import LinAlgError
 from numpy.exceptions import ComplexWarning
-from gprob import hstack, vstack, iid_copy, broadcast_to
-from gprob.normal_ import normal, Normal, safer_cholesky, cov
+from gprob import hstack, vstack, iid_copy, broadcast_to, cov
+from gprob.normal_ import normal, Normal, safer_cholesky
 from gprob.sparse import iid_repeat
 from utils import random_normal, random_correlate, asnormal
 
@@ -1291,11 +1291,11 @@ def test_cov_func():
         assert np.max(np.abs(c[:, :2, :, 2:] - c12)) < tol
 
         # Too few input arguments.
-        with pytest.raises(ValueError):
+        with pytest.raises(TypeError):
             cov()
 
         # Too many input arguments.
-        with pytest.raises(ValueError):
+        with pytest.raises(TypeError):
             cov(normal(), normal(), normal())
 
 

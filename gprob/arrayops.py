@@ -24,9 +24,6 @@ def fallback_to_normal(func):
     return func_
 
 
-# ---------- probability functions ----------
-
-
 @fallback_to_normal
 def iid_copy(x):
     """Creates an independent identically distributed copy of `x`."""
@@ -55,9 +52,9 @@ def cov(*args):
         One or two random variables.
 
     Returns:
-        For one random variable, `x`, the function returns `x.cov()`. 
-        For two random variables, `x` and `y`, the function returns 
-        their cross-covariance.
+        - For one random variable, `x`, the function returns `x.cov()`. 
+        - For two random variables, `x` and `y`, the function returns 
+          their cross-covariance.
         
         The cross-covariance of two normal variables 
         is an array `c` with the dimension number equal 
@@ -127,15 +124,18 @@ def cov(*args):
         >>> cov(v1, v2).shape
         (3, 2, 4)
     """
+
+    mod, cls = resolve(args)
+    args = [mod.lift(cls, arg) for arg in args]
+
+    if len(args) == 1:
+        return args[0].cov()
+    
     if len(args) == 0 or len(args) > 2:
         raise TypeError("The function can accept only one or two input "
                         f"arguments, while {len(args)} arguments are given.")
     
-    mod, _ = resolve(args)
-    return mod.cov(*args)
-
-
-# ---------- array functions ----------
+    return mod.cov(*args)  # len(args) == 2.
 
 
 @fallback_to_normal
@@ -786,7 +786,8 @@ def linearized_unary(jmpf):
 
     def flin(x):
         mod, cls = resolve([x])
-        return mod.call_linearized(cls, x, f, jmpf)
+        x_ = mod.lift(cls, x)
+        return mod.call_linearized(x_, f, jmpf)
     
     flin.__name__ = f_name
     return flin

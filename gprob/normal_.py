@@ -403,17 +403,9 @@ def safer_cholesky(x):
     return ltri
 
 
-def cov(*args):
-    """The normal implementation of the covariance. The function 
-    expects `args` to have strictly one or two elements."""
+def cov(x, y):
+    """The normal implementation of the covariance between two variables."""
 
-    args = [lift(Normal, arg) for arg in args]
-    
-    if len(args) == 1:
-        return args[0].cov()
-    
-    # The remaining case is len(args) == 2.
-    x, y = args
     _, [ax, ay] = complete([x.ravel(), y.ravel()])
     cov2d = ax.T @ ay.conj()
     return cov2d.reshape(x.shape + y.shape)

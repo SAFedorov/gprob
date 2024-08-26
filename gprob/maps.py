@@ -268,8 +268,6 @@ class LatentMap:
             av = value.a
         self.a[key_a] = _unsq(av, self.b[key].ndim)
     
-    # ---------- array methods ----------
-    
     def conjugate(self):
         return self.__class__(self.a.conj(), self.b.conj(), self.lat)
     
@@ -582,8 +580,7 @@ def stack(cls, arrays, axis=0):
     return cls(a, b, union_lat)
 
 
-def call_linearized(cls, x, func, jmpfunc):
-    x = cls._mod.lift(cls, x)
+def call_linearized(x, func, jmpfunc):
     b = func(x.b)
     delta = jmpfunc(x.b, b, x.delta)
     return delta + b
@@ -604,9 +601,6 @@ def fftfunc_n(cls, name, x, s, axes, norm):
     b = func(x.b, s, axes, norm)
     a = func(x.a, s, _axes_a(axes), norm)
     return cls(a, b, x.lat)
-
-
-# ---------- bilinear functions ----------
 
 
 def bilinearfunc(cls, name, x, y, args=tuple(), pargs=tuple()):

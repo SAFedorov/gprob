@@ -191,8 +191,6 @@ class SparseNormal(Normal):
             # as their axes are always compatible.
         
         super().__setitem__(key, value)
-        
-    # ---------- array methods ----------
 
     def conjugate(self):
         return _finalize(super().conjugate(), self._iaxid)
@@ -368,8 +366,6 @@ class SparseNormal(Normal):
     def broadcast_to(self, shape):
         iaxid = (None,) * (len(shape) - self.ndim) + self._iaxid
         return _finalize(super().broadcast_to(shape), iaxid)
-
-    # ---------- probability methods ----------
 
     def iid_copy(self):
         """Creates an independent identically distributed copy 
@@ -899,9 +895,8 @@ def _item_iaxid(x, key):
     return tuple([None if ax is None else x._iaxid[ax] for ax in out_axs])
     
 
-def cov(*args):
-    """The sparse implementation of the covariance. The function 
-    expects `args` to have strictly one or two elements."""
+def cov(x, y):
+    """The sparse implementation of the covariance between two variables."""
 
     def find_det_dense_shape(v, d):
         # Tries resolving what the independence axes of the deterministic 
@@ -940,14 +935,6 @@ def cov(*args):
                                  "correspondence with the independence axes "
                                  "of the sparse normal variable ambiguous.")
         return dense_shape_d
-
-    args = [lift(SparseNormal, arg) for arg in args]
-
-    if len(args) == 1:
-        return args[0].cov()
-
-    # The remaining case is len(args) == 2.
-    x, y = args
 
     if x.nlat == 0 and y.nlat == 0:
         # It is not allowed for both inputs to be deterministic 
@@ -1041,8 +1028,8 @@ def stack(cls, arrays, axis=0):
     return _finalize(normal_.stack(cls, arrays, axis), iaxid)
 
 
-def call_linearized(cls, x, f, jmpf):
-    return _finalize(normal_.call_linearized(cls, x, f, jmpf), x._iaxid)
+def call_linearized(x, f, jmpf):
+    return _finalize(normal_.call_linearized(x, f, jmpf), x._iaxid)
 
 
 def fftfunc(cls, name, x, n, axis, norm):

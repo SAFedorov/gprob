@@ -666,7 +666,7 @@ def test_cov():
     r1 = 2 * np.random.rand(n) - 1
     r2 = 2 * np.random.rand(n) - 1
 
-    c1 = 2 * gp.sparse.cov(v * r1, v1 * r2)
+    c1 = 2 * gp.cov(v * r1, v1 * r2)
     c2 = (v * r1 + v1 * r2).var() - (r1 ** 2) * v.var() - (r2 ** 2) * v1.var()
     assert c1.shape == c2.shape
     assert np.max(np.abs(c1 - c2)) < tol
@@ -681,9 +681,9 @@ def test_cov():
 
     v = iid_repeat(iid_repeat(normal(), 4), 4)
     with pytest.raises(ValueError):
-        gp.sparse.cov(v, v.T)
+        gp.cov(v, v.T)
     with pytest.raises(ValueError):
-        gp.sparse.cov(v, iid_repeat(normal((4,)), 4))
+        gp.cov(v, iid_repeat(normal((4,)), 4))
 
 
 def test_cov_det():
@@ -693,79 +693,80 @@ def test_cov_det():
     tol = 1e-8
 
     with pytest.raises(ValueError):
-        gp.sparse.cov(1, 1)  # Two deterministic constants are not allowed 
+        x, y = lift(SparseNormal, 1), lift(SparseNormal, 2)
+        gp.cov(x, y)  # Two deterministic constants are not allowed 
                              # in the sparse implementation.
 
     # One independence axis.
 
     v = iid_repeat(normal(), 4)  # shape (4,)
 
-    c = gp.sparse.cov(v, np.ones((4,)))
+    c = gp.cov(v, np.ones((4,)))
     assert c.shape == (4,)
     assert np.max(np.abs(c)) < tol
 
-    c = gp.sparse.cov(np.ones((4,)), v)
+    c = gp.cov(np.ones((4,)), v)
     assert c.shape == (4,)
     assert np.max(np.abs(c)) < tol
 
     v = iid_repeat(normal(size=(4,)), 4)  # shape (4,)
 
     with pytest.raises(ValueError):
-        gp.sparse.cov(v, np.ones((4, 4)))
+        gp.cov(v, np.ones((4, 4)))
 
     with pytest.raises(ValueError):
-        gp.sparse.cov(np.ones((4, 4)), v)
+        gp.cov(np.ones((4, 4)), v)
 
     v = iid_repeat(normal(size=(3,)), 4)  # shape (4, 3)
 
-    c = gp.sparse.cov(v, np.ones((2, 4)))
+    c = gp.cov(v, np.ones((2, 4)))
     assert c.shape == (3, 2, 4)
     assert np.max(np.abs(c)) < tol
 
-    c = gp.sparse.cov(np.ones((2, 4)), v)
+    c = gp.cov(np.ones((2, 4)), v)
     assert c.shape == (2, 3, 4)
     assert np.max(np.abs(c)) < tol
     
     with pytest.raises(ValueError) as e_1l:
-        gp.sparse.cov(v, np.ones((2, 3)))  # Mismatching shape.
+        gp.cov(v, np.ones((2, 3)))  # Mismatching shape.
 
     with pytest.raises(ValueError) as e_1r:
-        gp.sparse.cov(np.ones((2, 3)), v)
+        gp.cov(np.ones((2, 3)), v)
     
     with pytest.raises(ValueError) as e_2l:
-        gp.sparse.cov(v, np.ones((4, 4)))  # Ambiguous shape.
+        gp.cov(v, np.ones((4, 4)))  # Ambiguous shape.
 
     with pytest.raises(ValueError) as e_2r:
-        gp.sparse.cov(np.ones((4, 4)), v)
+        gp.cov(np.ones((4, 4)), v)
 
     # Two independence axes.
 
     v = iid_repeat(iid_repeat(normal(), 4), 4)
 
     r = np.random.rand(4, 4)
-    c = gp.sparse.cov(v, r)
+    c = gp.cov(v, r)
     assert c.shape == (4, 4)
     assert np.max(np.abs(c)) < tol
 
-    c = gp.sparse.cov(r, v)  # Changing the order.
+    c = gp.cov(r, v)  # Changing the order.
     assert c.shape == (4, 4)
     assert np.max(np.abs(c)) < tol
 
     v = iid_repeat(iid_repeat(normal(size=(3,)), 4), 4)  # shape (4, 4, 3)
 
-    c = gp.sparse.cov(v, np.ones((4, 2, 4)))
+    c = gp.cov(v, np.ones((4, 2, 4)))
     assert c.shape == (3, 2, 4, 4)
     assert np.max(np.abs(c)) < tol
 
-    c = gp.sparse.cov(np.ones((4, 2, 5, 4)), v)
+    c = gp.cov(np.ones((4, 2, 5, 4)), v)
     assert c.shape == (2, 5, 3, 4, 4)
     assert np.max(np.abs(c)) < tol
 
     with pytest.raises(ValueError) as e_3l:
-        gp.sparse.cov(v, np.ones((2, 4)))  # Too few dimensions of size 4.
+        gp.cov(v, np.ones((2, 4)))  # Too few dimensions of size 4.
 
     with pytest.raises(ValueError) as e_3r:
-        gp.sparse.cov(np.ones((2, 4)), v)
+        gp.cov(np.ones((2, 4)), v)
 
     assert get_message(e_1l) == get_message(e_1r)
     assert get_message(e_2l) == get_message(e_2r)
@@ -783,10 +784,10 @@ def test_cov_det():
     # More error tests.
 
     with pytest.raises(ValueError):
-        gp.sparse.cov(v, np.ones((4, 2, 4, 4)))
+        gp.cov(v, np.ones((4, 2, 4, 4)))
 
     with pytest.raises(ValueError):
-        gp.sparse.cov(np.ones((4, 2, 4, 4)), v)
+        gp.cov(np.ones((4, 2, 4, 4)), v)
 
 
 def test_sample():
@@ -3711,7 +3712,7 @@ def test_iid_copy():
 
     assert v.shape == v_.shape
     assert v.iscomplex == v_.iscomplex
-    assert np.max(np.abs(gp.sparse.cov(v, v_))) < tol
+    assert np.max(np.abs(gp.cov(v, v_))) < tol
     assert np.max(np.abs(v.mean() - v_.mean())) < tol
     assert np.max(np.abs(v.cov() - v_.cov())) < tol
 
@@ -3721,7 +3722,7 @@ def test_iid_copy():
 
     assert v.shape == v_.shape
     assert v.iscomplex == v_.iscomplex
-    assert np.max(np.abs(gp.sparse.cov(v, v_))) < tol
+    assert np.max(np.abs(gp.cov(v, v_))) < tol
     assert np.max(np.abs(v.mean() - v_.mean())) < tol
     assert np.max(np.abs(v.cov() - v_.cov())) < tol
 

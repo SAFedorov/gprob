@@ -6,6 +6,46 @@ import numpy as np
 import gprob as gp
 
 from gprob.normal_ import Normal
+from gprob.sparse import SparseNormal
+
+
+def test_resolve():
+    nv = gp.normal()
+    sv = gp.iid_repeat(gp.normal(), 3)
+
+    mod, cls = gp.arrayops.resolve([0, 1])
+    assert mod is gp.normal_
+    assert cls is Normal
+
+    mod, cls = gp.arrayops.resolve([0, nv])
+    assert mod is gp.normal_
+    assert cls is Normal
+
+    mod, cls = gp.arrayops.resolve([0, [nv]])
+    assert mod is gp.normal_
+    assert cls is Normal
+
+    mod, cls = gp.arrayops.resolve([0, sv])
+    assert mod is gp.sparse
+    assert cls is SparseNormal
+
+    mod, cls = gp.arrayops.resolve([nv, sv])
+    assert mod is gp.sparse
+    assert cls is SparseNormal
+
+    # An edge case where [SparseNormal()] is present as an input. 
+    # It could be consistently handled with a different dispatch method,
+    # but for the sake of performance it is now just a type error.
+
+    with pytest.raises(TypeError):
+        va = [0, [sv]]
+        mod, cls = gp.arrayops.resolve(va)
+        [mod.lift(cls, v) for v in va]
+
+    with pytest.raises(TypeError):
+        va = [0, [sv]]
+        mod, cls = gp.arrayops.resolve(va)
+        [mod.match_(cls, v) for v in va]
 
 
 def test_cov():
