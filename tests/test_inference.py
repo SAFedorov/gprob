@@ -6,7 +6,7 @@ from gprob.normal_ import normal, cov
 from gprob.func import ConditionError
 from utils import random_normal, random_correlate
 
-np.random.seed(0)
+np.random.seed(1)
 
 
 def test_conditioning():
@@ -258,16 +258,15 @@ def test_masked_conditioning():
 
             v = random_normal(sh, dtype=dt)
             vc = random_normal(shc, dtype=dt)
-            v, vc = random_correlate([v, vc])
-            
-            # Ensures correlation. 
-            try:
-                assert np.abs(cov(v, vc)).max() > 1e-3
-            except Exception:
-                # random_correlate may produce no correlations 
-                # with a probability non-negligible for very small arrays
-                # because it uses random shuffling.
-                vc = vc + v
+
+            # Ensures correlation.
+            max_tries = 5
+            for i in range(max_tries):            
+                v, vc = random_correlate([v, vc])
+                if np.abs(cov(v, vc)).max() > 1e-3:
+                    break
+
+            assert np.abs(cov(v, vc)).max() > 1e-3
 
             mc_cond = v.condition({vc: 0}, mask=mask)  # Causal mask
 

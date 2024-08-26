@@ -2212,6 +2212,120 @@ def test_stack():
     assert v_.iaxes == tuple()
 
 
+def test_fft():
+    tol = 1e-8
+
+    fft_funcs = [gp.fft.fft, gp.fft.ifft, gp.fft.hfft, 
+                 gp.fft.rfft, gp.fft.irfft, gp.fft.ihfft]
+
+    ro = np.random.rand(4, 6)
+    rs = np.random.rand(4, 6)
+
+    x = random_normal(shape=(6,))
+    nx = ro + gp.stack([x] * 4) * rs
+    sx = ro + iid_repeat(x, 4) * rs
+
+    assert isinstance(nx, Normal)
+    assert isinstance(sx, SparseNormal)
+
+    for func in fft_funcs:
+        ny = func(nx)
+        sy = func(sx)
+
+        assert np.max(np.abs(ny.mean() - sy.mean())) < tol
+        assert np.max(np.abs(ny.var() - sy.var())) < tol
+
+        with pytest.raises(ValueError):
+            func(sx, axis=0)
+
+
+def test_fft2():
+    tol = 1e-8
+
+    fft_funcs = [gp.fft.fft2, gp.fft.ifft2, gp.fft.rfft2, gp.fft.irfft2]
+
+    ro = np.random.rand(3, 4, 6)
+    rs = np.random.rand(3, 4, 6)
+
+    x = random_normal(shape=(3, 6))
+    nx = ro + gp.stack([x] * 4, axis=1) * rs
+    sx = ro + iid_repeat(x, 4, axis=1) * rs
+
+    assert isinstance(nx, Normal)
+    assert isinstance(sx, SparseNormal)
+
+    for func in fft_funcs:
+        ny = func(nx, axes=(0, -1))
+        sy = func(sx, axes=(0, -1))
+
+        assert np.max(np.abs(ny.mean() - sy.mean())) < tol
+        assert np.max(np.abs(ny.var() - sy.var())) < tol
+
+        with pytest.raises(ValueError):
+            func(sx)
+
+        ny = func(nx.transpose((1, 0, 2)))
+        sy = func(sx.transpose((1, 0, 2)))
+
+        assert np.max(np.abs(ny.mean() - sy.mean())) < tol
+        assert np.max(np.abs(ny.var() - sy.var())) < tol
+
+        with pytest.raises(ValueError):
+            func(sx.transpose((1, 0, 2)), axes=(0, -1))
+
+
+def test_fftn():
+    tol = 1e-8
+
+    fft_funcs = [gp.fft.fftn, gp.fft.ifftn, gp.fft.rfftn, gp.fft.irfftn]
+
+    ro = np.random.rand(2, 3, 4, 5)
+    rs = np.random.rand(2, 3, 4, 5)
+
+    x = random_normal(shape=(2, 3, 5))
+    nx = ro + gp.stack([x] * 4, axis=2) * rs
+    sx = ro + iid_repeat(x, 4, axis=2) * rs
+
+    assert isinstance(nx, Normal)
+    assert isinstance(sx, SparseNormal)
+
+    for func in fft_funcs:
+        ny = func(nx, axes=(0, 1, -1))
+        sy = func(sx, axes=(0, 1, -1))
+
+        assert np.max(np.abs(ny.mean() - sy.mean())) < tol
+        assert np.max(np.abs(ny.var() - sy.var())) < tol
+
+        with pytest.raises(ValueError):
+            func(sx)
+
+        # A check with axes=None, the default.
+        x_ = assparsenormal(x)
+        
+        ny = func(x, axes=None)
+        sy = func(x_, axes=None)
+
+        assert np.max(np.abs(ny.mean() - sy.mean())) < tol
+        assert np.max(np.abs(ny.var() - sy.var())) < tol
+
+        ny = func(x, s=[4, 4, 4], axes=None)
+        sy = func(x_, s=[4, 4, 4], axes=None)
+
+        assert np.max(np.abs(ny.mean() - sy.mean())) < tol
+        assert np.max(np.abs(ny.var() - sy.var())) < tol
+
+        # A check with axes=None and s not None, where the transform axes 
+        # are inferred from the number of elements in s.
+        ny = func(nx.transpose((2, 0, 1, 3)), s=[4, 4, 4], axes=None)
+        sy = func(sx.transpose((2, 0, 1, 3)), s=[4, 4, 4], axes=None)
+
+        assert np.max(np.abs(ny.mean() - sy.mean())) < tol
+        assert np.max(np.abs(ny.var() - sy.var())) < tol
+
+        with pytest.raises(ValueError):
+            func(sx.transpose((2, 0, 1, 3)), s=[4, 4, 4, 4], axes=None)
+
+
 def test_matmul():
     # Some trivial cases first.
 

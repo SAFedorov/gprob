@@ -301,6 +301,7 @@ def test_fftn():
         _test_array_func(f, test_shapes=ts, module_name="fft")
         _test_array_func(f, axes=[-2, -3, -1], test_shapes=ts, module_name="fft")
         _test_array_func(f, axes=[-2, -3, -1], s=[3, 5, 7], test_shapes=ts, module_name="fft")
+        _test_array_func(f, axes=None, s=[5, 7], test_shapes=ts, module_name="fft")
         _test_array_func(f, axes=[0, 2, 1], test_shapes=ts, module_name="fft")
         _test_array_func(f, axes=[0, 2, 1], norm="ortho", test_shapes=ts, module_name="fft")
         _test_array_func(f, axes=[0, 2, 1], norm="forward", test_shapes=ts, module_name="fft")
@@ -313,7 +314,7 @@ def test_fftn():
                          test_dtype=np.complex128, test_shapes=ts, module_name="fft")
         _test_array_func(f, axes=[2, 1, 0], 
                          test_dtype=np.complex128, test_shapes=ts, module_name="fft")
-
+    
 
 def _test_array_func2(f, op1_shape=None, op2_shape=None, *args, **kwargs):
     # *args so far are only used for the subscripts of einsum, 

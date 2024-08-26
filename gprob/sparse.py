@@ -1033,11 +1033,24 @@ def call_linearized(x, f, jmpf):
 
 
 def fftfunc(cls, name, x, n, axis, norm):
-    raise NotImplementedError
+    if x._iaxid[axis]:
+        raise ValueError("Fourier transforms along independence axes "
+                         f"({axis}) are not supported.")
+    
+    return _finalize(normal_.fftfunc(cls, name, x, n, axis, norm), x._iaxid)
 
 
 def fftfunc_n(cls, name, x, s, axes, norm):
-    raise NotImplementedError
+    if axes is None:
+        ndim = x.ndim if s is None else len(s)
+        axes = tuple(range(-ndim, 0))
+
+    for axis in axes:
+        if x._iaxid[axis]:
+            raise ValueError("Fourier transforms along independence axes "
+                             f"({axis}) are not supported.")
+    
+    return _finalize(normal_.fftfunc_n(cls, name, x, s, axes, norm), x._iaxid)
 
 
 def _check_independence(x, op_axes, n):

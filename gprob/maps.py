@@ -595,7 +595,8 @@ def fftfunc(cls, name, x, n, axis, norm):
 
 def fftfunc_n(cls, name, x, s, axes, norm):
     if axes is None:
-        axes = list(range(x.ndim))
+        ndim = x.ndim if s is None else len(s)
+        axes = tuple(range(-ndim, 0))
 
     func = getattr(np.fft, name)
     b = func(x.b, s, axes, norm)
