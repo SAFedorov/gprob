@@ -196,6 +196,18 @@ class SparseNormal(Normal):
         return _finalize(super().conjugate(), self._iaxid)
     
     def cumsum(self, axis):
+        """Computes the cumulative sum of the elements.
+
+        Args:
+            axis (int): 
+                Axis along which the cumulative sum is computed. 
+                `None` values are not supported.
+
+        Returns:
+            A new sparse normal variable representing the result of 
+            the cumulative summation with the same dimensions as the input.
+        """
+
         if axis is None:
             # For regular arrays, None is the default value. For sparse arrays, 
             # it is not supported because these arrays usually 
@@ -315,6 +327,25 @@ class SparseNormal(Normal):
         return _finalize(x, iaxid)
 
     def sum(self, axis, keepdims=False):
+        """Computes the sum of all elements of the variable along an axis 
+        or axes.
+
+        Args:
+            axis (int, tuple of int): 
+                Axis or axes along which to sum the elements. 
+                `None` is not supported.
+            keepdims (bool):
+                If `True`, the reduced axes are retained in the output 
+                as dimensions with size one. This enables the result 
+                to broadcast against the input array.
+
+        Returns:
+            A new sparse normal variable representing the result of 
+            the summation. The output variable has the same dimensions as 
+            the input, except the summation axes are removed unless `keepdims` 
+            is `True`.
+        """
+
         if not isinstance(axis, int) and not isinstance(axis, tuple):
             raise ValueError("`axis` must be an integer or "
                              "a tuple of integers.")
@@ -368,8 +399,6 @@ class SparseNormal(Normal):
         return _finalize(super().broadcast_to(shape), iaxid)
 
     def iid_copy(self):
-        """Creates an independent identically distributed copy 
-        of the varaible."""
         return _finalize(super().iid_copy(), self._iaxid)
 
     def condition(self, observations):

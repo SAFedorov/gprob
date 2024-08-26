@@ -170,9 +170,8 @@ def sum(x, axis=None, keepdims=False):
         x (random variable): 
             The input array random variable whose elements are to be summed.
         axis (int, tuple of int, or None): 
-            Axis or axes along which to sum the elements. 
-            - If `None`, the function sums all elements.
-            - If a tuple of integers, the function sums over multiple axes.
+            Axis or axes along which to sum the elements. If `None`, 
+            the function sums all elements.
         keepdims (bool): 
             If `True`, the reduced axes are retained in the output as dimensions 
             with size one. This enables the result to broadcast against 
