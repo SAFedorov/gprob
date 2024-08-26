@@ -14,7 +14,13 @@ from .func import condition, logp
 
 
 class Normal(LatentMap):
-    """Array of normal random variables."""
+    """Array of normal random variables, 
+    
+    x[...] = sum_k a[i...] xi[i] + b[...],
+    
+    where `xi[i]` are the independent identically-distributed Gaussian 
+    random variables: `xi[i] ~ N(0, 1)` for all `i`, and `...` is 
+    a multi-dimensional index."""
 
     _mod = import_module(__name__)
 

@@ -9,14 +9,7 @@ NUMERIC_ARRAY_KINDS = {"b", "i", "u", "f", "c"}
 
 
 class LatentMap:
-    """An affine map of latent random variables,
-    
-    x[...] = sum_k a[i...] xi[i] + b[...],
-    
-    where `xi`s are the independent identically-distributed latent Gaussian 
-    random variables, `xi[i] ~ N(0, 1)` for all `i`, and `...` is an arbitrary 
-    multi-dimensional index.
-    """
+    """An affine map of latent variables."""
 
     __slots__ = ("a", "b", "lat")
     __array_ufunc__ = None
@@ -269,12 +262,26 @@ class LatentMap:
         self.a[key_a] = _unsq(av, self.b[key].ndim)
     
     def conjugate(self):
+        """Element-wise complex conjugate."""
         return self.__class__(self.a.conj(), self.b.conj(), self.lat)
     
     def conj(self):
+        """Element-wise complex conjugate."""
         return self.conjugate()
     
     def cumsum(self, axis=None):
+        """Computes the cumulative sum of the elements.
+
+        Args:
+            axis (int or None): 
+                Axis along which the cumulative sum is computed. If `None`, 
+                the cumulative sum is computed over the flattened array.
+
+        Returns:
+            A new random variable representing the result of the cumulative 
+            summation with the same dimensions as the input.
+        """
+        
         b = np.cumsum(self.b, axis=axis)
 
         if axis is None:
@@ -292,12 +299,41 @@ class LatentMap:
         return self.__class__(a, b, self.lat)
     
     def diagonal(self, offset=0, axis1=0, axis2=1):
+        """Extracts a diagonal from the varaible.
+
+        Args:
+            offset (int): 
+                The offset of the diagonal from the main diagonal.
+            axis1 (int): 
+                The first axis along which the diagonal should be taken.
+            axis2 (int): 
+                The second axis along which the diagonal should be taken.
+
+        Returns:
+            A new random variable consisting of the extracted diagonal elements.
+        """
+        
         b = self.b.diagonal(offset=offset, axis1=axis1, axis2=axis2)
         axis1_a, axis2_a = _axes_a([axis1, axis2])
         a = self.a.diagonal(offset=offset, axis1=axis1_a, axis2=axis2_a)
         return self.__class__(a, b, self.lat)
     
     def flatten(self, order="C"):
+        """Flattens a random variable while ensuring that the underying map 
+        is stored contiguously in the memory. The map arrays of the returned 
+        variable are always copies of the map arrays of the original variable. 
+
+        Args:
+            order (str): 
+                The order in which the input array elements are read.
+                - 'C': C-style row-major order.
+                - 'F': Fortran-style column-major order.
+
+        Returns:
+            A new one-dimensional random variable containing all the elements of 
+            the original variable in the specified order.
+        """
+
         if order not in ["C", "F"]:
             raise ValueError("Only C and F orders are supported.")
         
@@ -306,11 +342,39 @@ class LatentMap:
         return self.__class__(a, b, self.lat)
     
     def moveaxis(self, source, destination):
+        """Moves an axis to a new position.
+
+        Args:
+            source (int):
+                The original position of the axis.
+            destination (int):
+                The destination position of the axis.
+
+        Returns:
+            A new random variable with the transformed layout.
+        """
+
         b = np.moveaxis(self.b, source, destination)
         a = np.moveaxis(self.a, *_axes_a([source, destination]))
         return self.__class__(a, b, self.lat)
     
     def ravel(self, order="C"):
+        """Flattens a random variable while ensuring that the underying map 
+        is stored contiguously in the memory. The map arrays of the returned 
+        variable are views of the map arrays of the original variable whenever 
+        possible. 
+
+        Args:
+            order (str): 
+                The order in which the input array elements are read.
+                - 'C': C-style row-major order.
+                - 'F': Fortran-style column-major order.
+
+        Returns:
+            A new one-dimensional random variable containing all the elements 
+            of the input variable in the specified order.
+        """
+        
         b = self.b.ravel(order=order)
 
         if order == "C":
@@ -322,11 +386,45 @@ class LatentMap:
         raise ValueError("Only C and F orders are supported.")
     
     def reshape(self, newshape, order="C"):
+        """Gives the variable a new shape.
+
+        Args:
+            newshape (tuple of int): 
+                The new shape. One dimension can be set to `-1` to infer its
+                size from the total number of elements and the other dimensions.
+            order (str): 
+                The order in which the array elements are read.
+                - 'C': C-style row-major order.
+                - 'F': Fortran-style column-major order.
+
+        Returns:
+            A new random variable with the specified shape and order.
+        """
+
         b = self.b.reshape(newshape, order=order)
         a = self.a.reshape((self.nlat,) + b.shape, order=order)
         return self.__class__(a, b, self.lat)
     
     def sum(self, axis=None, keepdims=False):
+        """Computes the sum of all elements of the variable along an axis 
+        or axes.
+
+        Args:
+            axis (int, tuple of int, or None): 
+                Axis or axes along which to sum the elements. 
+                - If `None`, the function sums all elements.
+                - If a tuple of integers, the function sums over multiple axes.
+            keepdims (bool): 
+                If `True`, the reduced axes are retained in the output 
+                as dimensions with size one. This enables the result 
+                to broadcast against the input array.
+
+        Returns:
+            A new random variable representing the result of the summation. 
+            The output variable has the same dimensions as the input, except 
+            the summation axes are removed unless `keepdims` is `True`.
+        """
+        
         # "where" is absent because its broadcasting is not implemented.
         # "initial" is also not implemented.
         b = self.b.sum(axis, keepdims=keepdims)
@@ -340,6 +438,17 @@ class LatentMap:
         return self.__class__(a, b, self.lat)
     
     def transpose(self, axes=None):
+        """Permutes the axes of the variable.
+
+        Args:
+            axes (tuple of int or None): 
+                The desired axes order. If `None`, the existing axes 
+                order is reversed.
+
+        Returns:
+            A new random variable with the axes in the new order.
+        """
+        
         b = self.b.transpose(axes)
 
         if axes is None:
@@ -349,17 +458,58 @@ class LatentMap:
         return self.__class__(a, b, self.lat)
     
     def trace(self, offset=0, axis1=0, axis2=1):
+        """Calculates the sum of the diagonal elements of the variable.
+
+        Args:
+            offset (int): 
+                The offset of the diagonal to be summed from the main diagonal.
+            axis1 (int): 
+                The first axis along which the diagonal should be summed.
+            axis2 (int): 
+                The second axis along which the diagonal should be summed.
+
+        Returns:
+            A new random variable, consisting of the sum(s) of the diagonal 
+            elements with respect to the specified axes.
+        """
+
         b = self.b.trace(offset=offset, axis1=axis1, axis2=axis2)
         axis1_a, axis2_a = _axes_a([axis1, axis2])
         a = self.a.trace(offset=offset, axis1=axis1_a, axis2=axis2_a)
         return self.__class__(a, b, self.lat)
     
     def split(self, indices_or_sections, axis=0):
+        """Splits the variable along an axis.
+
+        Args:
+            indices_or_sections (int or sequence of int):
+                - If an integer, n, the input variable is to be divided along
+                 `axis` into n equal pieces.
+                - If a sequence of sorted integers, its entries indicate where 
+                along `axis` the input variable is to be split.
+            axis (int):
+                The axis along which the variable is to be split.
+
+        Returns:
+            A list of new random variables into which the original is split.
+        """
+        
         bs = np.split(self.b, indices_or_sections, axis=axis)
         as_ = np.split(self.a, indices_or_sections, axis=_axes_a([axis])[0])
         return [self.__class__(a, b, self.lat) for a, b in zip(as_, bs)]
     
     def broadcast_to(self, shape):
+        """Broadcasts the variable to a new shape.
+
+        Args:
+            shape (tuple of int): 
+                The desired shape to broadcast the variable to.
+
+        Returns:
+            A new random variable with the specified shape consisting
+            of duplicates of the input variable.
+        """
+        
         b = np.broadcast_to(self.b, shape)
         a = _broadcast(self.a, shape)
         return self.__class__(a, b, self.lat)

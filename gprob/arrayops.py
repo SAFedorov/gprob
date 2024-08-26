@@ -144,8 +144,7 @@ def diagonal(x, offset=0, axis1=0, axis2=1):
 
     Args:
         x (random variable): 
-            The input array random variable from which the diagonal is 
-            to be extracted.
+            The input array random variable.
         offset (int): 
             The offset of the diagonal from the main diagonal.
         axis1 (int): 
@@ -157,7 +156,7 @@ def diagonal(x, offset=0, axis1=0, axis2=1):
         A new random variable consisting of the extracted diagonal elements.
 
     Note:
-        This function is similar to `numpy.diagonal`.
+        This function operates similarly to `numpy.diagonal`.
     """
     return x.diagonal(offset=offset, axis1=axis1, axis2=axis2)
 
@@ -176,8 +175,8 @@ def sum(x, axis=None, keepdims=False):
             - If a tuple of integers, the function sums over multiple axes.
         keepdims (bool): 
             If `True`, the reduced axes are retained in the output as dimensions 
-            with size one. This enables the result to broadcast correctly 
-            against the input array.
+            with size one. This enables the result to broadcast against 
+            the input array.
 
     Returns:
         A new random variable representing the result of the summation. 
@@ -185,28 +184,28 @@ def sum(x, axis=None, keepdims=False):
         the summation axes are removed unless `keepdims` is `True`.
 
     Note:
-        This function is similar to `numpy.sum`.
+        This function operates similarly to `numpy.sum`.
     """
     return x.sum(axis=axis, keepdims=keepdims)
 
 
 @fallback_to_normal
 def cumsum(x, axis=None):
-    """Computes the cumulative sum of elements of a random variable.
+    """Computes the cumulative sum of the elements of a random variable.
 
     Args:
-        x (random variable): 
+        x (random variable):
             The input array random variable.
-        axis (int or None): 
+        axis (int or None):
             Axis along which the cumulative sum is computed. If `None`, 
-            the the cumsum is computed over the flattened array.
+            the cumulative sum is computed over the flattened array.
 
     Returns:
         A new random variable representing the result of the cumulative 
-        summation. The output variable has the same dimensions as the input.
+        summation with the same dimensions as the input.
 
     Note:
-        This function is similar to `numpy.cumsum`.
+        This function operates similarly to `numpy.cumsum`.
     """
     return x.cumsum(axis=axis)
 
@@ -216,19 +215,18 @@ def moveaxis(x, source, destination):
     """Moves an axis of a random variable to a new position.
 
     Args:
-        x (random variable): 
+        x (random variable):
             The input array random variable whose axis is to be moved.
-        source (int): 
-            The original position of the axis to move.
-        destination (int): 
-            The destination position of the axis to move.
+        source (int):
+            The original position of the axis.
+        destination (int):
+            The destination position of the axis.
 
     Returns:
-        A new random variable whose axes are transformed with respect to 
-        the original. The remaining axes keep their original order.
+        A new random variable with the transformed layout.
 
     Note:
-        This function is similar to `numpy.moveaxis`,
+        This function operates similarly to `numpy.moveaxis`,
         except for the lack of support of multiple source and destination axes.
     """
     return x.moveaxis(source, destination)
@@ -237,7 +235,9 @@ def moveaxis(x, source, destination):
 @fallback_to_normal
 def ravel(x, order="C"):
     """Flattens a random variable while ensuring that the underying latent map 
-    is stored contiguously in the memory.
+    is stored contiguously in the memory. The map arrays of the returned 
+    variable are views of the map arrays of the input variable whenever 
+    possible. 
 
     Args:
         x (random variable): 
@@ -252,7 +252,7 @@ def ravel(x, order="C"):
         the input variable in the specified order.
 
     Note:
-        This function is similar to `numpy.ravel`.
+        This function operates similarly to `numpy.ravel`.
     """
     return x.ravel(order=order)
 
@@ -265,9 +265,8 @@ def reshape(x, newshape, order="C"):
         x (random variable): 
             The input array random variable to be reshaped.
         newshape (tuple of int): 
-            The new shape for the array. One dimension can be set to `-1` 
-            to infer its size from the total size of the array and 
-            its other dimensions.
+            The new shape. One dimension can be set to `-1` to infer its
+            size from the total number of elements and the other dimensions.
         order (str): 
             The order in which the array elements are read.
             - 'C': C-style row-major order.
@@ -277,7 +276,7 @@ def reshape(x, newshape, order="C"):
         A new random variable with the specified shape and order.
 
     Note:
-        This function is similar to `numpy.reshape`.
+        This function operates similarly to `numpy.reshape`.
     """
     return x.reshape(newshape, order=order)
 
@@ -290,14 +289,14 @@ def transpose(x, axes=None):
         x (random variable): 
             The input array random variable to be transposed.
         axes (tuple of int or None): 
-            The desired order of the axes. If `None`, the axes order 
-            is reversed.
+            The desired axes order. If `None`, the existing axes 
+            order is reversed.
 
     Returns:
         A new random variable with the axes in the new order.
 
     Note:
-        This function is similar to `numpy.transpose`.
+        This function operates similarly to `numpy.transpose`.
     """
     return x.transpose(axes=axes)
 
@@ -321,7 +320,7 @@ def trace(x, offset=0, axis1=0, axis2=1):
         elements with respect to the specified axes.
 
     Note:
-        This function is similar to `numpy.trace`.
+        This function operates similarly to `numpy.trace`.
     """
     return x.trace(offset=offset, axis1=axis1, axis2=axis2)
 
@@ -334,14 +333,14 @@ def broadcast_to(x, shape):
         x (random variable): 
             The input array random variable to be broadcast.
         shape (tuple of int): 
-            The desired shape to broadcast the random variable to.
+            The desired shape to broadcast the input variable to.
 
     Returns:
         A new random variable with the specified shape consisting of duplicates
         of the input variable.
 
     Note:
-        This function is similar to `numpy.broadcast_to`.
+        This function operates similarly to `numpy.broadcast_to`.
     """
     return x.broadcast_to(shape)
 
@@ -361,7 +360,7 @@ def concatenate(arrays, axis=0):
         present in `arrays`.
 
     Note:
-        This function is similar to `numpy.concatenate`.
+        This function operates similarly to `numpy.concatenate`.
     """
 
     if len(arrays) == 0:
@@ -387,7 +386,7 @@ def stack(arrays, axis=0):
         present in `arrays`.
 
     Note:
-        This function is similar to `numpy.stack`.
+        This function operates similarly to `numpy.stack`.
     """
 
     if len(arrays) == 0:
@@ -409,7 +408,7 @@ def hstack(arrays):
         present in `arrays`.
     
     Note:
-        This function is similar to `numpy.hstack`.
+        This function operates similarly to `numpy.hstack`.
     """
     
     if len(arrays) == 0:
@@ -437,7 +436,7 @@ def vstack(arrays):
         present in `arrays`.
     
     Note:
-        This function is similar to `numpy.vstack`.
+        This function operates similarly to `numpy.vstack`.
     """
 
     if len(arrays) == 0:
@@ -465,7 +464,7 @@ def dstack(arrays):
         present in `arrays`.
     
     Note:
-        This function is similar to `numpy.dstack`.
+        This function operates similarly to `numpy.dstack`.
     """
 
     if len(arrays) == 0:
@@ -501,8 +500,8 @@ def split(x, indices_or_sections, axis=0):
         A list of new random variables into which the input variable is split.
     
     Note:
-        This function is similar to `numpy.split`.
-    """  
+        This function operates similarly to `numpy.split`.
+    """
     return x.split(indices_or_sections=indices_or_sections, axis=axis)
 
 
@@ -523,7 +522,7 @@ def hsplit(x, indices_or_sections):
         A list of new random variables into which the input variable is split.
     
     Note:
-        This function is similar to `numpy.hsplit`.
+        This function operates similarly to `numpy.hsplit`.
     """
 
     if x.ndim < 1:
@@ -550,7 +549,7 @@ def vsplit(x, indices_or_sections):
         A list of new random variables into which the input variable is split.
     
     Note:
-        This function is similar to `numpy.vsplit`.
+        This function operates similarly to `numpy.vsplit`.
     """
 
     if x.ndim < 2:
@@ -575,7 +574,7 @@ def dsplit(x, indices_or_sections):
         A list of new random variables into which the input variable is split.
     
     Note:
-        This function is similar to `numpy.dsplit`.
+        This function operates similarly to `numpy.dsplit`.
     """
 
     if x.ndim < 3:
@@ -620,7 +619,7 @@ def matmul(x, y):
         of `x` and `y`.
 
     Note:
-        This function is similar to `numpy.matmul`, and follows the same rules 
+        This function operates similarly to `numpy.matmul`, and follows the same rules 
         regarding the shapes of the input and output variables.
     """
     return x @ y
@@ -640,7 +639,7 @@ def dot(x, y):
         A new random variable resulting from the dot product of `x` and `y`.
 
     Note:
-        This function is similar to `numpy.dot`, and follows the same rules 
+        This function operates similarly to `numpy.dot`, and follows the same rules 
         regarding the shapes of the input and output variables.
     """
 
@@ -662,7 +661,7 @@ def inner(x, y):
         A new random variable resulting from the inner product of `x` and `y`.
 
     Note:
-        This function is similar to `numpy.inner`, and follows the same rules 
+        This function operates similarly to `numpy.inner`, and follows the same rules 
         regarding the shapes of the input and output variables.
     """
 
@@ -684,7 +683,7 @@ def outer(x, y):
         A new random variable resulting from the outer product of `x` and `y`.
 
     Note:
-        This function is similar to `numpy.outer`, and follows the same rules 
+        This function operates similarly to `numpy.outer`, and follows the same rules 
         regarding the shapes of the input and output variables.
     """
 
@@ -708,7 +707,7 @@ def kron(x, y):
         of `x` and `y`.
 
     Note:
-        This function is similar to `numpy.kron`, and follows the same rules 
+        This function operates similarly to `numpy.kron`, and follows the same rules 
         regarding the shapes of the variables and the arrangement of elements.
     """
 
@@ -742,7 +741,7 @@ def tensordot(x, y, axes=2):
         of `x` and `y`.
 
     Note:
-        This function is similar to `numpy.tensordot`, and follows the same 
+        This function operates similarly to `numpy.tensordot`, and follows the same 
         rules regarding the shapes of the input and output variables.
     """
 
@@ -769,7 +768,7 @@ def einsum(subs, x, y):
         of `x` and `y` according to the subscripts.
 
     Note:
-        This function is similar to `numpy.einsum` and follows the same rules 
+        This function operates similarly to `numpy.einsum` and follows the same rules 
         regarding the subscripts and the variable shapes.
     """
 
