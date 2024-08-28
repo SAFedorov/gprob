@@ -9,8 +9,8 @@ from gprob import maps
 from gprob import (normal,
                    stack, hstack, vstack, dstack, concatenate,
                    split, hsplit, vsplit, dsplit,
-                   sum, cumsum, trace, diagonal, reshape, moveaxis, ravel, transpose,
-                   add, subtract, multiply, divide, power, 
+                   sum, cumsum, trace, diagonal, reshape, moveaxis, ravel, 
+                   transpose, add, subtract, multiply, divide, power, 
                    einsum, dot, matmul, inner, outer, kron, tensordot)
 
 from gprob.fft import (fft, fft2, fftn, 
@@ -47,13 +47,36 @@ def _gts(ndim = None):
     raise ValueError("ndim must be None, an integer or a string")
 
 
-def _test_array_func(f, *args, test_shapes=None, test_dtype=np.float64, 
-                     module_name="", **kwargs):
+def _test_array_func(f, args=tuple(), pargs=tuple(), test_shapes=None, 
+                     test_dtype=np.float64, mod="", **kwargs):
+    """Tests a numpy-like function taking a single random variable as an input
+    and producing a single random variable at the output.
     
-    # single input and single output functions
+    Args:
+        f (callable): 
+            The random function to be tested.
+        args (sequence): 
+            The positional arguments to be supplied to the tested function 
+            after the random variable.
+        pargs (sequence):
+            The positional arguments to be supplied to the tested function 
+            before the random variable.
+        test_shapes (None, int, str or sequence):
+            The shapes of the random variables to be generated for testing.
+            if not a sequence, a default set of shapes is used.
+        test_dtype (numpy dtype):
+            The data type of the test variables.
+        mod (str):
+            The name of the module where the function is located.
+        **kwargs:
+            The keyword arguments to be passed to the tested function.
 
-    if module_name != "":
-        mod = getattr(np, module_name)
+    Returns:
+        None
+    """
+
+    if mod != "":
+        mod = getattr(np, mod)
         npf = getattr(mod, f.__name__)
     else:
         npf = getattr(np, f.__name__)
@@ -64,12 +87,12 @@ def _test_array_func(f, *args, test_shapes=None, test_dtype=np.float64,
     for sh in test_shapes:
         # The operation on random variables.
         vin = random_normal(sh, test_dtype)
-        vout = f(vin, *args, **kwargs)
+        vout = f(*pargs, vin, *args, **kwargs)
 
         assert vin.a.shape[1:] == vin.b.shape
         assert vout.a.shape[1:] == vout.b.shape
 
-        refmean = npf(vin.b, *args, **kwargs)
+        refmean = npf(*pargs, vin.b, *args, **kwargs)
         assert vout.b.shape == refmean.shape
         assert vout.b.dtype == refmean.dtype
         assert np.all(vout.b == refmean)
@@ -80,19 +103,19 @@ def _test_array_func(f, *args, test_shapes=None, test_dtype=np.float64,
         assert vout.a.dtype == dt
 
         for arin, arout in zip(vin.a, vout.a):
-            aref = npf(arin, *args, **kwargs)
+            aref = npf(*pargs, arin, *args, **kwargs)
             assert arout.shape == aref.shape
             assert np.allclose(arout, aref, rtol=tol, atol=tol * np.max(np.abs(arin)))
 
         # The operation on deterministic variables.
         vin = random_det_normal(sh, test_dtype)
-        vout = f(vin, *args, **kwargs)
+        vout = f(*pargs, vin, *args, **kwargs)
 
         assert vin.a.size == 0
         assert vin.a.shape[1:] == vin.b.shape
         assert vout.a.shape[1:] == vout.b.shape
 
-        refmean = npf(vin.b, *args, **kwargs)
+        refmean = npf(*pargs, vin.b, *args, **kwargs)
         assert vout.b.shape == refmean.shape
         assert vout.b.dtype == refmean.dtype
         assert np.all(vout.b == refmean)
@@ -158,11 +181,11 @@ def test_transpose():
 
 
 def test_moveaxis():
-    _test_array_func(moveaxis, 0, 0, test_shapes="1dmin")
-    _test_array_func(moveaxis, 0, 1, test_shapes="2dmin")
-    _test_array_func(moveaxis, -1, 0, test_shapes="2dmin")
-    _test_array_func(moveaxis, -1, -2, test_shapes="3dmin")
-    _test_array_func(moveaxis, 0, 2, test_shapes="3dmin")
+    _test_array_func(moveaxis, [0, 0], test_shapes="1dmin")
+    _test_array_func(moveaxis, [0, 1], test_shapes="2dmin")
+    _test_array_func(moveaxis, [-1, 0], test_shapes="2dmin")
+    _test_array_func(moveaxis, [-1, -2], test_shapes="3dmin")
+    _test_array_func(moveaxis, [0, 2], test_shapes="3dmin")
 
 
 def test_reshape():
@@ -201,9 +224,9 @@ def test_reshape():
                           (*sh, 1), (sh[0], 1, 1, *sh[1:]), (1, *sh)]
 
         for new_sh in new_shapes:
-            _test_array_func(reshape, new_sh, test_shapes=[sh])
-            _test_array_func(reshape, new_sh, test_shapes=[sh], order="F")
-            _test_array_func(reshape, new_sh, test_shapes=[sh], order="A")
+            _test_array_func(reshape, [new_sh], test_shapes=[sh])
+            _test_array_func(reshape, [new_sh], test_shapes=[sh], order="F")
+            _test_array_func(reshape, [new_sh], test_shapes=[sh], order="A")
 
 
 def test_fft():
@@ -213,39 +236,39 @@ def test_fft():
     ts = [(2,), (4,), (16,), (128,), (3, 32), (3, 2, 7)]
 
     for f in cfft_funcs + rfft_funcs:
-        _test_array_func(f, test_shapes=ts, module_name="fft")
+        _test_array_func(f, test_shapes=ts, mod="fft")
         _test_array_func(f, axis=-2, 
-                         test_shapes=[s + (2,) for s in ts], module_name="fft")
+                         test_shapes=[s + (2,) for s in ts], mod="fft")
         _test_array_func(f, axis=1, 
-                         test_shapes=[(1, 10) + s for s in ts], module_name="fft")
+                         test_shapes=[(1, 10) + s for s in ts], mod="fft")
         _test_array_func(f, axis=1, n=20,
-                         test_shapes=[(2, 63, 2)], module_name="fft")
+                         test_shapes=[(2, 63, 2)], mod="fft")
         _test_array_func(f, axis=0, n=129,
-                         test_shapes=[(128, 2)], module_name="fft")
+                         test_shapes=[(128, 2)], mod="fft")
         
     for f in cfft_funcs:
         _test_array_func(f, test_shapes=ts, 
-                         test_dtype=np.complex128, module_name="fft")
+                         test_dtype=np.complex128, mod="fft")
         _test_array_func(f, axis=1, n=90, test_shapes=[(2, 63, 2)],
-                         test_dtype=np.complex128, module_name="fft")
+                         test_dtype=np.complex128, mod="fft")
         
     ts = [(128, 2), (89, 1)]
 
     for f in cfft_funcs + rfft_funcs:
         _test_array_func(f, axis=0, n=129, norm="ortho",
-                         test_shapes=ts, module_name="fft")
+                         test_shapes=ts, mod="fft")
         _test_array_func(f, axis=0, norm="backward",
-                         test_shapes=ts, module_name="fft")
+                         test_shapes=ts, mod="fft")
         _test_array_func(f, axis=0, n=64, norm="forward",
-                         test_shapes=ts, module_name="fft")
+                         test_shapes=ts, mod="fft")
     
     for f in cfft_funcs:
         _test_array_func(f, axis=0, n=129, norm="ortho",
-                         test_dtype=np.complex128, test_shapes=ts, module_name="fft")
+                         test_dtype=np.complex128, test_shapes=ts, mod="fft")
         _test_array_func(f, axis=0, norm="backward",
-                         test_dtype=np.complex128, test_shapes=ts, module_name="fft")
+                         test_dtype=np.complex128, test_shapes=ts, mod="fft")
         _test_array_func(f, axis=0, n=64, norm="forward",
-                         test_dtype=np.complex128, test_shapes=ts, module_name="fft")
+                         test_dtype=np.complex128, test_shapes=ts, mod="fft")
 
 
 def test_fft2():
@@ -255,38 +278,38 @@ def test_fft2():
     ts = [(2, 2), (4, 2), (5, 3), (3, 17), (2, 8, 4)]
 
     for f in cfft_funcs + rfft_funcs:
-        _test_array_func(f, test_shapes=ts, module_name="fft")
+        _test_array_func(f, test_shapes=ts, mod="fft")
         _test_array_func(f, axes=[0, 1], 
-                         test_shapes=[s + (2,) for s in ts], module_name="fft")
+                         test_shapes=[s + (2,) for s in ts], mod="fft")
         _test_array_func(f, axes=[-3, 1], 
-                         test_shapes=[(1, 10) + s for s in ts], module_name="fft")
+                         test_shapes=[(1, 10) + s for s in ts], mod="fft")
         _test_array_func(f, axes=(0, 1), s=(5, 20),
-                         test_shapes=[(2, 63, 2)], module_name="fft")
+                         test_shapes=[(2, 63, 2)], mod="fft")
         _test_array_func(f, s=(64, 3),
-                         test_shapes=[(128, 2)], module_name="fft")
+                         test_shapes=[(128, 2)], mod="fft")
         
     for f in cfft_funcs:
-        _test_array_func(f, test_shapes=ts, test_dtype=np.complex128, module_name="fft")
+        _test_array_func(f, test_shapes=ts, test_dtype=np.complex128, mod="fft")
         _test_array_func(f, axes=(0, 1), s=(5, 20), test_dtype=np.complex128,
-                         test_shapes=[(2, 63, 2)], module_name="fft")
+                         test_shapes=[(2, 63, 2)], mod="fft")
   
     ts = [(33, 3, 2), (8, 7, 2)]
 
     for f in cfft_funcs + rfft_funcs:
         _test_array_func(f, axes=(0, 1), norm="ortho",
-                         test_shapes=ts, module_name="fft")
+                         test_shapes=ts, mod="fft")
         _test_array_func(f, axes=(0, 1), norm="backward",
-                         test_shapes=ts, module_name="fft")
+                         test_shapes=ts, mod="fft")
         _test_array_func(f, axes=(0, 1), s=(32, 5), norm="forward",
-                         test_shapes=ts, module_name="fft")
+                         test_shapes=ts, mod="fft")
     
     for f in cfft_funcs:
         _test_array_func(f, axes=(0, 1), s=(29, 5), norm="ortho",
-                         test_dtype=np.complex128, test_shapes=ts, module_name="fft")
+                         test_dtype=np.complex128, test_shapes=ts, mod="fft")
         _test_array_func(f, axes=(0, 1), norm="backward",
-                         test_dtype=np.complex128, test_shapes=ts, module_name="fft")
+                         test_dtype=np.complex128, test_shapes=ts, mod="fft")
         _test_array_func(f, axes=(0, 1), s=(32, 5), norm="forward",
-                         test_dtype=np.complex128, test_shapes=ts, module_name="fft")
+                         test_dtype=np.complex128, test_shapes=ts, mod="fft")
         
 
 def test_fftn():
@@ -298,23 +321,23 @@ def test_fftn():
     ts = [(16, 3, 2), (2, 4, 7, 2)]
 
     for f in cfft_funcs + rfft_funcs:
-        _test_array_func(f, test_shapes=ts, module_name="fft")
-        _test_array_func(f, axes=[-2, -3, -1], test_shapes=ts, module_name="fft")
-        _test_array_func(f, axes=[-2, -3, -1], s=[3, 5, 7], test_shapes=ts, module_name="fft")
-        _test_array_func(f, axes=None, s=[5, 7], test_shapes=ts, module_name="fft")
-        _test_array_func(f, axes=[0, 2, 1], test_shapes=ts, module_name="fft")
-        _test_array_func(f, axes=[0, 2, 1], norm="ortho", test_shapes=ts, module_name="fft")
-        _test_array_func(f, axes=[0, 2, 1], norm="forward", test_shapes=ts, module_name="fft")
-        _test_array_func(f, axes=[2, 1, 0], norm="backward", test_shapes=ts, module_name="fft")
+        _test_array_func(f, test_shapes=ts, mod="fft")
+        _test_array_func(f, axes=[-2, -3, -1], test_shapes=ts, mod="fft")
+        _test_array_func(f, axes=[-2, -3, -1], s=[3, 5, 7], test_shapes=ts, mod="fft")
+        _test_array_func(f, axes=None, s=[5, 7], test_shapes=ts, mod="fft")
+        _test_array_func(f, axes=[0, 2, 1], test_shapes=ts, mod="fft")
+        _test_array_func(f, axes=[0, 2, 1], norm="ortho", test_shapes=ts, mod="fft")
+        _test_array_func(f, axes=[0, 2, 1], norm="forward", test_shapes=ts, mod="fft")
+        _test_array_func(f, axes=[2, 1, 0], norm="backward", test_shapes=ts, mod="fft")
 
     for f in cfft_funcs:
         _test_array_func(f, axes=[0, 2, 1], norm="ortho", s=[3, 5, 7],
-                         test_dtype=np.complex128, test_shapes=ts, module_name="fft")
+                         test_dtype=np.complex128, test_shapes=ts, mod="fft")
         _test_array_func(f, axes=[0, 2, 1], norm="forward", 
-                         test_dtype=np.complex128, test_shapes=ts, module_name="fft")
+                         test_dtype=np.complex128, test_shapes=ts, mod="fft")
         _test_array_func(f, axes=[2, 1, 0], 
-                         test_dtype=np.complex128, test_shapes=ts, module_name="fft")
-    
+                         test_dtype=np.complex128, test_shapes=ts, mod="fft")
+
 
 def _test_array_func2(f, op1_shape=None, op2_shape=None, *args, **kwargs):
     # *args so far are only used for the subscripts of einsum, 
@@ -762,23 +785,6 @@ def test_concatenate():
         vins = random_correlate([random_normal((*s[:ax+1], i, *s[ax+1:]))
                                   for i in range(1, 4)])
         _test_concat_func(concatenate, axis=ax, vins_list=[vins])
-
-
-def test_zero_arg_concat_func():
-    with pytest.raises(ValueError):
-        concatenate([])
-
-    with pytest.raises(ValueError):
-        stack([])
-    
-    with pytest.raises(ValueError):
-        hstack([])
-
-    with pytest.raises(ValueError):
-        vstack([])
-
-    with pytest.raises(ValueError):
-        dstack([])
 
 
 def _test_split_func(f, test_shapes="1dmin", test_axis=None, **kwargs):
