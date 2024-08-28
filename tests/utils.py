@@ -12,7 +12,10 @@ def assparsenormal(x):
 
 
 def random_normal(shape, dtype=np.float64):
-    """Generates a normal variable with random mean and latent map."""
+    """Generates a normal variable with random mean and latent map. 
+    The mean and the map coefficients are uniformly distributed over [-1, 1] 
+    for real data types, or made of the real and imaginary parts 
+    that are uniformly distributed over [-1, 1] for complex data types."""
 
     sz = reduce(lambda x, y: x * y, shape, 1)
 

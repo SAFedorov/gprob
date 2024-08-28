@@ -948,6 +948,65 @@ def test_divide():
             _assert_normals_close(divide(v, ar), multiply(v, 1/ar))
 
 
+def test_power():
+
+    # Identical shapes of the operands.
+    test_shapes = [tuple(), (2,), (3, 2)]
+    for sh in test_shapes:
+
+        # normal-constant
+        v = 1.001 + random_normal(sh)
+        x = (2 * np.random.rand(*sh) - 1)
+
+        v_ = power(v, x)
+        v_ref = power(v.mean(), x) * (1 + x * v.delta / v.mean())
+        _assert_normals_close(v_, v_ref)
+
+        v_ = power(v, 3)
+        v_ref = v * v * v
+        _assert_normals_close(v_, v_ref)
+
+        v_ = power(v, -2)
+        v_ref = 1 / v / v
+        _assert_normals_close(v_, v_ref)
+
+        v_ = power(v, 0)
+        v_ref = normal(1., 0., size=v.shape)
+        _assert_normals_close(v_, v_ref)
+        
+        # constant-normal
+        v = random_normal(sh)
+        x = np.random.rand(*sh) + 0.001
+
+        v_ = power(x, v)
+        v_ref = power(x, v.mean()) * (1 + np.log(x) * v.delta)
+        _assert_normals_close(v_, v_ref)
+
+        v_ = power(0, 1 + v)  # negative powers of 0 are ill-defined
+        v_ref = normal(0., 0., size=v.shape)
+        _assert_normals_close(v_, v_ref)
+
+        v_ = power(1, v)
+        v_ref = normal(1., 0., size=v.shape)
+        _assert_normals_close(v_, v_ref)
+
+        # normal-normal
+        v = 1.001 + random_normal(sh)
+        v2 = random_normal(sh)
+        v_ = power(v, v2)
+
+        y, z = v.mean(), v2.mean()
+        v_ref = (y**z + y**z*v2.delta*np.log(y) 
+                 + v.delta*(y**(-1+z)*z+y**(-1+z)*v2.delta*(1+z*np.log(y))))
+        _assert_normals_close(v_, v_ref)
+
+    # Another case for broadcasting over the second operand.
+    v = random_normal(tuple())
+    v_ = power(v, [2, 3, 4])
+    v_ref = stack([v * v, v * v * v, v * v * v * v])
+    _assert_normals_close(v_, v_ref)
+
+
 def test_heterogeneous_ops():
     # Heterogeneous variables have mean and variance with different data types.
 
