@@ -19,6 +19,8 @@ from gprob.fft import (fft, fft2, fftn,
                        irfft, irfft2, irfftn,
                        hfft, ihfft)
 
+from gprob.linalg import solve, asolve
+
 from utils import random_normal, random_det_normal, random_correlate
 
 
@@ -48,7 +50,7 @@ def _gts(ndim = None):
 
 
 def _test_array_func(f, args=tuple(), pargs=tuple(), test_shapes=None, 
-                     test_dtype=np.float64, mod="", **kwargs):
+                     test_dtype=np.float64, mod="", npf=None, **kwargs):
     """Tests a numpy-like function taking a single random variable as an input
     and producing a single random variable at the output.
     
@@ -68,6 +70,8 @@ def _test_array_func(f, args=tuple(), pargs=tuple(), test_shapes=None,
             The data type of the test variables.
         mod (str):
             The name of the module where the function is located.
+        npf (callable or None):
+            The function operating on numerical arrays to use as a reference.
         **kwargs:
             The keyword arguments to be passed to the tested function.
 
@@ -75,11 +79,11 @@ def _test_array_func(f, args=tuple(), pargs=tuple(), test_shapes=None,
         None
     """
 
-    if mod != "":
-        mod = getattr(np, mod)
-        npf = getattr(mod, f.__name__)
-    else:
-        npf = getattr(np, f.__name__)
+    if npf is None:
+        if mod != "":
+            npf = getattr(getattr(np, mod), f.__name__)
+        else:
+            npf = getattr(np, f.__name__)
 
     if test_shapes is None or isinstance(test_shapes, (str, int)):
         test_shapes = _gts(test_shapes)
@@ -337,6 +341,76 @@ def test_fftn():
                          test_dtype=np.complex128, test_shapes=ts, mod="fft")
         _test_array_func(f, axes=[2, 1, 0], 
                          test_dtype=np.complex128, test_shapes=ts, mod="fft")
+
+
+def test_solve():
+    a = 2 * np.random.rand(2, 2) - 1
+    _test_array_func(solve, pargs=(a,), test_shapes=[(2,), (2, 3)], mod="linalg")
+    
+    a = 2 * np.random.rand(5, 5) - 1
+    _test_array_func(solve, pargs=(a,), test_shapes=[(5,), (5, 3)], mod="linalg")
+    
+    a = 2 * np.random.rand(3, 2, 2) - 1
+    v = normal(size=(2,))
+
+    with pytest.raises(ValueError):
+        solve(a, v)  # Error because of the wrong number of dimensions of a.
+
+    a = 2 * np.random.rand(2, 2) - 1
+    v = normal(size=(2, 2, 3))
+
+    assert np.linalg.solve(a, v.mean()).shape == v.shape
+    with pytest.raises(ValueError):
+        solve(a, v)  # Error because of the wrong number of dimensions of v.
+
+    # Some more erroneous cases.
+
+    a = 2 * np.random.rand(2, 2) - 1
+    v = normal()
+    with pytest.raises(ValueError):
+        solve(a, v)
+
+    a = 2 * np.random.rand(2) - 1
+    v = normal(size=(2,))
+    with pytest.raises(ValueError):
+        solve(a, v)
+        
+    a = 2 * np.random.rand(3, 3) - 1
+    v = normal(size=(2,))
+    with pytest.raises(ValueError):
+        solve(a, v)
+
+
+def test_asolve():
+    def asolve_ref(a, b):
+        return np.linalg.solve(a, b[..., None]).squeeze(-1)
+    
+    a = 2 * np.random.rand(2, 2) - 1
+    _test_array_func(asolve, pargs=(a,), test_shapes=[(2,)], npf=asolve_ref)
+    
+    a = 2 * np.random.rand(5, 5) - 1
+    _test_array_func(asolve, pargs=(a,), test_shapes=[(5,)], npf=asolve_ref)
+
+    a = 2 * np.random.rand(4, 3, 2, 2) - 1
+    _test_array_func(asolve, pargs=(a,), 
+                     test_shapes=[(1, 1, 2,), (4, 3, 2)], npf=asolve_ref)
+
+    # Some more erroneous cases.
+
+    a = 2 * np.random.rand(2, 2) - 1
+    v = normal()
+    with pytest.raises(ValueError):
+        asolve(a, v)
+
+    a = 2 * np.random.rand(2) - 1
+    v = normal(size=(2,))
+    with pytest.raises(ValueError):
+        asolve(a, v)
+        
+    a = 2 * np.random.rand(3, 3) - 1
+    v = normal(size=(2,))
+    with pytest.raises(ValueError):
+        asolve(a, v)
 
 
 def _test_array_func2(f, op1_shape=None, op2_shape=None, *args, **kwargs):
@@ -628,6 +702,8 @@ def test_einsum():
     
 
 def _test_array_method(name, *args, test_shapes=None, **kwargs):
+    """Tests array methods that do not have standalone counterparts."""
+
     if test_shapes is None or isinstance(test_shapes, (str, int)):
         test_shapes = _gts(test_shapes)
 

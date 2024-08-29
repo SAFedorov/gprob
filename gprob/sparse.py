@@ -1057,6 +1057,20 @@ def stack(cls, arrays, axis=0):
     return _finalize(normal_.stack(cls, arrays, axis), iaxid)
 
 
+def solve(cls, x, y):
+    if y._iaxid[0]:
+        raise ValueError("Solutions along independence axes are not supported.")
+
+    return _finalize(normal_.solve(cls, x, y), y.iaxid)
+
+
+def asolve(cls, x, y):
+    if y._iaxid[-1]:
+        raise ValueError("Solutions along independence axes are not supported.")
+
+    return _finalize(normal_.solve(cls, x, y), y._iaxid)
+
+
 def call_linearized(x, f, jmpf):
     return _finalize(normal_.call_linearized(x, f, jmpf), x._iaxid)
 

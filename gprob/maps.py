@@ -729,6 +729,18 @@ def stack(cls, arrays, axis=0):
     return cls(a, b, union_lat)
 
 
+def solve(cls, x, y):
+    b = np.linalg.solve(x, y.b)
+    a = np.linalg.solve(x, y.a.T).T    
+    return cls(a, b, y.lat)
+
+
+def asolve(cls, x, y):
+    b = np.linalg.solve(x, y.b[..., None])
+    a = np.linalg.solve(x, _unsq(y.a[..., None], b.ndim))
+    return cls(a.squeeze(-1), b.squeeze(-1), y.lat)
+
+
 def call_linearized(x, func, jmpfunc):
     b = func(x.b)
     delta = jmpfunc(x.b, b, x.delta)

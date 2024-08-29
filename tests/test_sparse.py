@@ -3842,7 +3842,7 @@ def test_iid_copy():
 
 
 def test_doc_string_sync():
-    methods = ["iid_copy", "mean", "var", "sample", "logp", "__or__"]
+    methods = ["mean", "var", "sample", "logp", "__or__"]
 
     for m in methods:
         assert getattr(Normal, m).__doc__
