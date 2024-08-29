@@ -10,5 +10,9 @@ from .arrayops import (iid_copy, mean, var, cov,
     exp, exp2, log, log2, log10, sqrt, cbrt, sin, cos, tan, arcsin, arccos, 
     arctan, sinh, cosh, tanh, arcsinh, arccosh, arctanh, conjugate, conj)
 
-from .parametric import pnormal
+try:
+    from .parametric import pnormal
+except ModuleNotFoundError:
+    pnormal = None
+
 from .sparse import iid_repeat

@@ -73,12 +73,14 @@ class SparseNormal(Normal):
     def _niax(self):
         return len(self._iaxid) - self._iaxid.count(None)
     
-    def __array__(self):
+    def __array__(self, dtype=np.object_, copy=False):
         # The application of default numpy.array() to a sparse variable 
         # can silently return an empty array of numeric type, because sparse 
         # variables cannot be iterated over along their independence axes. 
+
+        # `dtype` and `copy` are for compatibility with array API.
         
-        return np.fromiter([self], np.object_).reshape(tuple())
+        return np.fromiter([self], dtype).reshape(tuple())
     
     def __repr__(self):
         return print_(self, extra_attrs=("iaxes",))
@@ -491,7 +493,7 @@ class SparseNormal(Normal):
             raise LinAlgError("Degenerate conditions.")
 
         t_ax = tuple(range(niax)) + (-1, -2)
-        es = np.linalg.solve(r.transpose(t_ax), -mc)
+        es = np.linalg.solve(r.transpose(t_ax), -mc[..., None]).squeeze(-1)
         aproj = (q.transpose(t_ax) @ av)
 
         cond_a = av - q @ aproj
@@ -662,14 +664,17 @@ class SparseNormal(Normal):
 
         batch_ndim = x.ndim - self.ndim
 
+        if not batch_ndim:
+            delta_x = delta_x[None, ...]
+            nsamples = 1
+        else:
+            nsamples = len(x)
+
         # Moves the sparse axes to the beginning and the batch axis to the end.
-        sparse_ax = [i + batch_ndim for i, b in enumerate(self._iaxid) if b]
-        dense_ax = [i + batch_ndim for i, b in enumerate(self._iaxid) if not b]
+        sparse_ax = [i + 1 for i, b in enumerate(self._iaxid) if b]
+        dense_ax = [i + 1 for i, b in enumerate(self._iaxid) if not b]
 
-        if batch_ndim:
-            dense_ax.append(0)
-
-        delta_x = delta_x.transpose(tuple(sparse_ax + dense_ax))
+        delta_x = delta_x.transpose(tuple(sparse_ax + dense_ax + [0]))
 
         # Covariance with the sparse axes first.
         cov = self.cov()
@@ -682,11 +687,14 @@ class SparseNormal(Normal):
 
         cov = cov.reshape(cov.shape[:niax] + (dense_sz, dense_sz))
 
-        new_x_sh = delta_x.shape[:niax] + (dense_sz,) + (len(x),) * batch_ndim
+        new_x_sh = delta_x.shape[:niax] + (dense_sz,) + (nsamples,)
         delta_x = delta_x.reshape(new_x_sh)
 
         ltr = np.linalg.cholesky(cov)
         z = np.linalg.solve(ltr, delta_x)
+
+        if not batch_ndim:
+            z = z.squeeze(-1)
         
         sparse_sz = self.size // dense_sz
         rank = cov.shape[-1] * sparse_sz  # The rank is full.
