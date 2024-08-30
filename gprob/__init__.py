@@ -1,4 +1,5 @@
 from . import fft
+from . import linalg
 from . import func
 from .normal_ import Normal, normal
     

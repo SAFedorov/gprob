@@ -2212,6 +2212,114 @@ def test_stack():
     assert v_.iaxes == tuple()
 
 
+def test_solve():
+    tol = 1e-8
+
+    # Lifted normal variables.
+    a = 2 * np.random.rand(3, 3) - 1
+    v = assparsenormal(normal(1, 1, size=(3,)))
+    v_ = gp.linalg.solve(a, v)
+
+    v2 = a @ v_
+    assert isinstance(v_, SparseNormal)
+    assert v_.iaxes == tuple()
+    assert np.abs(np.max(v.mean() - v2.mean())) < tol
+    assert np.abs(np.max(v.cov() - v2.cov())) < tol
+
+    v = assparsenormal(normal(1, 1, size=(3, 4)))
+    v_ = gp.linalg.solve(a, v)
+
+    v2 = a @ v_
+    assert isinstance(v_, SparseNormal)
+    assert v_.iaxes == tuple()
+    assert np.abs(np.max(v.mean() - v2.mean())) < tol
+    assert np.abs(np.max(v.cov() - v2.cov())) < tol
+    
+    v = assparsenormal(normal(1, 1))
+    with pytest.raises(ValueError):
+        gp.linalg.solve(a, v)
+
+    v = assparsenormal(normal(1, 1, size=(3, 3, 4)))
+    with pytest.raises(ValueError):
+        gp.linalg.solve(a, v)
+
+    # 1 independence axis.
+    v = iid_repeat(normal(1, 1), 3)
+    with pytest.raises(ValueError):
+        gp.linalg.solve(a, v)
+
+    v = iid_repeat(normal(1, 1, size=4), 3)
+    with pytest.raises(ValueError):
+        gp.linalg.solve(a, v)
+
+    v = iid_repeat(normal(1, 1, size=3), 4, axis=-1)
+    v_ = gp.linalg.solve(a, v)
+
+    v2 = a @ v_
+    assert isinstance(v_, SparseNormal)
+    assert v_.iaxes == (1,)
+    assert np.abs(np.max(v.mean() - v2.mean())) < tol
+    assert np.abs(np.max(v.cov() - v2.cov())) < tol
+
+    # 2 independence axes.
+    v = iid_repeat(iid_repeat(normal(1, 1), 3), 4)
+    with pytest.raises(ValueError):
+        gp.linalg.solve(a, v)
+
+
+def test_asolve():
+    tol = 1e-8
+
+    # Lifted normal variables.
+    a = 2 * np.random.rand(3, 3) - 1
+    v = assparsenormal(normal(1, 1, size=(3,)))
+    v_ = gp.linalg.asolve(a, v)
+
+    v2 = a @ v_
+    assert isinstance(v_, SparseNormal)
+    assert v_.iaxes == tuple()
+    assert np.abs(np.max(v.mean() - v2.mean())) < tol
+    assert np.abs(np.max(v.cov() - v2.cov())) < tol
+    
+    v = assparsenormal(normal(1, 1))
+    with pytest.raises(ValueError):
+        gp.linalg.asolve(a, v)
+
+    v = assparsenormal(normal(1, 1, size=(3, 4)))
+    with pytest.raises(ValueError):
+        gp.linalg.asolve(a, v)
+
+    a = 2 * np.random.rand(1, 3, 3) - 1
+    v = assparsenormal(normal(1, 1, size=(4, 3)))
+    v_ = gp.linalg.asolve(a, v)
+
+    v2 = gp.einsum("...ji, ...i -> ...j", a, v_)
+    assert isinstance(v_, SparseNormal)
+    assert v_.iaxes == tuple()
+    assert np.abs(np.max(v.mean() - v2.mean())) < tol
+    assert np.abs(np.max(v.cov() - v2.cov())) < tol
+
+    # 1 independence axis.
+    a = 2 * np.random.rand(4, 3, 3) - 1
+
+    v = iid_repeat(normal(1, 1), 3)
+    with pytest.raises(ValueError):
+        gp.linalg.asolve(a, v)
+
+    v = iid_repeat(normal(1, 1, size=4), 3, axis=-1)
+    with pytest.raises(ValueError):
+        gp.linalg.asolve(a, v)
+
+    v = iid_repeat(normal(1, 1, size=3), 4)
+    v_ = gp.linalg.asolve(a, v)
+
+    v2 = gp.einsum("...ji, ...i -> ...j", a, v_)
+    assert isinstance(v_, SparseNormal)
+    assert v_.iaxes == (0,)
+    assert np.abs(np.max(v.mean() - v2.mean())) < tol
+    assert np.abs(np.max(v.cov() - v2.cov())) < tol
+
+
 def test_fft():
     tol = 1e-8
 
@@ -2327,6 +2435,8 @@ def test_fftn():
 
 
 def test_matmul():
+    tol = 1e-10
+
     # Some trivial cases first.
 
     v = assparsenormal(1)
@@ -2342,12 +2452,42 @@ def test_matmul():
     assert w.shape == tuple()
     assert w.iaxes == tuple()
 
+    v = assparsenormal(normal(1, 1, size=(3,)))
+    for sh in [(3, 3), (2, 3, 3)]:
+        a = 2 * np.random.rand(*sh) - 1
+        w = a @ v
+        assert w.shape == a.shape[:-1]
+        assert w.iaxes == tuple()
+        assert np.max(np.abs(a @ v.mean() - w.mean())) < tol
+        assert np.max(np.abs((a**2) @ v.var() - w.var())) < tol
+
+        w = v @ a
+        assert w.shape == a.shape[:-1]
+        assert w.iaxes == tuple()
+        assert np.max(np.abs(v.mean() @ a - w.mean())) < tol
+        assert np.max(np.abs(v.var() @ (a**2) - w.var())) < tol
+
     # When at least one variable is a proper sparse normal.
 
     with pytest.raises(ValueError):
         iid_repeat(normal(), 3) @ [1, 1, 1]
     with pytest.raises(ValueError):
          [1, 1, 1] @ iid_repeat(normal(), 3)
+    
+    v = iid_repeat(normal(1, 1, size=(3,)), 4, axis=-1)
+    for sh in [(3, 3), (2, 3, 3)]:
+        a = 2 * np.random.rand(*sh) - 1
+        w = a @ v
+        assert w.shape == a.shape[:-1] + (4,)
+        assert w.iaxes == (w.ndim - 1,)
+        assert np.max(np.abs(a @ v.mean() - w.mean())) < tol
+        assert np.max(np.abs((a**2) @ v.var() - w.var())) < tol
+
+        w = v.T @ a
+        assert w.shape == a.shape[:-2] + (4, 3)
+        assert w.iaxes == (w.ndim - 2,)
+        assert np.max(np.abs(v.mean().T @ a - w.mean())) < tol
+        assert np.max(np.abs(v.var().T @ (a**2) - w.var())) < tol
 
     v = iid_repeat(normal(size=(3,)), 7)  # shape (7, 3), iaxes (0,)
 
@@ -2438,8 +2578,6 @@ def test_matmul():
     assert w.iaxes == (1, 4)
 
     # An example with two random variables.
-
-    tol = 1e-10
     
     v1 = iid_repeat(iid_repeat(random_normal((3, 5)), 7), 4)
     # shape (4, 7, 3, 5), iaxes (0, 1)

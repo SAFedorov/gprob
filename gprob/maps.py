@@ -731,7 +731,12 @@ def stack(cls, arrays, axis=0):
 
 def solve(cls, x, y):
     b = np.linalg.solve(x, y.b)
-    a = np.linalg.solve(x, y.a.T).T    
+
+    if y.ndim != 1:
+        a = np.linalg.solve(x, y.a)
+    else:
+        a = np.linalg.solve(x, y.a.T).T
+
     return cls(a, b, y.lat)
 
 

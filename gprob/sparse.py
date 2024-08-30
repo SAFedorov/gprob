@@ -115,19 +115,18 @@ class SparseNormal(Normal):
         
         x = super().__matmul__(other)
         
-        op_axis = self.ndim - 1
-        if self._iaxid[op_axis]:
+        if self._iaxid[-1]:
             raise ValueError("Matrix multiplication contracting over "
-                             "independence axes is not supported. "
-                             f"Axis {op_axis} of operand 1 is contracted.")
+                             "independence axes is not supported. Axis "
+                             f"{self.ndim - 1} of operand 1 is contracted.")
 
         if other.ndim == 1:
             iaxid = self._iaxid[:-1]
-        elif other.ndim <= self.ndim:
-            iaxid = self._iaxid
         else:
-            # There are dimensions added by broadcasting.
-            iaxid = (None,) * (other.ndim - self.ndim) + self._iaxid
+            iaxid = self._iaxid
+
+        if x.ndim > self.ndim:  # Accounts for broadcasting.
+            iaxid = (None,) * (x.ndim - self.ndim) + iaxid
 
         return _finalize(x, iaxid)
 
@@ -152,14 +151,13 @@ class SparseNormal(Normal):
                              "independence axes is not supported. "
                              f"Axis {op_axis} of operand 2 is contracted.")
 
+        iaxid = self._iaxid
+
         if other.ndim == 1:
-            iaxid = tuple([b for i, b in enumerate(self._iaxid) 
-                           if i != op_axis])
-        elif other.ndim >= 2 and other.ndim <= self.ndim - 1:
-            iaxid = self._iaxid
-        else:
-            d = other.ndim - self.ndim
-            iaxid = (None,) * d + self._iaxid
+            iaxid = tuple([b for i, b in enumerate(iaxid) if i != op_axis])
+        
+        if x.ndim > self.ndim:  # Accounts for broadcasting.
+            iaxid = (None,) * (x.ndim - self.ndim) + iaxid
 
         return _finalize(x, iaxid)
     
@@ -1069,14 +1067,14 @@ def solve(cls, x, y):
     if y._iaxid[0]:
         raise ValueError("Solutions along independence axes are not supported.")
 
-    return _finalize(normal_.solve(cls, x, y), y.iaxid)
+    return _finalize(normal_.solve(cls, x, y), y._iaxid)
 
 
 def asolve(cls, x, y):
     if y._iaxid[-1]:
         raise ValueError("Solutions along independence axes are not supported.")
 
-    return _finalize(normal_.solve(cls, x, y), y._iaxid)
+    return _finalize(normal_.asolve(cls, x, y), y._iaxid)
 
 
 def call_linearized(x, f, jmpf):

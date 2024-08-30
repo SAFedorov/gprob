@@ -4,7 +4,7 @@ from .arrayops import resolve
 
 
 def solve(a, b):
-    """The function solves a system of linear equations where the coefficient 
+    """Solves a system of linear equations where the coefficient 
     matrix is `a` and the constant vector is `b`.
 
     Args:
@@ -41,8 +41,8 @@ def solve(a, b):
 # The dedicated batch function allows supporting numpy versions older than 2.0. 
 
 def asolve(a, b):
-    """The function solves an array of system of linear equations where 
-    the coefficient matrices are `a` and the constant vectors are `b`.
+    """Solves an array of systems of linear equations where the coefficient 
+    matrices are `a` and the constant vectors are `b`.
 
     Args:
         a (array of numeric matrix):
