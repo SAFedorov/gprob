@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gprob"
-version = "0.2"
+version = "0.7.0"
 description = "Probabilistic programming with arrays of Gaussian variables."
 requires-python = ">=3.6"
 readme = "readme.md"
@@ -22,9 +22,15 @@ keywords = [
     "Noise",
     "Random variables",
     "Stochastic processes",
+    "Gaussian processes",
     "Probabilistic programming",
     "Python",
     "Numpy",
     "Scipy",
 ]
 dependencies = []
+
+[tool.setuptools]
+packages=[
+    "gprob"
+]
