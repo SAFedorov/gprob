@@ -8,7 +8,7 @@ from numpy.exceptions import ComplexWarning
 
 import gprob as gp
 from gprob.normal_ import normal, Normal
-from gprob.sparse import (_item_iaxid, iid_repeat, _finalize,
+from gprob.sparse import (_item_iaxid, iid, _finalize,
                           SparseNormal, SparseConditionWarning, lift)
 
 from utils import random_normal, get_message, assparsenormal
@@ -82,7 +82,7 @@ def test_lift():
     assert x.iaxes == tuple()
     assert x._iaxid == (None, None, None)
 
-    x = iid_repeat(normal(), 3)
+    x = iid(normal(), 3)
     assert lift(SparseNormal, x) is x
 
 
@@ -182,7 +182,7 @@ def test_implicit_type_lifting():
     assert len(v._iaxid) == v.ndim
 
     x = normal()
-    y = iid_repeat(normal(), 3)
+    y = iid(normal(), 3)
 
     for op in elementwise_ops:
         with pytest.raises(ValueError):
@@ -192,121 +192,134 @@ def test_implicit_type_lifting():
             op(y, x)
 
 
-def test_iid_repeat():
+def test_iid():
     # A numeric constant.
     number = 1
-    assert iid_repeat(number, 5, axis=0).shape == (5,)
-    assert iid_repeat(number, 5, axis=0).iaxes == (0,)
+    assert iid(number, 5, axis=0).shape == (5,)
+    assert iid(number, 5, axis=0).iaxes == (0,)
 
     arr = np.ones((3, 4))
-    assert iid_repeat(arr, 5, axis=0).shape == (5, 3, 4)
-    assert iid_repeat(arr, 5, axis=0).iaxes == (0,)
+    assert iid(arr, 5, axis=0).shape == (5, 3, 4)
+    assert iid(arr, 5, axis=0).iaxes == (0,)
 
     # One independence axis.
 
-    assert iid_repeat(normal(), 0, axis=0).shape == (0,)
-    assert iid_repeat(normal(), 0, axis=0).iaxes == (0,)
+    assert iid(normal(), 0, axis=0).shape == (0,)
+    assert iid(normal(), 0, axis=0).iaxes == (0,)
 
-    assert iid_repeat(normal(), 5, axis=0).shape == (5,)
-    assert iid_repeat(normal(), 5, axis=0).iaxes == (0,)
+    assert iid(normal(), 5, axis=0).shape == (5,)
+    assert iid(normal(), 5, axis=0).iaxes == (0,)
 
     v = normal(size=(2, 3))
 
-    assert iid_repeat(v, 5, axis=0).shape == (5, 2, 3)
-    assert iid_repeat(v, 5, axis=0).iaxes == (0,)
+    assert iid(v, 5, axis=0).shape == (5, 2, 3)
+    assert iid(v, 5, axis=0).iaxes == (0,)
 
-    assert iid_repeat(v, 5, axis=-3).shape == (5, 2, 3)
-    assert iid_repeat(v, 5, axis=-3).iaxes == (0,)
+    assert iid(v, 5, axis=-3).shape == (5, 2, 3)
+    assert iid(v, 5, axis=-3).iaxes == (0,)
 
-    assert iid_repeat(v, 5, axis=1).shape == (2, 5, 3)
-    assert iid_repeat(v, 5, axis=1).iaxes == (1,)
+    assert iid(v, 5, axis=1).shape == (2, 5, 3)
+    assert iid(v, 5, axis=1).iaxes == (1,)
 
-    assert iid_repeat(v, 5, axis=-2).shape == (2, 5, 3)
-    assert iid_repeat(v, 5, axis=-2).iaxes == (1,)
+    assert iid(v, 5, axis=-2).shape == (2, 5, 3)
+    assert iid(v, 5, axis=-2).iaxes == (1,)
 
-    assert iid_repeat(v, 5, axis=2).shape == (2, 3, 5)
-    assert iid_repeat(v, 5, axis=2).iaxes == (2,)
+    assert iid(v, 5, axis=2).shape == (2, 3, 5)
+    assert iid(v, 5, axis=2).iaxes == (2,)
 
-    assert iid_repeat(v, 5, axis=-1).shape == (2, 3, 5)
-    assert iid_repeat(v, 5, axis=-1).iaxes == (2,)
+    assert iid(v, 5, axis=-1).shape == (2, 3, 5)
+    assert iid(v, 5, axis=-1).iaxes == (2,)
 
     # Two independence axes.
 
-    v = iid_repeat(v, 5, axis=1)  # shape (2, 5, 3), iaxes (1,)
+    v = iid(v, 5, axis=1)  # shape (2, 5, 3), iaxes (1,)
 
-    assert iid_repeat(v, 6, axis=0).shape == (6, 2, 5, 3)
-    assert iid_repeat(v, 6, axis=0).iaxes == (0, 2)
+    assert iid(v, 6, axis=0).shape == (6, 2, 5, 3)
+    assert iid(v, 6, axis=0).iaxes == (0, 2)
 
-    assert iid_repeat(v, 6, axis=-4).shape == (6, 2, 5, 3)
-    assert iid_repeat(v, 6, axis=-4).iaxes == (0, 2)
+    assert iid(v, 6, axis=-4).shape == (6, 2, 5, 3)
+    assert iid(v, 6, axis=-4).iaxes == (0, 2)
 
-    assert iid_repeat(v, 6, axis=1).shape == (2, 6, 5, 3)
-    assert iid_repeat(v, 6, axis=1).iaxes == (1, 2)
+    assert iid(v, 6, axis=1).shape == (2, 6, 5, 3)
+    assert iid(v, 6, axis=1).iaxes == (1, 2)
 
-    assert iid_repeat(v, 6, axis=-3).shape == (2, 6, 5, 3)
-    assert iid_repeat(v, 6, axis=-3).iaxes == (1, 2)
+    assert iid(v, 6, axis=-3).shape == (2, 6, 5, 3)
+    assert iid(v, 6, axis=-3).iaxes == (1, 2)
 
-    assert iid_repeat(v, 6, axis=2).shape == (2, 5, 6, 3)
-    assert iid_repeat(v, 6, axis=2).iaxes == (1, 2)
+    assert iid(v, 6, axis=2).shape == (2, 5, 6, 3)
+    assert iid(v, 6, axis=2).iaxes == (1, 2)
 
-    assert iid_repeat(v, 6, axis=-2).shape == (2, 5, 6, 3)
-    assert iid_repeat(v, 6, axis=-2).iaxes == (1, 2)
+    assert iid(v, 6, axis=-2).shape == (2, 5, 6, 3)
+    assert iid(v, 6, axis=-2).iaxes == (1, 2)
 
-    assert iid_repeat(v, 6, axis=3).shape == (2, 5, 3, 6)
-    assert iid_repeat(v, 6, axis=3).iaxes == (1, 3)
+    assert iid(v, 6, axis=3).shape == (2, 5, 3, 6)
+    assert iid(v, 6, axis=3).iaxes == (1, 3)
 
-    assert iid_repeat(v, 6, axis=-1).shape == (2, 5, 3, 6)
-    assert iid_repeat(v, 6, axis=-1).iaxes == (1, 3)
+    assert iid(v, 6, axis=-1).shape == (2, 5, 3, 6)
+    assert iid(v, 6, axis=-1).iaxes == (1, 3)
 
     # Three independence axes.
 
-    v = iid_repeat(v, 6, axis=-1)  # shape (2, 5, 3, 6), iaxes (1, 3)
+    v = iid(v, 6, axis=-1)  # shape (2, 5, 3, 6), iaxes (1, 3)
 
-    assert iid_repeat(v, 4, axis=0).shape == (4, 2, 5, 3, 6)
-    assert iid_repeat(v, 4, axis=0).iaxes == (0, 2, 4)
+    assert iid(v, 4, axis=0).shape == (4, 2, 5, 3, 6)
+    assert iid(v, 4, axis=0).iaxes == (0, 2, 4)
 
-    assert iid_repeat(v, 4, axis=-5).shape == (4, 2, 5, 3, 6)
-    assert iid_repeat(v, 4, axis=-5).iaxes == (0, 2, 4)
+    assert iid(v, 4, axis=-5).shape == (4, 2, 5, 3, 6)
+    assert iid(v, 4, axis=-5).iaxes == (0, 2, 4)
 
-    assert iid_repeat(v, 4, axis=1).shape == (2, 4, 5, 3, 6)
-    assert iid_repeat(v, 4, axis=1).iaxes == (1, 2, 4)
+    assert iid(v, 4, axis=1).shape == (2, 4, 5, 3, 6)
+    assert iid(v, 4, axis=1).iaxes == (1, 2, 4)
 
-    assert iid_repeat(v, 4, axis=-4).shape == (2, 4, 5, 3, 6)
-    assert iid_repeat(v, 4, axis=-4).iaxes == (1, 2, 4)
+    assert iid(v, 4, axis=-4).shape == (2, 4, 5, 3, 6)
+    assert iid(v, 4, axis=-4).iaxes == (1, 2, 4)
 
-    assert iid_repeat(v, 4, axis=2).shape == (2, 5, 4, 3, 6)
-    assert iid_repeat(v, 4, axis=2).iaxes == (1, 2, 4)
+    assert iid(v, 4, axis=2).shape == (2, 5, 4, 3, 6)
+    assert iid(v, 4, axis=2).iaxes == (1, 2, 4)
 
-    assert iid_repeat(v, 4, axis=-3).shape == (2, 5, 4, 3, 6)
-    assert iid_repeat(v, 4, axis=-3).iaxes == (1, 2, 4)
+    assert iid(v, 4, axis=-3).shape == (2, 5, 4, 3, 6)
+    assert iid(v, 4, axis=-3).iaxes == (1, 2, 4)
 
-    assert iid_repeat(v, 4, axis=3).shape == (2, 5, 3, 4, 6)
-    assert iid_repeat(v, 4, axis=3).iaxes == (1, 3, 4)
+    assert iid(v, 4, axis=3).shape == (2, 5, 3, 4, 6)
+    assert iid(v, 4, axis=3).iaxes == (1, 3, 4)
 
-    assert iid_repeat(v, 4, axis=-2).shape == (2, 5, 3, 4, 6)
-    assert iid_repeat(v, 4, axis=-2).iaxes == (1, 3, 4)
+    assert iid(v, 4, axis=-2).shape == (2, 5, 3, 4, 6)
+    assert iid(v, 4, axis=-2).iaxes == (1, 3, 4)
 
-    assert iid_repeat(v, 4, axis=4).shape == (2, 5, 3, 6, 4)
-    assert iid_repeat(v, 4, axis=4).iaxes == (1, 3, 4)
+    assert iid(v, 4, axis=4).shape == (2, 5, 3, 6, 4)
+    assert iid(v, 4, axis=4).iaxes == (1, 3, 4)
 
-    assert iid_repeat(v, 4, axis=-1).shape == (2, 5, 3, 6, 4)
-    assert iid_repeat(v, 4, axis=-1).iaxes == (1, 3, 4)
+    assert iid(v, 4, axis=-1).shape == (2, 5, 3, 6, 4)
+    assert iid(v, 4, axis=-1).iaxes == (1, 3, 4)
 
     # Axis out of bound.
     # raised exception is AxisError, which is a subtype of ValueError
     with pytest.raises(AxisError):
-        iid_repeat(v, 4, axis=5)
+        iid(v, 4, axis=5)
     with pytest.raises(AxisError):
-        iid_repeat(v, 4, axis=-6)
+        iid(v, 4, axis=-6)
     with pytest.raises(AxisError):
-        iid_repeat(v, 4, axis=24)
+        iid(v, 4, axis=24)
 
     with pytest.raises(AxisError):
-        iid_repeat(normal(), 7, axis=1)
+        iid(normal(), 7, axis=1)
     with pytest.raises(AxisError):
-        iid_repeat(normal(), 7, axis=-2)
+        iid(normal(), 7, axis=-2)
     with pytest.raises(AxisError):
-        iid_repeat(normal(), 7, axis=22)
+        iid(normal(), 7, axis=22)
+
+
+def test_icopy():
+    tol = 1e-10
+    
+    v = iid(iid(normal(size=(3,)), 4), 5, axis=-1)
+    w = v.icopy()
+
+    assert v.shape == w.shape
+    assert v.iaxes == w.iaxes
+    assert np.abs(np.max(v.b - w.b)) < tol
+    assert np.abs(np.max(v.a - w.a)) < tol
+    assert np.abs(np.max(gp.cov(v, w))) < tol
 
 
 def test_properties():
@@ -314,8 +327,8 @@ def test_properties():
 
     tol = 1e-8
 
-    v1 = iid_repeat(iid_repeat(normal(), 4), 8) * np.random.rand(8, 4)
-    v2 = iid_repeat(iid_repeat(normal(), 4), 8)
+    v1 = iid(iid(normal(), 4), 8) * np.random.rand(8, 4)
+    v2 = iid(iid(normal(), 4), 8)
 
     vc = v1 + 1j * v2
 
@@ -363,7 +376,7 @@ def test_properties():
 
 
 def test_getitem():
-    v = iid_repeat(iid_repeat(normal(size=(4, 5)), 2, axis=1), 3, axis=1)
+    v = iid(iid(normal(size=(4, 5)), 2, axis=1), 3, axis=1)
     # v.shape is (4, 3, 2, 5), v.iaxes are (1, 2)
 
     assert v[2].shape == (3, 2, 5)
@@ -459,7 +472,7 @@ def test_setitem():
 
     # - single integer index. 
 
-    v = iid_repeat(normal(size=(3, 2)), 4, axis=1)  
+    v = iid(normal(size=(3, 2)), 4, axis=1)  
     # shape (3, 4, 2), iaxes (1,)
 
     rs = 2 * np.random.rand(3, 4, 2) - 1
@@ -470,7 +483,7 @@ def test_setitem():
     vv = v.var()
     vc = gp.cov(v, np.zeros((4, 2)))
 
-    v1 = iid_repeat(normal(0.1, 2, size=(2,)), 4)
+    v1 = iid(normal(0.1, 2, size=(2,)), 4)
     
     v[0] = v1
     vm[0] = v1.mean()
@@ -484,7 +497,7 @@ def test_setitem():
 
     # - slice and two integer indices.
 
-    v = iid_repeat(normal(size=(3, 2)), 4, axis=1)  
+    v = iid(normal(size=(3, 2)), 4, axis=1)  
     # shape (3, 4, 2), iaxes (1,)
 
     rs = 2 * np.random.rand(3, 4, 2) - 1
@@ -494,7 +507,7 @@ def test_setitem():
     vm = v.mean()
     vv = v.var()
 
-    v1 = iid_repeat(normal(0.1, 2, size=(3,)), 4, axis=-1)
+    v1 = iid(normal(0.1, 2, size=(3,)), 4, axis=-1)
 
     v[1, :, 0] = v1[1, :]
     vm[1, :, 0] = v1[1, :].mean()
@@ -523,7 +536,7 @@ def test_setitem():
     assert np.max(np.abs(gp.cov(v, v1) - vc)) < tol
 
     # Setting a trivial value.
-    v = iid_repeat(normal(), 4)
+    v = iid(normal(), 4)
 
     v[:] = 1
     assert np.max(np.abs(v.mean() - 1)) < tol
@@ -531,7 +544,7 @@ def test_setitem():
 
     # Errors.
 
-    v = iid_repeat(normal(), 4)
+    v = iid(normal(), 4)
 
     with pytest.raises(IndexError):
         v[0] = normal()
@@ -544,8 +557,8 @@ def test_setitem():
     assert np.max(np.abs(v.mean() - [1, 0, 0, 0])) < tol
     assert np.max(np.abs(v.var() - [0, 1, 1, 1])) < tol
 
-    v = iid_repeat(normal(size=4), 4)
-    v1 = iid_repeat(normal(size=4), 4, axis=1)
+    v = iid(normal(size=4), 4)
+    v1 = iid(normal(size=4), 4, axis=1)
 
     with pytest.raises(ValueError):
         v[:, :] = v1  # Mismatching iaxes.
@@ -555,8 +568,8 @@ def test_broadcasting():
 
     # Combine variables with compatible shapes and independence axes 
     # but different numbers of dimensions.
-    v1 = iid_repeat(normal(size=(2,)), 3, axis=1)
-    v2 = iid_repeat(normal() + 2., 3, axis=0)
+    v1 = iid(normal(size=(2,)), 3, axis=1)
+    v2 = iid(normal() + 2., 3, axis=0)
 
     assert (v1 + v2).shape == (2, 3)
     assert (v1 + v2).iaxes == (1,)
@@ -595,14 +608,14 @@ def test_broadcast_to():
 
     # 1 Independence axis.
 
-    v = iid_repeat(normal(), 4)
+    v = iid(normal(), 4)
     v = gp.reshape(v, (1, 4, 1))
     assert v.iaxes == (1,)
     v = gp.broadcast_to(v, (5, 3, 4, 2))
     assert v.shape == (5, 3, 4, 2)
     assert v.iaxes == (2,)
 
-    v = iid_repeat(normal(size=(2, 3)), 4)
+    v = iid(normal(size=(2, 3)), 4)
     assert v.iaxes == (0,)
     v = gp.broadcast_to(v, (2, 6, 4, 2, 3))
     assert v.shape == (2, 6, 4, 2, 3)
@@ -616,15 +629,15 @@ def test_broadcast_to():
 
     # 2 independence axes.
 
-    v = iid_repeat(normal(size=(2, 4)), 3, axis=1)
-    v = iid_repeat(v, 5, axis=-1)
+    v = iid(normal(size=(2, 4)), 3, axis=1)
+    v = iid(v, 5, axis=-1)
     assert v.iaxes == (1, 3)
     v = gp.broadcast_to(v, (6, 2, 3, 4, 5))
     assert v.shape == (6, 2, 3, 4, 5)
     assert v.iaxes == (2, 4)
 
-    v = iid_repeat(normal(size=(2, 1)), 3, axis=1)
-    v = iid_repeat(v, 5, axis=-1)
+    v = iid(normal(size=(2, 1)), 3, axis=1)
+    v = iid(v, 5, axis=-1)
     assert v.iaxes == (1, 3)
     v = gp.broadcast_to(v, (6, 2, 3, 4, 5))
     assert v.shape == (6, 2, 3, 4, 5)
@@ -635,7 +648,7 @@ def test_cov():
     tol = 1e-10
 
     nv = random_normal((2, 3))
-    v = iid_repeat(iid_repeat(nv, 4, axis=1), 5, axis=-1)
+    v = iid(iid(nv, 4, axis=1), 5, axis=-1)
     # shape (2, 4, 3, 5), iaxes (1, 3)
 
     r1 = np.random.rand(1, 4, 1, 1)
@@ -644,8 +657,8 @@ def test_cov():
     v1 = r1 * r2 * v
 
     # A dense Normal variable with the same statistics.
-    v2 = gp.stack([nv.iid_copy() for _ in range(4)], axis=1)
-    v2 = gp.stack([v2.iid_copy() for _ in range(5)], axis=-1)
+    v2 = gp.stack([nv.icopy() for _ in range(4)], axis=1)
+    v2 = gp.stack([v2.icopy() for _ in range(5)], axis=-1)
 
     v2 = r1 * r2 * v2
 
@@ -659,8 +672,8 @@ def test_cov():
     # Covariance betveen two variables.
 
     n = 20
-    v1 = iid_repeat(normal(), n)
-    v2 = iid_repeat(normal(), n)
+    v1 = iid(normal(), n)
+    v2 = iid(normal(), n)
     v = v1 + v2
 
     r1 = 2 * np.random.rand(n) - 1
@@ -679,11 +692,11 @@ def test_cov():
     assert c1.shape == c1_.shape
     assert np.max(np.abs(c1 - c1_)) < tol
 
-    v = iid_repeat(iid_repeat(normal(), 4), 4)
+    v = iid(iid(normal(), 4), 4)
     with pytest.raises(ValueError):
         gp.cov(v, v.T)
     with pytest.raises(ValueError):
-        gp.cov(v, iid_repeat(normal((4,)), 4))
+        gp.cov(v, iid(normal((4,)), 4))
 
 
 def test_cov_det():
@@ -699,7 +712,7 @@ def test_cov_det():
 
     # One independence axis.
 
-    v = iid_repeat(normal(), 4)  # shape (4,)
+    v = iid(normal(), 4)  # shape (4,)
 
     c = gp.cov(v, np.ones((4,)))
     assert c.shape == (4,)
@@ -709,7 +722,7 @@ def test_cov_det():
     assert c.shape == (4,)
     assert np.max(np.abs(c)) < tol
 
-    v = iid_repeat(normal(size=(4,)), 4)  # shape (4,)
+    v = iid(normal(size=(4,)), 4)  # shape (4,)
 
     with pytest.raises(ValueError):
         gp.cov(v, np.ones((4, 4)))
@@ -717,7 +730,7 @@ def test_cov_det():
     with pytest.raises(ValueError):
         gp.cov(np.ones((4, 4)), v)
 
-    v = iid_repeat(normal(size=(3,)), 4)  # shape (4, 3)
+    v = iid(normal(size=(3,)), 4)  # shape (4, 3)
 
     c = gp.cov(v, np.ones((2, 4)))
     assert c.shape == (3, 2, 4)
@@ -741,7 +754,7 @@ def test_cov_det():
 
     # Two independence axes.
 
-    v = iid_repeat(iid_repeat(normal(), 4), 4)
+    v = iid(iid(normal(), 4), 4)
 
     r = np.random.rand(4, 4)
     c = gp.cov(v, r)
@@ -752,7 +765,7 @@ def test_cov_det():
     assert c.shape == (4, 4)
     assert np.max(np.abs(c)) < tol
 
-    v = iid_repeat(iid_repeat(normal(size=(3,)), 4), 4)  # shape (4, 4, 3)
+    v = iid(iid(normal(size=(3,)), 4), 4)  # shape (4, 4, 3)
 
     c = gp.cov(v, np.ones((4, 2, 4)))
     assert c.shape == (3, 2, 4, 4)
@@ -795,8 +808,8 @@ def test_sample():
     assert v.sample().shape == v.shape
     assert v.sample(1).shape == (1,) + v.shape
 
-    v1 = iid_repeat(iid_repeat(random_normal((2, 3)), 4, axis=1), 5, axis=-1)
-    v2 = iid_repeat(iid_repeat(random_normal((2, 3)), 4, axis=1), 5, axis=-1)
+    v1 = iid(iid(random_normal((2, 3)), 4, axis=1), 5, axis=-1)
+    v2 = iid(iid(random_normal((2, 3)), 4, axis=1), 5, axis=-1)
     v = 0.5 * v1 - v2
     # shape (2, 4, 3, 5), iaxes (1, 3)
 
@@ -941,8 +954,8 @@ def test_condition():
         rs = 2 * np.random.rand(sz) - 1
         ro = 2 * np.random.rand(sz) - 1
         rv = normal(-0.3, 2.3)
-        nv_list.append(gp.stack([o + s * rv.iid_copy() for o, s in zip(ro, rs)]))
-        snv_list.append(ro + rs * iid_repeat(rv, sz))
+        nv_list.append(gp.stack([o + s * rv.icopy() for o, s in zip(ro, rs)]))
+        snv_list.append(ro + rs * iid(rv, sz))
 
     nvc = sum(nv_list).condition(nv_list[0] + 0.4 * nv_list[1])
     snvc = sum(snv_list).condition(snv_list[0] + 0.4 * snv_list[1])
@@ -958,8 +971,8 @@ def test_condition():
         rs = 2 * np.random.rand(sz, 2) - 1
         ro = 2 * np.random.rand(sz, 2) - 1
         rv = random_normal((2,))
-        nv_list.append(gp.stack([o + s * rv.iid_copy() for o, s in zip(ro, rs)]))
-        snv_list.append(ro + rs * iid_repeat(rv, sz))
+        nv_list.append(gp.stack([o + s * rv.icopy() for o, s in zip(ro, rs)]))
+        snv_list.append(ro + rs * iid(rv, sz))
 
     nv = sum(nv_list)
     snv = sum(snv_list)
@@ -1024,8 +1037,8 @@ def test_condition():
         rs = 2 * np.random.rand(sz, 2, 3, 4) - 1
         ro = 2 * np.random.rand(sz, 2, 3, 4) - 1
         rv = random_normal((2, 3, 4))
-        nv_list.append(gp.stack([o + s * rv.iid_copy() for o, s in zip(ro, rs)]))
-        snv_list.append(ro + rs * iid_repeat(rv, sz))
+        nv_list.append(gp.stack([o + s * rv.icopy() for o, s in zip(ro, rs)]))
+        snv_list.append(ro + rs * iid(rv, sz))
 
     nv = sum(nv_list)
     snv = sum(snv_list)
@@ -1074,7 +1087,7 @@ def test_condition():
         rs = 2 * np.random.rand(sz1, sz2) - 1
         ro = 2 * np.random.rand(sz1, sz2) - 1
         nv_list.append(ro + rs * normal(size=(sz1, sz2)))
-        snv_list.append(ro + rs * iid_repeat(iid_repeat(normal(), sz2), sz1))
+        snv_list.append(ro + rs * iid(iid(normal(), sz2), sz1))
 
     nv = sum(nv_list)
     snv = sum(snv_list)
@@ -1100,10 +1113,10 @@ def test_condition():
         rs = 2 * np.random.rand(3, 4, 5, 2) - 1
         ro = 2 * np.random.rand(3, 4, 5, 2) - 1
         rv = random_normal((5, 2))
-        nv = gp.stack([rv.iid_copy() for _ in range(4)])
-        nv = gp.stack([nv.iid_copy() for _ in range(3)])    
+        nv = gp.stack([rv.icopy() for _ in range(4)])
+        nv = gp.stack([nv.icopy() for _ in range(3)])    
         nv_list.append(ro + rs * nv)
-        snv_list.append(ro + rs * iid_repeat(iid_repeat(rv, 4), 3))
+        snv_list.append(ro + rs * iid(iid(rv, 4), 3))
 
     nv = sum(nv_list)
     snv = sum(snv_list)
@@ -1117,8 +1130,8 @@ def test_condition():
 
     # Other cases. -------------------------------------------------------------
 
-    snv1 = iid_repeat(iid_repeat(normal(), 4), 5)
-    snv2 = iid_repeat(normal(), 4)
+    snv1 = iid(iid(normal(), 4), 5)
+    snv2 = iid(normal(), 4)
 
     # Conditioning a variable on itself.
     x = np.random.rand(5, 4)
@@ -1144,8 +1157,8 @@ def test_condition():
         assert snvc is snv1
 
     # Different sizes of independence axes.
-    snv1 = iid_repeat(normal(), 5)
-    snv2 = iid_repeat(normal(), 4)
+    snv1 = iid(normal(), 5)
+    snv2 = iid(normal(), 4)
     with pytest.warns(SparseConditionWarning):
         snvc = snv2 | snv1
         assert snvc is snv2
@@ -1154,8 +1167,8 @@ def test_condition():
         snvc = snv1 | snv2
         assert snvc is snv1
 
-    snv1 = iid_repeat(iid_repeat(normal(), 5), 4)
-    snv2 = iid_repeat(iid_repeat(normal(), 5), 3)
+    snv1 = iid(iid(normal(), 5), 4)
+    snv2 = iid(iid(normal(), 5), 3)
     with pytest.warns(SparseConditionWarning):
         snvc = snv2 | snv1
         assert snvc is snv2
@@ -1164,7 +1177,7 @@ def test_condition():
         snvc = snv1 | snv2
         assert snvc is snv1
 
-    snv3 = iid_repeat(iid_repeat(normal(), 5), 4)
+    snv3 = iid(iid(normal(), 5), 4)
     snv13 = snv1 + snv3
     with pytest.warns(SparseConditionWarning):
         nv1 = normal(size=(4, 5))
@@ -1175,7 +1188,7 @@ def test_condition():
 
 
 def test_cumsum():
-    v = iid_repeat(iid_repeat(normal(size=(4, 5)), 2, axis=1), 3, axis=1)
+    v = iid(iid(normal(size=(4, 5)), 2, axis=1), 3, axis=1)
     # v.shape is (4, 3, 2, 5), v.iaxes are (1, 2)
 
     assert v.shape == (4, 3, 2, 5)
@@ -1253,7 +1266,7 @@ def test_logp():
     rs = 2 * np.random.rand(sz) - 1
     ro = 2 * np.random.rand(sz) - 1
     nv = gp.stack([o + s * normal() for o, s in zip(ro, rs)])
-    snv = ro + rs * iid_repeat(normal(), sz)
+    snv = ro + rs * iid(normal(), sz)
     x = 2 * np.random.rand(3, sz) - 1
     check_sparse_vs_normal(snv, nv, x[0])
     check_sparse_vs_normal(snv, nv, x)
@@ -1264,8 +1277,8 @@ def test_logp():
     rs = 2 * np.random.rand(sparse_sz, dense_sz) - 1
     ro = 2 * np.random.rand(sparse_sz, dense_sz) - 1
     rv = random_normal((dense_sz,))
-    nv = gp.stack([o + s * rv.iid_copy() for o, s in zip(ro, rs)])
-    snv = ro + rs * iid_repeat(rv, sparse_sz)
+    nv = gp.stack([o + s * rv.icopy() for o, s in zip(ro, rs)])
+    snv = ro + rs * iid(rv, sparse_sz)
     x = 2 * np.random.rand(2, sparse_sz, dense_sz) - 1
     check_sparse_vs_normal(snv, nv, x[0])
     check_sparse_vs_normal(snv, nv, x)
@@ -1273,8 +1286,8 @@ def test_logp():
     # 1D dense subspace, swap axes.
     sparse_sz = 4
     dense_sz = 3
-    nv = gp.stack([o + s * rv.iid_copy() for o, s in zip(ro, rs)], axis=1)
-    snv = ro.T + rs.T * iid_repeat(rv, sparse_sz, axis=1)
+    nv = gp.stack([o + s * rv.icopy() for o, s in zip(ro, rs)], axis=1)
+    snv = ro.T + rs.T * iid(rv, sparse_sz, axis=1)
     x = 2 * np.random.rand(2, dense_sz, sparse_sz) - 1
     check_sparse_vs_normal(snv, nv, x[0])
     check_sparse_vs_normal(snv, nv, x)
@@ -1285,8 +1298,8 @@ def test_logp():
     rs = 2 * np.random.rand(sparse_sz, *dense_sz) - 1
     ro = 2 * np.random.rand(sparse_sz, *dense_sz) - 1
     rv = random_normal(dense_sz)
-    nv = gp.stack([o + s * rv.iid_copy() for o, s in zip(ro, rs)])
-    snv = ro + rs * iid_repeat(rv, sparse_sz)
+    nv = gp.stack([o + s * rv.icopy() for o, s in zip(ro, rs)])
+    snv = ro + rs * iid(rv, sparse_sz)
     x = 2 * np.random.rand(2, sparse_sz, *dense_sz) - 1
     check_sparse_vs_normal(snv, nv, x[0])
     check_sparse_vs_normal(snv, nv, x)
@@ -1297,7 +1310,7 @@ def test_logp():
     rs = 2 * np.random.rand(3, 4) - 1
     ro = 2 * np.random.rand(3, 4) - 1
     nv = ro + rs * normal(size=(3, 4))
-    snv = ro + rs * iid_repeat(iid_repeat(normal(), 4), 3)
+    snv = ro + rs * iid(iid(normal(), 4), 3)
     x = 2 * np.random.rand(2, 3, 4) - 1
     check_sparse_vs_normal(snv, nv, x[0])
     check_sparse_vs_normal(snv, nv, x)
@@ -1306,10 +1319,10 @@ def test_logp():
     rs = 2 * np.random.rand(3, 4, 5) - 1
     ro = 2 * np.random.rand(3, 4, 5) - 1
     rv = random_normal((5,))
-    nv = gp.stack([rv.iid_copy() for _ in range(4)])
-    nv = gp.stack([nv.iid_copy() for _ in range(3)])    
+    nv = gp.stack([rv.icopy() for _ in range(4)])
+    nv = gp.stack([nv.icopy() for _ in range(3)])    
     nv = ro + rs * nv
-    snv = ro + rs * iid_repeat(iid_repeat(rv, 4), 3)
+    snv = ro + rs * iid(iid(rv, 4), 3)
     x = 2 * np.random.rand(2, 3, 4, 5) - 1
     check_sparse_vs_normal(snv, nv, x[0])
     check_sparse_vs_normal(snv, nv, x)
@@ -1318,10 +1331,10 @@ def test_logp():
     rs = 2 * np.random.rand(3, 4, 5, 2) - 1
     ro = 2 * np.random.rand(3, 4, 5, 2) - 1
     rv = random_normal((5, 2))
-    nv = gp.stack([rv.iid_copy() for _ in range(4)])
-    nv = gp.stack([nv.iid_copy() for _ in range(3)])    
+    nv = gp.stack([rv.icopy() for _ in range(4)])
+    nv = gp.stack([nv.icopy() for _ in range(3)])    
     nv = ro + rs * nv
-    snv = ro + rs * iid_repeat(iid_repeat(rv, 4), 3)
+    snv = ro + rs * iid(iid(rv, 4), 3)
     x = 2 * np.random.rand(2, 3, 4, 5, 2) - 1
     check_sparse_vs_normal(snv, nv, x[0])
     check_sparse_vs_normal(snv, nv, x)
@@ -1332,7 +1345,7 @@ def test_logp():
     rs = 2 * np.random.rand(3, 4, 5) - 1
     ro = 2 * np.random.rand(3, 4, 5) - 1
     nv = ro + rs * normal(size=(3, 4, 5))
-    snv = ro + rs * iid_repeat(iid_repeat(iid_repeat(normal(), 5), 4), 3)
+    snv = ro + rs * iid(iid(iid(normal(), 5), 4), 3)
     x = 2 * np.random.rand(2, 3, 4, 5) - 1
     check_sparse_vs_normal(snv, nv, x[0])
     check_sparse_vs_normal(snv, nv, x)
@@ -1341,24 +1354,24 @@ def test_logp():
     rs = 2 * np.random.rand(3, 4, 5, 2) - 1
     ro = 2 * np.random.rand(3, 4, 5, 2) - 1
     rv = random_normal((2,))
-    nv = gp.stack([rv.iid_copy() for _ in range(5)])
-    nv = gp.stack([nv.iid_copy() for _ in range(4)])
-    nv = gp.stack([nv.iid_copy() for _ in range(3)])    
+    nv = gp.stack([rv.icopy() for _ in range(5)])
+    nv = gp.stack([nv.icopy() for _ in range(4)])
+    nv = gp.stack([nv.icopy() for _ in range(3)])    
     nv = ro + rs * nv
-    snv = ro + rs * iid_repeat(iid_repeat(iid_repeat(rv, 5), 4), 3)
+    snv = ro + rs * iid(iid(iid(rv, 5), 4), 3)
     x = 2 * np.random.rand(2, 3, 4, 5, 2) - 1
     check_sparse_vs_normal(snv, nv, x[0])
     check_sparse_vs_normal(snv, nv, x)
 
     with pytest.warns(ComplexWarning):
-        iid_repeat(normal(), 1).logp([1+0.j])
+        iid(normal(), 1).logp([1+0.j])
 
     with pytest.raises(ValueError):
-        iid_repeat(normal(), 1).logp([[[1]]])  # Too high dimension of x.
+        iid(normal(), 1).logp([[[1]]])  # Too high dimension of x.
 
 
 def test_diagonal():
-    v = iid_repeat(iid_repeat(normal(size=(4, 5)), 2, axis=0), 3, axis=0)
+    v = iid(iid(normal(size=(4, 5)), 2, axis=0), 3, axis=0)
     # v.shape is (3, 2, 4, 5), v.iaxes are (0, 1)
     assert v.diagonal(axis1=-2, axis2=-1).shape == (3, 2, 4)
     assert v.diagonal(axis1=-2, axis2=-1).iaxes == (0, 1)
@@ -1382,12 +1395,12 @@ def test_diagonal():
     with pytest.raises(AxisError):
         v.diagonal(axis1=2, axis2=-5)
 
-    v = iid_repeat(iid_repeat(normal(size=(4, 5)), 2, axis=-1), 3, axis=-1)
+    v = iid(iid(normal(size=(4, 5)), 2, axis=-1), 3, axis=-1)
     # v.shape is (4, 5, 2, 3), v.iaxes are (2, 3)
     assert v.diagonal(axis1=0, axis2=1).shape == (2, 3, 4)
     assert v.diagonal(axis1=0, axis2=1).iaxes == (0, 1)
 
-    v = iid_repeat(iid_repeat(normal(size=(4, 5)), 2, axis=1), 3, axis=1)
+    v = iid(iid(normal(size=(4, 5)), 2, axis=1), 3, axis=1)
     # v.shape is (4, 3, 2, 5), v.iaxes are (1, 2)
 
     assert v.diagonal(axis1=0, axis2=-1).shape == (3, 2, 4)
@@ -1425,13 +1438,13 @@ def test_flatten_ravel():
         assert v_.ndim == 1
         assert v_.iaxes == tuple()
         
-        v = iid_repeat(normal(), 3)
+        v = iid(normal(), 3)
         v_ = getattr(v, nm)()
         assert v_.ndim == 1
         assert v_.size == 3
         assert v_.iaxes == (0,)
 
-        v = iid_repeat(normal(size=(1, 1, 1, 1)), 3, axis=2)
+        v = iid(normal(size=(1, 1, 1, 1)), 3, axis=2)
         assert v.shape == (1, 1, 3, 1, 1)
         assert v.iaxes == (2,)
         v_ = getattr(v, nm)()
@@ -1439,9 +1452,9 @@ def test_flatten_ravel():
         assert v_.size == 3
         assert v_.iaxes == (0,)
 
-        v = iid_repeat(normal(size=(1, 1, 1)), 3, axis=2)
-        v = iid_repeat(v, 1, axis=0)
-        v = iid_repeat(v, 1, axis=-1)
+        v = iid(normal(size=(1, 1, 1)), 3, axis=2)
+        v = iid(v, 1, axis=0)
+        v = iid(v, 1, axis=-1)
         assert v.shape == (1, 1, 1, 3, 1, 1)
         assert v.iaxes == (0, 3, 5)
         v_ = getattr(v, nm)()
@@ -1449,9 +1462,9 @@ def test_flatten_ravel():
         assert v_.size == 3
         assert v_.iaxes == (0,)
 
-        v = iid_repeat(normal(size=(0, 1, 0)), 3, axis=2)
-        v = iid_repeat(v, 1, axis=0)
-        v = iid_repeat(v, 1, axis=-1)
+        v = iid(normal(size=(0, 1, 0)), 3, axis=2)
+        v = iid(v, 1, axis=0)
+        v = iid(v, 1, axis=-1)
         assert v.shape == (1, 0, 1, 3, 0, 1)
         assert v.iaxes == (0, 3, 5)
         v_ = getattr(v, nm)()
@@ -1459,9 +1472,9 @@ def test_flatten_ravel():
         assert v_.size == 0
         assert v_.iaxes == (0,)
 
-        v = iid_repeat(normal(size=(1, 3, 1)), 1, axis=1)
-        v = iid_repeat(v, 1, axis=0)
-        v = iid_repeat(v, 1, axis=-1)
+        v = iid(normal(size=(1, 3, 1)), 1, axis=1)
+        v = iid(v, 1, axis=0)
+        v = iid(v, 1, axis=-1)
         assert v.shape == (1, 1, 1, 3, 1, 1)
         assert v.iaxes == (0, 2, 5)
         v_ = getattr(v, nm)()
@@ -1470,16 +1483,16 @@ def test_flatten_ravel():
         assert v_.iaxes == tuple()
 
         with pytest.raises(ValueError):
-            v = iid_repeat(normal(size=(2,)), 3)
+            v = iid(normal(size=(2,)), 3)
             v_ = getattr(v, nm)()
 
         with pytest.raises(ValueError):
-            v = iid_repeat(iid_repeat(normal(), 3), 2)
+            v = iid(iid(normal(), 3), 2)
             v_ = getattr(v, nm)()
 
 
 def test_moveaxis():
-    v = iid_repeat(iid_repeat(normal(size=(4, 6, 5)), 2, axis=1), 3, axis=1)
+    v = iid(iid(normal(size=(4, 6, 5)), 2, axis=1), 3, axis=1)
     # v.shape is (4, 3, 2, 6, 5), v.iaxes are (1, 2)
 
     v_ = v.moveaxis(3, 4)
@@ -1559,7 +1572,7 @@ def test_reshape():
     assert v.reshape((2, 3, -1, 3)).iaxes == tuple()
 
     # Zero-sized arrays.
-    v = iid_repeat(iid_repeat(normal(size=(2, 3, 0)), 0), 5, axis=-2)
+    v = iid(iid(normal(size=(2, 3, 0)), 0), 5, axis=-2)
 
     sh = (1, 0, 3, 4, 0)
     assert v.reshape(sh).shape == sh
@@ -1590,7 +1603,7 @@ def test_reshape():
 
     # Non-trivial examples.
 
-    v = iid_repeat(iid_repeat(normal(size=(4, 5)), 2, axis=0), 3, axis=0)
+    v = iid(iid(normal(size=(4, 5)), 2, axis=0), 3, axis=0)
     assert v.shape == (3, 2, 4, 5)
     assert v.iaxes == (0, 1)
 
@@ -1637,7 +1650,7 @@ def test_reshape():
     assert v_.reshape(sh).shape == sh
     assert v_.reshape(sh).iaxes == (1, 2)
 
-    v_ = iid_repeat(v, 1, axis=-1)
+    v_ = iid(v, 1, axis=-1)
     assert v_.shape == (3, 2, 4, 5, 1)
     assert v_.iaxes == (0, 1, 4)
 
@@ -1660,7 +1673,7 @@ def test_reshape():
     # Checking the arrangement of elements.
     tol = 1e-10
 
-    v = iid_repeat(random_normal((8, 9)), 5)  # First axis.
+    v = iid(random_normal((8, 9)), 5)  # First axis.
 
     sh = (5, 3, 4, 2, 3)
     vvar = v.var()
@@ -1672,7 +1685,7 @@ def test_reshape():
     assert np.max(np.abs(v.reshape(sh, order="F").var() 
                          - vvar.reshape(sh, order="C"))) > tol
     
-    v = iid_repeat(random_normal((8, 9)), 5, axis=-1)  # Last axis.
+    v = iid(random_normal((8, 9)), 5, axis=-1)  # Last axis.
 
     sh = (3, 4, 2, 3, 5)
     vvar = v.var()
@@ -1685,7 +1698,7 @@ def test_reshape():
                          - vvar.reshape(sh, order="C"))) > tol
     
 
-    v = iid_repeat(random_normal((8, 9)), 5, axis=1)  # Middle axis.
+    v = iid(random_normal((8, 9)), 5, axis=1)  # Middle axis.
 
     sh = (2, 4, 5, 3, 3)
     vvar = v.var()
@@ -1703,29 +1716,29 @@ def test_reshape():
         v.reshape(sh)
     assert vvar.reshape(sh).shape == sh  # But this should work.
 
-    v = iid_repeat(normal(size=(1,)), 1)  # shape (1, 1), iaxes (0,)
+    v = iid(normal(size=(1,)), 1)  # shape (1, 1), iaxes (0,)
     assert v.reshape((1,)).shape == (1,)
     assert v.reshape((1,)).iaxes == (0,)
 
-    v = iid_repeat(normal(size=(1,)), 1, axis=-1)  # shape (1, 1), iaxes (1,)
+    v = iid(normal(size=(1,)), 1, axis=-1)  # shape (1, 1), iaxes (1,)
     assert v.reshape((1,)).shape == (1,)
     assert v.reshape((1,)).iaxes == (0,)
 
     # Tests the preservation of axes's ids.
 
     # A trivial reshaping.
-    v = iid_repeat(iid_repeat(iid_repeat(normal(), 3), 3), 3, axis=1)
+    v = iid(iid(iid(normal(), 3), 3), 3, axis=1)
     assert v._iaxid == v.reshape((3, 3, 3))._iaxid
 
     # A case with transposition.
-    v1 = iid_repeat(normal(size=(2, 3)), 5, axis=-1) 
-    v1 = iid_repeat(v1, 5)
-    v1 = iid_repeat(v1, 5)
+    v1 = iid(normal(size=(2, 3)), 5, axis=-1) 
+    v1 = iid(v1, 5)
+    v1 = iid(v1, 5)
     # shape (5, 5, 2, 3, 5), iaxes (0, 1, 4)
 
-    v2 = iid_repeat(normal(size=(2, 3)), 5, axis=-1) 
-    v2 = iid_repeat(v2, 5)
-    v2 = iid_repeat(v2, 5, axis=1)
+    v2 = iid(normal(size=(2, 3)), 5, axis=-1) 
+    v2 = iid(v2, 5)
+    v2 = iid(v2, 5, axis=1)
 
     with pytest.raises(ValueError):
         v1 + v2  # iaxids are incompatible.
@@ -1744,7 +1757,7 @@ def test_reshape():
 
 
 def test_sum():
-    v = iid_repeat(iid_repeat(normal(size=(4, 5)), 2, axis=1), 3, axis=1)
+    v = iid(iid(normal(size=(4, 5)), 2, axis=1), 3, axis=1)
     # v.shape is (4, 3, 2, 5), v.iaxes are (1, 2)
 
     for ax, iax in zip([0, 3, -1, -4, (0,), (0, 3), (-1, -4)],
@@ -1798,7 +1811,7 @@ def test_sum():
 
 
 def test_split():
-    v = iid_repeat(iid_repeat(normal(size=(4, 6, 5)), 2, axis=1), 3, axis=1)
+    v = iid(iid(normal(size=(4, 6, 5)), 2, axis=1), 3, axis=1)
     # v.shape is (4, 3, 2, 6, 5), v.iaxes are (1, 2)
 
     with pytest.raises(ValueError):
@@ -1827,7 +1840,7 @@ def test_split():
 
     tol = 1e-10
 
-    v = iid_repeat(iid_repeat(random_normal((4, 6, 5)), 2, axis=1), 3, axis=1)
+    v = iid(iid(random_normal((4, 6, 5)), 2, axis=1), 3, axis=1)
     # v.shape is (4, 3, 2, 6, 5), v.iaxes are (1, 2)
 
     assert len(v.split(3, axis=-2)) == 3
@@ -1871,7 +1884,7 @@ def test_transpose():
     assert v.iaxes == tuple()
 
     # A matrix variable with one independence axis.
-    v = iid_repeat(random_normal((4,)), 2, axis=1)
+    v = iid(random_normal((4,)), 2, axis=1)
     # v.shape is (4, 2), v.iaxes are (1,)
 
     assert v.transpose().iaxes == (0,)
@@ -1886,7 +1899,7 @@ def test_transpose():
     assert np.max(np.abs(vvar1 - vvar2)) < tol
     
     # A multi-dimensional variable.
-    v = iid_repeat(iid_repeat(random_normal((4, 6, 5)), 2, axis=1), 3, axis=1)
+    v = iid(iid(random_normal((4, 6, 5)), 2, axis=1), 3, axis=1)
     # v.shape is (4, 3, 2, 6, 5), v.iaxes are (1, 2)
 
     assert v.T.shape == (5, 6, 2, 3, 4)
@@ -1932,7 +1945,7 @@ def test_transpose():
     assert np.max(np.abs(vvar1 - vvar2)) < tol
     assert v.transpose(ax).iaxes == (2, 3)
 
-    v = iid_repeat(iid_repeat(random_normal((4, 5)), 2, axis=1), 3, axis=3)
+    v = iid(iid(random_normal((4, 5)), 2, axis=1), 3, axis=3)
     # v.shape is (4, 2, 5, 3), v.iaxes are (1, 3)
 
     ax = (2, 3, 0, 1)
@@ -1960,14 +1973,14 @@ def test_transpose():
 def test_iaxes_compatibility():
 
     # The numbers of independence axes are different.
-    v1 = iid_repeat(iid_repeat(normal(), 3), 3)
-    v2 = iid_repeat(normal(), 3)
+    v1 = iid(iid(normal(), 3), 3)
+    v2 = iid(normal(), 3)
     with pytest.raises(ValueError) as num_e:
         v1 - v2
 
     # The locations of the independence axes are different.
-    v1 = iid_repeat(normal(size=(3,)), 3)
-    v2 = iid_repeat(normal(size=(3,)), 3, axis=1)
+    v1 = iid(normal(size=(3,)), 3)
+    v2 = iid(normal(size=(3,)), 3, axis=1)
     with pytest.raises(ValueError) as loc_e:
         v1 - v2
     
@@ -1979,8 +1992,8 @@ def test_iaxes_compatibility():
     # should make the transposed and the original variables incompatible 
     # in arithmetic operations.
 
-    v1 = iid_repeat(iid_repeat(normal(), 3), 3)
-    v2 = iid_repeat(iid_repeat(normal(), 3), 3)
+    v1 = iid(iid(normal(), 3), 3)
+    v2 = iid(iid(normal(), 3), 3)
 
     assert (v1 - v2).shape == (3, 3)
     assert (v1 - v2).iaxes == (0, 1)
@@ -1989,7 +2002,7 @@ def test_iaxes_compatibility():
     with pytest.raises(ValueError):
         v1 + v1.T
 
-    v2 = iid_repeat(iid_repeat(normal(), 3), 3)
+    v2 = iid(iid(normal(), 3), 3)
     assert (v1 + v2).shape == (3, 3)
     assert (v1.mean() + v2.mean().T).shape == (3, 3)
     with pytest.raises(ValueError) as ord_e:
@@ -1999,7 +2012,7 @@ def test_iaxes_compatibility():
     assert (v1.T - v2.T).shape == (3, 3)
     assert (v1.T - v2.T).iaxes == (0, 1)
 
-    v = iid_repeat(iid_repeat(random_normal((4, 5)), 3, axis=1), 3, axis=3)
+    v = iid(iid(random_normal((4, 5)), 3, axis=1), 3, axis=3)
     # v.shape is (4, 3, 5, 3), v.iaxes are (1, 3)
 
     v.mean() + v.mean().transpose((0, -1, 2, 1))  # Does not raise an error.
@@ -2018,7 +2031,7 @@ def test_iaxes_compatibility():
 
 
 def test_trace():
-    v = iid_repeat(iid_repeat(normal(size=(4, 5)), 2, axis=0), 3, axis=0)
+    v = iid(iid(normal(size=(4, 5)), 2, axis=0), 3, axis=0)
     # v.shape is (3, 2, 4, 5), v.iaxes are (0, 1)
     assert v.trace(axis1=-2, axis2=-1).shape == (3, 2)
     assert v.trace(axis1=-2, axis2=-1).iaxes == (0, 1)
@@ -2032,12 +2045,12 @@ def test_trace():
     with pytest.raises(ValueError):
         v.trace(axis1=1, axis2=2)
 
-    v = iid_repeat(iid_repeat(normal(size=(4, 5)), 2, axis=-1), 3, axis=-1)
+    v = iid(iid(normal(size=(4, 5)), 2, axis=-1), 3, axis=-1)
     # v.shape is (4, 5, 2, 3), v.iaxes are (2, 3)
     assert v.trace(axis1=0, axis2=1).shape == (2, 3)
     assert v.trace(axis1=0, axis2=1).iaxes == (0, 1)
 
-    v = iid_repeat(iid_repeat(normal(size=(4, 5)), 2, axis=1), 3, axis=1)
+    v = iid(iid(normal(size=(4, 5)), 2, axis=1), 3, axis=1)
     # v.shape is (4, 3, 2, 5), v.iaxes are (1, 2)
 
     assert v.trace(axis1=0, axis2=-1).shape == (3, 2)
@@ -2063,7 +2076,7 @@ def test_concatenate():
     tol = 1e-10
 
     xi = random_normal((8, 2))
-    v = iid_repeat(xi, 7, axis=-1)
+    v = iid(xi, 7, axis=-1)
     
     v1 = v[:3]  # (3, 2, 7)
     v2 = v[3:]  # (5, 2, 7)
@@ -2118,7 +2131,7 @@ def test_concatenate():
     vs = []
     for _ in range(100):
         xi = normal(size=(2,))
-        v = iid_repeat(iid_repeat(iid_repeat(xi, 3, axis=0), 4, axis=0), 5, axis=0)
+        v = iid(iid(iid(xi, 3, axis=0), 4, axis=0), 5, axis=0)
         # shape (5, 4, 3, 2), iaxes (0, 1, 2)
 
         vs.append(v)
@@ -2127,7 +2140,7 @@ def test_concatenate():
     assert v.shape == (5, 4, 3, 200)
     assert v.iaxes == (0, 1, 2)
 
-    v = iid_repeat(normal(size=(1,)), 7)
+    v = iid(normal(size=(1,)), 7)
 
     with pytest.raises(ValueError):
         gp.concatenate([v, normal(size=(7, 1))], axis=1)
@@ -2151,8 +2164,8 @@ def test_stack():
     tol = 1e-10
 
     xi = random_normal((8, 2))
-    v = iid_repeat(xi, 7, axis=-1)
-    v = iid_repeat(v, 3, axis=1)
+    v = iid(xi, 7, axis=-1)
+    v = iid(v, 3, axis=1)
 
     v1 = v[:4]  # shape (4, 3, 2, 7), iaxes (1, 3) 
     v2 = v[4:]  # shape (4, 3, 2, 7), iaxes (1, 3)
@@ -2183,7 +2196,7 @@ def test_stack():
     vs = []
     for _ in range(100):
         xi = normal(size=(2,))
-        v = iid_repeat(iid_repeat(iid_repeat(xi, 3, axis=0), 4, axis=0), 5, axis=0)
+        v = iid(iid(iid(xi, 3, axis=0), 4, axis=0), 5, axis=0)
         # shape (5, 4, 3, 2), iaxes (0, 1, 2)
 
         vs.append(v)
@@ -2192,7 +2205,7 @@ def test_stack():
     assert v.shape == (5, 4, 3, 100, 2)
     assert v.iaxes == (0, 1, 2)
 
-    v = iid_repeat(normal(size=(1,)), 7)
+    v = iid(normal(size=(1,)), 7)
 
     with pytest.raises(ValueError):
         gp.stack([v, normal(size=(7, 1))], axis=1)
@@ -2244,15 +2257,15 @@ def test_solve():
         gp.linalg.solve(a, v)
 
     # 1 independence axis.
-    v = iid_repeat(normal(1, 1), 3)
+    v = iid(normal(1, 1), 3)
     with pytest.raises(ValueError):
         gp.linalg.solve(a, v)
 
-    v = iid_repeat(normal(1, 1, size=4), 3)
+    v = iid(normal(1, 1, size=4), 3)
     with pytest.raises(ValueError):
         gp.linalg.solve(a, v)
 
-    v = iid_repeat(normal(1, 1, size=3), 4, axis=-1)
+    v = iid(normal(1, 1, size=3), 4, axis=-1)
     v_ = gp.linalg.solve(a, v)
 
     v2 = a @ v_
@@ -2262,7 +2275,7 @@ def test_solve():
     assert np.abs(np.max(v.cov() - v2.cov())) < tol
 
     # 2 independence axes.
-    v = iid_repeat(iid_repeat(normal(1, 1), 3), 4)
+    v = iid(iid(normal(1, 1), 3), 4)
     with pytest.raises(ValueError):
         gp.linalg.solve(a, v)
 
@@ -2302,15 +2315,15 @@ def test_asolve():
     # 1 independence axis.
     a = 2 * np.random.rand(4, 3, 3) - 1
 
-    v = iid_repeat(normal(1, 1), 3)
+    v = iid(normal(1, 1), 3)
     with pytest.raises(ValueError):
         gp.linalg.asolve(a, v)
 
-    v = iid_repeat(normal(1, 1, size=4), 3, axis=-1)
+    v = iid(normal(1, 1, size=4), 3, axis=-1)
     with pytest.raises(ValueError):
         gp.linalg.asolve(a, v)
 
-    v = iid_repeat(normal(1, 1, size=3), 4)
+    v = iid(normal(1, 1, size=3), 4)
     v_ = gp.linalg.asolve(a, v)
 
     v2 = gp.einsum("...ji, ...i -> ...j", a, v_)
@@ -2331,7 +2344,7 @@ def test_fft():
 
     x = random_normal(shape=(6,))
     nx = ro + gp.stack([x] * 4) * rs
-    sx = ro + iid_repeat(x, 4) * rs
+    sx = ro + iid(x, 4) * rs
 
     assert isinstance(nx, Normal)
     assert isinstance(sx, SparseNormal)
@@ -2357,7 +2370,7 @@ def test_fft2():
 
     x = random_normal(shape=(3, 6))
     nx = ro + gp.stack([x] * 4, axis=1) * rs
-    sx = ro + iid_repeat(x, 4, axis=1) * rs
+    sx = ro + iid(x, 4, axis=1) * rs
 
     assert isinstance(nx, Normal)
     assert isinstance(sx, SparseNormal)
@@ -2392,7 +2405,7 @@ def test_fftn():
 
     x = random_normal(shape=(2, 3, 5))
     nx = ro + gp.stack([x] * 4, axis=2) * rs
-    sx = ro + iid_repeat(x, 4, axis=2) * rs
+    sx = ro + iid(x, 4, axis=2) * rs
 
     assert isinstance(nx, Normal)
     assert isinstance(sx, SparseNormal)
@@ -2470,11 +2483,11 @@ def test_matmul():
     # When at least one variable is a proper sparse normal.
 
     with pytest.raises(ValueError):
-        iid_repeat(normal(), 3) @ [1, 1, 1]
+        iid(normal(), 3) @ [1, 1, 1]
     with pytest.raises(ValueError):
-         [1, 1, 1] @ iid_repeat(normal(), 3)
+         [1, 1, 1] @ iid(normal(), 3)
     
-    v = iid_repeat(normal(1, 1, size=(3,)), 4, axis=-1)
+    v = iid(normal(1, 1, size=(3,)), 4, axis=-1)
     for sh in [(3, 3), (2, 3, 3)]:
         a = 2 * np.random.rand(*sh) - 1
         w = a @ v
@@ -2489,7 +2502,7 @@ def test_matmul():
         assert np.max(np.abs(v.mean().T @ a - w.mean())) < tol
         assert np.max(np.abs(v.var().T @ (a**2) - w.var())) < tol
 
-    v = iid_repeat(normal(size=(3,)), 7)  # shape (7, 3), iaxes (0,)
+    v = iid(normal(size=(3,)), 7)  # shape (7, 3), iaxes (0,)
 
     # Simple cases, no broadcasting.
     w = v @ np.ones((3,))
@@ -2540,7 +2553,7 @@ def test_matmul():
     # A larger-dimensional variable.
     # Including broadcasting when the random operand has larger dimension.
 
-    v = iid_repeat(iid_repeat(normal(size=(3, 5)), 7, axis=1), 4)  
+    v = iid(iid(normal(size=(3, 5)), 7, axis=1), 4)  
     # shape (4, 3, 7, 5), iaxes (0, 2)
 
     w = v @ np.ones((5,))
@@ -2579,10 +2592,10 @@ def test_matmul():
 
     # An example with two random variables.
     
-    v1 = iid_repeat(iid_repeat(random_normal((3, 5)), 7), 4)
+    v1 = iid(iid(random_normal((3, 5)), 7), 4)
     # shape (4, 7, 3, 5), iaxes (0, 1)
 
-    v2 = iid_repeat(iid_repeat(random_normal((5, 1)), 7), 4)
+    v2 = iid(iid(random_normal((5, 1)), 7), 4)
     # shape (4, 7, 5, 1), iaxes (0, 1)
 
     v2 += v1[:, :, 0, 0, None, None]  # for establishing correlation.
@@ -2599,7 +2612,7 @@ def test_matmul():
     assert np.max(np.abs(w.mean() - wref.mean())) < tol
     assert np.max(np.abs(w.var() - wref.var())) < tol
 
-    v3 = iid_repeat(normal(size=(7, 5, 1)), 4)
+    v3 = iid(normal(size=(7, 5, 1)), 4)
     with pytest.raises(ValueError):
         v1 @ v3
 
@@ -2622,7 +2635,7 @@ def test_einsum():
     # Tests against matrix multiplication.
 
     xi = random_normal((3, 2))
-    v = iid_repeat(xi, 5, axis=1)  # shape (3, 5, 2), iaxes (1,)
+    v = iid(xi, 5, axis=1)  # shape (3, 5, 2), iaxes (1,)
     
     x = np.random.rand(2)  # 1D
 
@@ -2687,7 +2700,7 @@ def test_einsum():
         gp.einsum("j, jk -> k", v[1, :, 1], x)
 
     xi = random_normal((3, 2))
-    v = iid_repeat(xi, 5, axis=1)  # shape (3, 5, 2), iaxes (1,)
+    v = iid(xi, 5, axis=1)  # shape (3, 5, 2), iaxes (1,)
 
     x = np.random.rand(4, 3, 2, 8)  # 4D
 
@@ -2702,7 +2715,7 @@ def test_einsum():
     # Tests agains inner.
 
     xi = random_normal((3, 2))
-    v = iid_repeat(xi, 5, axis=1)  # shape (3, 5, 2), iaxes (1,)
+    v = iid(xi, 5, axis=1)  # shape (3, 5, 2), iaxes (1,)
 
     x = np.random.rand(4, 3, 8, 2)  # 4D
 
@@ -2728,7 +2741,7 @@ def test_einsum():
 
     # Tests against outer.
 
-    v = iid_repeat(normal(0.5, 0.1), 5)
+    v = iid(normal(0.5, 0.1), 5)
     x = np.random.rand(4)
 
     v_ei = gp.einsum("i, j -> ij", x, v)
@@ -2744,7 +2757,7 @@ def test_einsum():
     assert_equal(v_ei, v_ou)
 
     xi = random_normal((1,))
-    v = iid_repeat(xi, 5, axis=1)  # shape (1, 5), iaxes (1,)
+    v = iid(xi, 5, axis=1)  # shape (1, 5), iaxes (1,)
     x = np.random.rand(1, 3)  # 4D
 
     v_ei = gp.einsum("ij, kl -> jl", v, x)
@@ -2837,7 +2850,7 @@ def test_dot():
 
     # - 1-d sparse variable.
     sz = 5
-    v = iid_repeat(normal(), sz)
+    v = iid(normal(), sz)
     rs = 2 * np.random.rand(sz) - 1
     ro = 2 * np.random.rand(sz) - 1
     v = ro + rs * v
@@ -2855,7 +2868,7 @@ def test_dot():
         gp.dot(x, v)
 
     # - Adds one dense dimension.
-    v = iid_repeat(normal(size=3), sz)  # shape (5, 3), iaxes (0,)
+    v = iid(normal(size=3), sz)  # shape (5, 3), iaxes (0,)
     rs = 2 * np.random.rand(sz, 1) - 1
     ro = 2 * np.random.rand(sz, 1) - 1
     v = ro + rs * v
@@ -2914,7 +2927,7 @@ def test_dot():
 
     # - Two dense dimensions.
     nv = normal(size=(2, 3))
-    v = iid_repeat(nv, sz, axis=1)  # shape (2, 5, 3), iaxes (1,)
+    v = iid(nv, sz, axis=1)  # shape (2, 5, 3), iaxes (1,)
     rs = 2 * np.random.rand(sz, 1) - 1
     ro = 2 * np.random.rand(sz, 1) - 1
     v = ro + rs * v
@@ -3006,7 +3019,7 @@ def test_dot():
     # - 2-d sparse variable.
     sz1 = 5
     sz2 = 6
-    v = iid_repeat(iid_repeat(normal(), sz1), sz2)  # shape (6, 5)
+    v = iid(iid(normal(), sz1), sz2)  # shape (6, 5)
     rs = 2 * np.random.rand(sz2, sz1) - 1
     ro = 2 * np.random.rand(sz2, sz1) - 1
     v = ro + rs * v
@@ -3039,7 +3052,7 @@ def test_dot():
     sz2 = 6
     dsz = 7
     nv = normal(size=dsz)
-    v = iid_repeat(iid_repeat(nv, sz1), sz2)  # shape (6, 5, 7)
+    v = iid(iid(nv, sz1), sz2)  # shape (6, 5, 7)
     rs = 2 * np.random.rand(sz2, sz1, dsz) - 1
     ro = 2 * np.random.rand(sz2, sz1, dsz) - 1
     v = ro + rs * v
@@ -3104,7 +3117,7 @@ def test_dot():
 
     # A more complex example with correlations between elements.
     nv = normal(size=(3, 2))
-    v1 = iid_repeat(iid_repeat(nv, 4, axis=-1), 5)  # shape (5, 3, 2, 4)
+    v1 = iid(iid(nv, 4, axis=-1), 5)  # shape (5, 3, 2, 4)
     rs = 2 * np.random.rand(5, 3, 2, 4) - 1
     ro = 2 * np.random.rand(5, 3, 2, 4) - 1
     v1 = ro + rs * v1
@@ -3115,7 +3128,7 @@ def test_dot():
     nv1_ref = nv1_ref.sum(axis=2)
 
     nv = normal(size=(3, 2))
-    v2 = iid_repeat(iid_repeat(nv, 4, axis=-1), 5)  # shape (5, 3, 2, 4)
+    v2 = iid(iid(nv, 4, axis=-1), 5)  # shape (5, 3, 2, 4)
     rs = 2 * np.random.rand(5, 3, 2, 4) - 1
     ro = 2 * np.random.rand(5, 3, 2, 4) - 1
     v2 = ro + rs * v2
@@ -3202,7 +3215,7 @@ def test_inner():
 
     # - 1-d sparse variable.
     sz = 5
-    v = iid_repeat(normal(), sz)
+    v = iid(normal(), sz)
     rs = 2 * np.random.rand(sz) - 1
     ro = 2 * np.random.rand(sz) - 1
     v = ro + rs * v
@@ -3220,7 +3233,7 @@ def test_inner():
         gp.inner(v, x)
 
     # - 2-d variable with one sparse axis.
-    v = iid_repeat(normal(size=3), 5)  # shape (5, 3), iaxes (0,)
+    v = iid(normal(size=3), 5)  # shape (5, 3), iaxes (0,)
     rs = 2 * np.random.rand(5, 3) - 1
     ro = 2 * np.random.rand(5, 3) - 1
     v = ro + rs * v
@@ -3279,7 +3292,7 @@ def test_inner():
 
     # - Two dense and one sparse dimensions.
     nv = normal(size=(2, 3))
-    v = iid_repeat(nv, 5, axis=1)  # shape (2, 5, 3), iaxes (1,)
+    v = iid(nv, 5, axis=1)  # shape (2, 5, 3), iaxes (1,)
     rs = 2 * np.random.rand(2, 5, 3) - 1
     ro = 2 * np.random.rand(2, 5, 3) - 1
     v = ro + rs * v
@@ -3368,7 +3381,7 @@ def test_inner():
     # 2 independence axis.
 
     # - 2-d sparse variable.
-    v = iid_repeat(iid_repeat(normal(), 5), 6)  # shape (6, 5)
+    v = iid(iid(normal(), 5), 6)  # shape (6, 5)
     rs = 2 * np.random.rand(6, 5) - 1
     ro = 2 * np.random.rand(6, 5) - 1
     v = ro + rs * v
@@ -3398,7 +3411,7 @@ def test_inner():
 
     # - Adds one dense dimension.
     nv = normal(size=7)
-    v = iid_repeat(iid_repeat(nv, 5), 6)  # shape (6, 5, 7)
+    v = iid(iid(nv, 5), 6)  # shape (6, 5, 7)
     rs = 2 * np.random.rand(6, 5, 7) - 1
     ro = 2 * np.random.rand(6, 5, 7) - 1
     v = ro + rs * v
@@ -3535,7 +3548,7 @@ def test_outer():
     assert np.max(np.abs(v_.cov() - nv_.cov())) < tol
 
     # 1 independence axis.
-    v = iid_repeat(normal(), 5)
+    v = iid(normal(), 5)
     rs = 2 * np.random.rand(5) - 1
     ro = 2 * np.random.rand(5) - 1
     v = ro + rs * v
@@ -3566,7 +3579,7 @@ def test_outer():
     assert np.max(np.abs(v_.cov() - 
                          dense_to_sparse_cov(nv_.cov(), (1,)))) < tol
 
-    v = iid_repeat(normal(size=4), 5)
+    v = iid(normal(size=4), 5)
 
     with pytest.raises(ValueError):
         gp.outer(v, [1, 2, 3])
@@ -3575,7 +3588,7 @@ def test_outer():
         gp.outer([1, 2, 3], v)
 
     # 2 independence axes.
-    v = iid_repeat(iid_repeat(normal(), 4), 5)
+    v = iid(iid(normal(), 4), 5)
 
     with pytest.raises(ValueError):
         gp.outer(v, [1, 2, 3])
@@ -3639,7 +3652,7 @@ def test_kron():
 
     # 1 independence axis.
 
-    v = iid_repeat(normal(size=2), 5, axis=-1)
+    v = iid(normal(size=2), 5, axis=-1)
     rs = 2 * np.random.rand(2, 5) - 1
     ro = 2 * np.random.rand(2, 5) - 1
     v = ro + rs * v
@@ -3674,7 +3687,7 @@ def test_kron():
 
     # A high-dimensional case, with broadcasting.
     
-    v = iid_repeat(iid_repeat(normal(size=(2, 3)), 5, axis=1), 6, axis=-1)
+    v = iid(iid(normal(size=(2, 3)), 5, axis=1), 6, axis=-1)
     # shape (2, 5, 3, 6), iaxes (1, 3)
 
     rs = 2 * np.random.rand(2, 5, 3, 6) - 1
@@ -3783,7 +3796,7 @@ def test_tensordot():
     
     # 1 independence axis.
 
-    v = iid_repeat(normal(size=(2, 3)), 5, 1)  # shape (2, 5, 3), iaxes (1,)
+    v = iid(normal(size=(2, 3)), 5, 1)  # shape (2, 5, 3), iaxes (1,)
 
     rs = 2 * np.random.rand(2, 5, 3) - 1
     ro = 2 * np.random.rand(2, 5, 3) - 1
@@ -3895,7 +3908,7 @@ def test_tensordot():
 
     # 2 independence axis.
 
-    v = iid_repeat(iid_repeat(normal(size=(2, 3)), 5, axis=1), 6, axis=-1)
+    v = iid(iid(normal(size=(2, 3)), 5, axis=1), 6, axis=-1)
     # shape (2, 5, 3, 6), iaxes (1, 3)
 
     rs = 2 * np.random.rand(2, 5, 3, 6) - 1
@@ -3930,14 +3943,14 @@ def test_tensordot():
 
     # Check addition after tensordot to see that iaxid are correct.
 
-    v = iid_repeat(iid_repeat(normal(size=(2, 3)), 5, axis=1), 5, axis=-1)
+    v = iid(iid(normal(size=(2, 3)), 5, axis=1), 5, axis=-1)
     # shape (2, 5, 3, 5), iaxes (1, 3)
 
     rs = 2 * np.random.rand(2, 5, 3, 5) - 1
     ro = 2 * np.random.rand(2, 5, 3, 5) - 1
     v = ro + rs * v
 
-    w = iid_repeat(iid_repeat(normal(), 5), 5, axis=-1)
+    w = iid(iid(normal(), 5), 5, axis=-1)
 
     x = 2 * np.random.rand(3, 2) - 1
 
@@ -3955,12 +3968,12 @@ def test_tensordot():
         assert (w.T + v_).shape == (5, 5)
 
 
-def test_iid_copy():
+def test_icopy():
     tol = 1e-8
 
-    v = iid_repeat(random_normal((3, 4)), 5, axis=1)
-    v = iid_repeat(v, 6, axis=-1)
-    v_ = v.iid_copy()
+    v = iid(random_normal((3, 4)), 5, axis=1)
+    v = iid(v, 6, axis=-1)
+    v_ = v.icopy()
 
     assert v.shape == v_.shape
     assert v.iscomplex == v_.iscomplex
@@ -3968,9 +3981,9 @@ def test_iid_copy():
     assert np.max(np.abs(v.mean() - v_.mean())) < tol
     assert np.max(np.abs(v.cov() - v_.cov())) < tol
 
-    v = iid_repeat(random_normal((4, 3), dtype=np.complex64), 5, axis=1)
-    v = iid_repeat(v, 6, axis=-2)
-    v_ = v.iid_copy()
+    v = iid(random_normal((4, 3), dtype=np.complex64), 5, axis=1)
+    v = iid(v, 6, axis=-2)
+    v_ = v.icopy()
 
     assert v.shape == v_.shape
     assert v.iscomplex == v_.iscomplex
@@ -3992,7 +4005,7 @@ def test_array_conversion():
     # The conversion of sparse normal variables to a numpy array 
     # must yield an array of object type.
 
-    v = iid_repeat(normal(), 3)
+    v = iid(normal(), 3)
 
     assert np.array(v).dtype == np.object_
     assert np.asarray(v).dtype == np.object_
@@ -4015,8 +4028,8 @@ def test_and():
     nv2 = nv1 - 0.5 * normal()
     nv = nv1 & nv2
 
-    v1 = iid_repeat(normal(), 4) + 0.2
-    v2 = v1 - 0.5 * iid_repeat(normal(), 4)
+    v1 = iid(normal(), 4) + 0.2
+    v2 = v1 - 0.5 * iid(normal(), 4)
 
     v = v1 & v2
     assert v.shape == (2, 4)

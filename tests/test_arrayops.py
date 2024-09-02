@@ -11,7 +11,7 @@ from gprob.sparse import SparseNormal
 
 def test_resolve():
     nv = gp.normal()
-    sv = gp.iid_repeat(gp.normal(), 3)
+    sv = gp.iid(gp.normal(), 3)
 
     mod, cls = gp.arrayops.resolve([0, 1])
     assert mod is gp.normal_
@@ -76,11 +76,11 @@ def test_cov():
     x = gp.cov(gp.normal(size=(2, 3)), np.ones((2, 3)))
     assert x.shape == (2, 3, 2, 3)
 
-    x = gp.cov(gp.iid_repeat(gp.normal(), 4), gp.iid_repeat(gp.normal(), 4))
+    x = gp.cov(gp.iid(gp.normal(), 4), gp.iid(gp.normal(), 4))
     assert x.shape == (4,)
 
-    v1 = gp.iid_repeat(gp.normal(size=3), 2)  # shape (2, 3)
-    v2 = gp.iid_repeat(gp.normal(size=(3, 4)), 2)  # shape (2, 3, 4)
+    v1 = gp.iid(gp.normal(size=3), 2)  # shape (2, 3)
+    v2 = gp.iid(gp.normal(size=(3, 4)), 2)  # shape (2, 3, 4)
 
     x = gp.cov(v1, v2)
     assert x.shape == (3, 3, 4, 2)

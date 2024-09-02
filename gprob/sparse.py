@@ -13,24 +13,28 @@ from .normal_ import (Normal, complete, lift, match_, complete_tensordot_axes,
 from .external import einsubs
 
 
-def iid_repeat(x, nrep=1, axis=0):
-    """Creates a sparse array of `nrep` independent identically distributed 
+def iid(x, n=1, axis=0):
+    """Creates a sparse array of independent identically distributed 
     copies of `x` stacked together along `axis`.
     
     Args:
-        x: Normal or sparse normal random variable.
-        nrep: Integer number of repetitions.
-        axis: Integer index of the axis along which the repetitions are stacked.
+        x (random variable): 
+            The variable whose distribution is to be copied.
+        n (int): 
+            The number of copies to be made.
+        axis (int): 
+            The axis in the final array along which the copies are stacked.
 
     Returns:
-        A sparse normal random variable with `axis` being an independence axis.
+        A sparse normal random variable whose elements along `axis` are 
+        statistically independent.
     """
 
-    y = lift(SparseNormal, x).iid_copy()
+    y = lift(SparseNormal, x).icopy()
     
     axis = _normalize_axis(axis, y.ndim + 1)
     sh1 = y.shape[:axis] + (1,) + y.shape[axis:]
-    sh2 = y.shape[:axis] + (nrep,) + y.shape[axis:]
+    sh2 = y.shape[:axis] + (n,) + y.shape[axis:]
 
     iaxid = y._iaxid[:axis] + (y._niax + 1,) + y._iaxid[axis:]
     return _finalize(y.reshape(sh1).broadcast_to(sh2), iaxid)
@@ -398,8 +402,8 @@ class SparseNormal(Normal):
         iaxid = (None,) * (len(shape) - self.ndim) + self._iaxid
         return _finalize(super().broadcast_to(shape), iaxid)
 
-    def iid_copy(self):
-        return _finalize(super().iid_copy(), self._iaxid)
+    def icopy(self):
+        return _finalize(super().icopy(), self._iaxid)
 
     def condition(self, observations):
         """Conditioning operation. Applicable between variables having the same 
@@ -538,14 +542,14 @@ class SparseNormal(Normal):
             and `*` denotes complex conjugation.
 
         Examples:
-            >>> v = iid_repeat(normal(size=(3,)), 4)
+            >>> v = iid(normal(size=(3,)), 4)
             >>> v.shape
             (4, 3)
             >>> v.cov().shape
             (3, 3, 4)
 
-            >>> v = iid_repeat(normal(size=(3, 2)), 4)
-            >>> v = iid_repeat(v, 5)
+            >>> v = iid(normal(size=(3, 2)), 4)
+            >>> v = iid(v, 5)
             >>> v.shape
             (5, 4, 3, 2)
             >>> v.cov().shape
@@ -578,7 +582,8 @@ class SparseNormal(Normal):
         """Samples the random variable `n` times.
         
         Args:
-            n: An integer number of samples or None.
+            n (int or None): 
+                The number of samples.
         
         Returns:
             A single sample with the same shape as the varaible if `n` is None, 
@@ -631,7 +636,8 @@ class SparseNormal(Normal):
         """Log likelihood of a sample.
     
         Args:
-            x: Sample value or a sequence of sample values.
+            x (array): 
+                A sample value or a sequence of sample values.
 
         Returns:
             Natural logarithm of the probability density at the sample value - 

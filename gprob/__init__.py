@@ -3,7 +3,7 @@ from . import linalg
 from . import func
 from .normal_ import Normal, normal
     
-from .arrayops import (iid_copy, mean, var, cov, 
+from .arrayops import (icopy, mean, var, cov, 
     broadcast_to, stack, hstack, vstack, dstack, concatenate,
     split, hsplit, vsplit, dsplit, sum, cumsum, trace, diagonal, reshape, 
     moveaxis, ravel, transpose, add, subtract, multiply, divide, power, 
@@ -16,4 +16,4 @@ try:
 except ModuleNotFoundError:
     pnormal = None
 
-from .sparse import iid_repeat
+from .sparse import iid

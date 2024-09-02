@@ -49,9 +49,8 @@ class Normal(LatentMap):
         
         return self._mod.stack(self.__class__, [other, self])
 
-    def iid_copy(self):
-        """Creates an independent identically distributed copy 
-        of the varaible."""
+    def icopy(self):
+        """Creates a statistically independent copy of the variable."""
 
         # Copies of `a` and `b` are taken becase if the original variable 
         # is in-place modified later, those modifications should not affect 
@@ -202,7 +201,8 @@ class Normal(LatentMap):
         """Samples the random variable `n` times.
         
         Args:
-            n: An integer number of samples or None.
+            n (int or None): 
+                The number of samples.
         
         Returns:
             A single sample with the same shape as the varaible if `n` is None, 
@@ -238,7 +238,8 @@ class Normal(LatentMap):
         """Log likelihood of a sample.
     
         Args:
-            x: Sample value or a sequence of sample values.
+            x (array): 
+                A sample value or a sequence of sample values.
 
         Returns:
             Natural logarithm of the probability density at the sample value - 

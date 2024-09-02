@@ -3,9 +3,9 @@ import numpy as np
 from scipy.stats import multivariate_normal as mvn
 from numpy.linalg import LinAlgError
 from numpy.exceptions import ComplexWarning
-from gprob import hstack, vstack, iid_copy, broadcast_to, cov
+from gprob import hstack, vstack, icopy, broadcast_to, cov
 from gprob.normal_ import normal, Normal, safer_cholesky
-from gprob.sparse import iid_repeat
+from gprob.sparse import iid
 from utils import random_normal, random_correlate, asnormal
 
 np.random.seed(0)
@@ -1246,7 +1246,7 @@ def test_asnormal():
         asnormal("s")
     
     with pytest.raises(TypeError) as te2:
-        asnormal(iid_repeat(normal(), 3))
+        asnormal(iid(normal(), 3))
 
     # Checks that the messages thrown in the two cases are different.
     assert te1.value.args[0] != te2.value.args[0]
@@ -1299,11 +1299,11 @@ def test_cov_func():
             cov(normal(), normal(), normal())
 
 
-def test_iid_copy():
+def test_icopy():
     tol = 1e-8
 
     v = random_normal((3, 4))
-    v_ = v.iid_copy()
+    v_ = v.icopy()
 
     assert v.shape == v_.shape
     assert v.iscomplex == v_.iscomplex
@@ -1311,7 +1311,7 @@ def test_iid_copy():
     assert np.max(np.abs(v.mean() - v_.mean())) < tol
     assert np.max(np.abs(v.cov() - v_.cov())) < tol
 
-    v_ = iid_copy(v)
+    v_ = icopy(v)
 
     assert v.shape == v_.shape
     assert v.iscomplex == v_.iscomplex
@@ -1320,7 +1320,7 @@ def test_iid_copy():
     assert np.max(np.abs(v.cov() - v_.cov())) < tol
 
     v = random_normal((4, 3), dtype=np.complex64)
-    v_ = v.iid_copy()
+    v_ = v.icopy()
 
     assert v.shape == v_.shape
     assert v.iscomplex == v_.iscomplex

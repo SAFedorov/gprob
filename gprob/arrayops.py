@@ -25,9 +25,9 @@ def fallback_to_normal(func):
 
 
 @fallback_to_normal
-def iid_copy(x):
-    """Creates an independent identically distributed copy of `x`."""
-    return x.iid_copy()
+def icopy(x):
+    """Creates a statistically independent copy of `x`."""
+    return x.icopy()
 
 
 @fallback_to_normal
@@ -114,13 +114,13 @@ def cov(*args):
 
         Sparse normal variables.
 
-        >>> v1 = iid_repeat(normal(), 3)  # shape (3,)
-        >>> v2 = iid_repeat(normal(), 3)  # shape (3,)
+        >>> v1 = iid(normal(), 3)  # shape (3,)
+        >>> v2 = iid(normal(), 3)  # shape (3,)
         >>> cov(v1, v1 + v2)
         array([1., 1., 1.])
 
-        >>> v1 = iid_repeat(normal(size=3), 4)  # shape (4, 3)
-        >>> v2 = iid_repeat(normal(size=2), 4)  # shape (4, 2)
+        >>> v1 = iid(normal(size=3), 4)  # shape (4, 3)
+        >>> v2 = iid(normal(size=2), 4)  # shape (4, 2)
         >>> cov(v1, v2).shape
         (3, 2, 4)
     """
