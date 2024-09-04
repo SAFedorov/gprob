@@ -52,7 +52,7 @@ def asolve(a, b):
             The random variable to be solved for with the shape (..., m).
 
     Returns:
-        A new random variable, `a^-1 @ b`, with the same shape as `b`.
+        A new random variable with the same shape as `b`.
     """
 
     if np.ndim(a) < 2:

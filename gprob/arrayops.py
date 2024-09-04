@@ -156,7 +156,7 @@ def diagonal(x, offset=0, axis1=0, axis2=1):
         A new random variable consisting of the extracted diagonal elements.
 
     Note:
-        This function operates similarly to `numpy.diagonal`.
+        This function is similar to `numpy.diagonal`.
     """
     return x.diagonal(offset=offset, axis1=axis1, axis2=axis2)
 
@@ -183,7 +183,7 @@ def sum(x, axis=None, keepdims=False):
         the summation axes are removed unless `keepdims` is `True`.
 
     Note:
-        This function operates similarly to `numpy.sum`.
+        This function is similar to `numpy.sum`.
     """
     return x.sum(axis=axis, keepdims=keepdims)
 
@@ -204,7 +204,7 @@ def cumsum(x, axis=None):
         summation with the same dimensions as the input.
 
     Note:
-        This function operates similarly to `numpy.cumsum`.
+        This function is similar to `numpy.cumsum`.
     """
     return x.cumsum(axis=axis)
 
@@ -225,7 +225,7 @@ def moveaxis(x, source, destination):
         A new random variable with the transformed layout.
 
     Note:
-        This function operates similarly to `numpy.moveaxis`,
+        This function is similar to `numpy.moveaxis`,
         except for the lack of support of multiple source and destination axes.
     """
     return x.moveaxis(source, destination)
@@ -251,7 +251,7 @@ def ravel(x, order="C"):
         the input variable in the specified order.
 
     Note:
-        This function operates similarly to `numpy.ravel`.
+        This function is similar to `numpy.ravel`.
     """
     return x.ravel(order=order)
 
@@ -275,7 +275,7 @@ def reshape(x, newshape, order="C"):
         A new random variable with the specified shape and order.
 
     Note:
-        This function operates similarly to `numpy.reshape`.
+        This function is similar to `numpy.reshape`.
     """
     return x.reshape(newshape, order=order)
 
@@ -295,7 +295,7 @@ def transpose(x, axes=None):
         A new random variable with the axes in the new order.
 
     Note:
-        This function operates similarly to `numpy.transpose`.
+        This function is similar to `numpy.transpose`.
     """
     return x.transpose(axes=axes)
 
@@ -319,7 +319,7 @@ def trace(x, offset=0, axis1=0, axis2=1):
         elements with respect to the specified axes.
 
     Note:
-        This function operates similarly to `numpy.trace`.
+        This function is similar to `numpy.trace`.
     """
     return x.trace(offset=offset, axis1=axis1, axis2=axis2)
 
@@ -339,7 +339,7 @@ def broadcast_to(x, shape):
         of the input variable.
 
     Note:
-        This function operates similarly to `numpy.broadcast_to`.
+        This function is similar to `numpy.broadcast_to`.
     """
     return x.broadcast_to(shape)
 
@@ -359,7 +359,7 @@ def concatenate(arrays, axis=0):
         present in `arrays`.
 
     Note:
-        This function operates similarly to `numpy.concatenate`.
+        This function is similar to `numpy.concatenate`.
     """
 
     if len(arrays) == 0:
@@ -385,7 +385,7 @@ def stack(arrays, axis=0):
         present in `arrays`.
 
     Note:
-        This function operates similarly to `numpy.stack`.
+        This function is similar to `numpy.stack`.
     """
 
     if len(arrays) == 0:
@@ -407,7 +407,7 @@ def hstack(arrays):
         present in `arrays`.
     
     Note:
-        This function operates similarly to `numpy.hstack`.
+        This function is similar to `numpy.hstack`.
     """
     
     if len(arrays) == 0:
@@ -435,7 +435,7 @@ def vstack(arrays):
         present in `arrays`.
     
     Note:
-        This function operates similarly to `numpy.vstack`.
+        This function is similar to `numpy.vstack`.
     """
 
     if len(arrays) == 0:
@@ -463,7 +463,7 @@ def dstack(arrays):
         present in `arrays`.
     
     Note:
-        This function operates similarly to `numpy.dstack`.
+        This function is similar to `numpy.dstack`.
     """
 
     if len(arrays) == 0:
@@ -499,7 +499,7 @@ def split(x, indices_or_sections, axis=0):
         A list of new random variables into which the input variable is split.
     
     Note:
-        This function operates similarly to `numpy.split`.
+        This function is similar to `numpy.split`.
     """
     return x.split(indices_or_sections=indices_or_sections, axis=axis)
 
@@ -521,7 +521,7 @@ def hsplit(x, indices_or_sections):
         A list of new random variables into which the input variable is split.
     
     Note:
-        This function operates similarly to `numpy.hsplit`.
+        This function is similar to `numpy.hsplit`.
     """
 
     if x.ndim < 1:
@@ -548,7 +548,7 @@ def vsplit(x, indices_or_sections):
         A list of new random variables into which the input variable is split.
     
     Note:
-        This function operates similarly to `numpy.vsplit`.
+        This function is similar to `numpy.vsplit`.
     """
 
     if x.ndim < 2:
@@ -573,7 +573,7 @@ def dsplit(x, indices_or_sections):
         A list of new random variables into which the input variable is split.
     
     Note:
-        This function operates similarly to `numpy.dsplit`.
+        This function is similar to `numpy.dsplit`.
     """
 
     if x.ndim < 3:
@@ -602,10 +602,9 @@ def power(x, y):
 
 
 def matmul(x, y):
-    """Performs matrix multiplication between a random variable and 
-    a numeric array, or linearized matrix multiplication between 
-    two random variables. The dimensions of both operands must be 
-    greater than 0.
+    """Matrix product between a random variable and a numeric array, 
+    or linearized matrix multiplication between two random variables. 
+    The dimensions of both operands must be greater than 0.
 
     Args:
         x (numeric array or random variable): 
@@ -614,19 +613,18 @@ def matmul(x, y):
             The second operand.
 
     Returns:
-        A new random variable resulting from the matrix multiplication 
-        of `x` and `y`.
+        A new random variable - the matrix product of `x` and `y`.
 
     Note:
-        This function operates similarly to `numpy.matmul`, and follows the same rules 
+        This function is similar to `numpy.matmul`, and follows the same rules 
         regarding the shapes of the input and output variables.
     """
     return x @ y
 
 
 def dot(x, y):
-    """Calculates the dot product between a random variable and 
-    a numeric array, or linearized dot product between two random variables.
+    """Dot product between a random variable and a numeric array, 
+    or linearized dot product between two random variables.
 
     Args:
         x (numeric array or random variable): 
@@ -635,10 +633,10 @@ def dot(x, y):
             The second operand.
 
     Returns:
-        A new random variable resulting from the dot product of `x` and `y`.
+        A new random variable - the dot product of `x` and `y`.
 
     Note:
-        This function operates similarly to `numpy.dot`, and follows the same rules 
+        This function is similar to `numpy.dot`, and follows the same rules 
         regarding the shapes of the input and output variables.
     """
 
@@ -647,8 +645,8 @@ def dot(x, y):
 
 
 def inner(x, y):
-    """Calculates the inner product between a random variable and 
-    a numeric array, or linearized inner product between two random variables.
+    """Inner product between a random variable and a numeric array, 
+    or linearized inner product between two random variables.
 
     Args:
         x (numeric array or random variable): 
@@ -657,10 +655,10 @@ def inner(x, y):
             The second operand.
 
     Returns:
-        A new random variable resulting from the inner product of `x` and `y`.
+        A new random variable - the inner product of `x` and `y`.
 
     Note:
-        This function operates similarly to `numpy.inner`, and follows the same rules 
+        This function is similar to `numpy.inner`, and follows the same rules 
         regarding the shapes of the input and output variables.
     """
 
@@ -669,8 +667,8 @@ def inner(x, y):
 
 
 def outer(x, y):
-    """Calculates the outer product between a random variable and 
-    a numeric array, or linearized outer product between two random variables.
+    """Outer product between a random variable and a numeric array, 
+    or linearized outer product between two random variables.
 
     Args:
         x (numeric array or random variable): 
@@ -679,10 +677,10 @@ def outer(x, y):
             The second operand.
 
     Returns:
-        A new random variable resulting from the outer product of `x` and `y`.
+        A new random variable - the outer product of `x` and `y`.
 
     Note:
-        This function operates similarly to `numpy.outer`, and follows the same rules 
+        This function is similar to `numpy.outer`, and follows the same rules 
         regarding the shapes of the input and output variables.
     """
 
@@ -691,9 +689,8 @@ def outer(x, y):
 
 
 def kron(x, y):
-    """Calculates the Kronecker product between a random variable and 
-    a numeric array, or linearized Kronecker product between two 
-    random variables.
+    """Kronecker product between a random variable and a numeric array, 
+    or linearized Kronecker product between two random variables.
 
     Args:
         x (numeric array or random variable): 
@@ -702,11 +699,10 @@ def kron(x, y):
             The second operand.
 
     Returns:
-        A new random variable resulting from the Kronecker product 
-        of `x` and `y`.
+        A new random variable - the Kronecker product of `x` and `y`.
 
     Note:
-        This function operates similarly to `numpy.kron`, and follows the same rules 
+        This function is similar to `numpy.kron`, and follows the same rules 
         regarding the shapes of the variables and the arrangement of elements.
     """
 
@@ -715,8 +711,8 @@ def kron(x, y):
 
 
 def tensordot(x, y, axes=2):
-    """Calculates the tensor dot product between a random variable and a numeric 
-    array, or linearized tensor dot product between two random variables.
+    """Tensor dot product between a random variable and a numeric array, 
+    or linearized tensor dot product between two random variables.
     
     The tensor dot product is the sum of the elements of `x` and `y` 
     along the selected axes.
@@ -736,11 +732,10 @@ def tensordot(x, y, axes=2):
             the same lengths.
 
     Returns:
-        A new random variable resulting from the tensor dot product 
-        of `x` and `y`.
+        A new random variable - the tensor dot product of `x` and `y`.
 
     Note:
-        This function operates similarly to `numpy.tensordot`, and follows the same 
+        This function is similar to `numpy.tensordot`, and follows the same 
         rules regarding the shapes of the input and output variables.
     """
 
@@ -749,8 +744,8 @@ def tensordot(x, y, axes=2):
 
 
 def einsum(subs, x, y):
-    """Performs the Einstein summation between a random variable and a numeric 
-    array, or linearized Einstein summation between two random variables.
+    """Einstein summation between a random variable and a numeric array, 
+    or linearized Einstein summation between two random variables.
 
     Args:
         subs (str):
@@ -763,12 +758,13 @@ def einsum(subs, x, y):
             The second input operand.
 
     Returns:
-        A new random variable resulting from the Einstein summation 
+        A new random variable - a result of the Einstein summation 
         of `x` and `y` according to the subscripts.
 
     Note:
-        This function operates similarly to `numpy.einsum` and follows the same rules 
-        regarding the subscripts and the variable shapes.
+        This function is similar to `numpy.einsum` and follows the same rules 
+        regarding the subscripts and the variable shapes, but does not support 
+        more than two operands.
     """
 
     mod, cls = resolve([x, y])
