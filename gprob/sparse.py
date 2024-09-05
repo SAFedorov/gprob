@@ -574,7 +574,7 @@ class SparseNormal(Normal):
         in_symb1.insert(0, elem_symb)
         in_symb2.insert(0, elem_symb)
 
-        subs = f"{"".join(in_symb1)},{"".join(in_symb2)}->{"".join(out_symb)}"
+        subs = f"{''.join(in_symb1)},{''.join(in_symb2)}->{''.join(out_symb)}"
         return np.einsum(subs, self.a, self.a.conj())
 
     
@@ -628,7 +628,7 @@ class SparseNormal(Normal):
 
         in_symb2.insert(0, elem_symb)
 
-        subs = f"{"".join(in_symb1)},{"".join(in_symb2)}->{"".join(out_symb)}"
+        subs = f"{''.join(in_symb1)},{''.join(in_symb2)}->{''.join(out_symb)}"
         return np.einsum(subs, r, self.a) + self.mean()
         
 
@@ -1041,7 +1041,7 @@ def cov(x, y):
     in_symb1.insert(0, elem_symb)
     in_symb2.insert(0, elem_symb)
     
-    subs = f"{"".join(in_symb1)},{"".join(in_symb2)}->{"".join(out_symb)}"
+    subs = f"{''.join(in_symb1)},{''.join(in_symb2)}->{''.join(out_symb)}"
     _, [ax, ay] = complete([x, y])
     return np.einsum(subs, ax, ay.conj())
 

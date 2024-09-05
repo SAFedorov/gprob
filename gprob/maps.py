@@ -94,17 +94,17 @@ class LatentMap:
             a = _unsq(self.a, other.ndim) + _unsq(other.a, self.ndim)
             return self.__class__(a, b, self.lat)
     
-        op1, op2 = self, other
-        lat, swapped = latent.ounion(op1.lat, op2.lat)
+        x, y = self, other
+        lat, swapped = latent.ounion(x.lat, y.lat)
         
         if swapped:
-            op1, op2 = op2, op1
+            x, y = y, x
 
         a = np.zeros((len(lat),) + b.shape, 
-                     dtype=np.promote_types(op1.a.dtype, op2.a.dtype))
-        a[:len(op1.lat)] = _unsq(op1.a, b.ndim)
-        idx = [lat[k] for k in op2.lat]
-        a[idx] += _unsq(op2.a, b.ndim)
+                     dtype=np.promote_types(x.a.dtype, y.a.dtype))
+        a[:len(x.lat)] = _unsq(x.a, b.ndim)
+        idx = [lat[k] for k in y.lat]
+        a[idx] += _unsq(y.a, b.ndim)
 
         return self.__class__(a, b, lat)
     
@@ -577,17 +577,17 @@ def complete(seq):
         return lat, [extend_a(op, lat) for op in seq]
 
     # The rest is an optimization for the case of two operands.
-    op1, op2 = seq
+    x, y = seq
 
-    if op1.lat is op2.lat:
-        return op1.lat, [op1.a, op2.a]
+    if x.lat is y.lat:
+        return x.lat, [x.a, y.a]
     
-    lat, swapped = latent.ounion(op1.lat, op2.lat)
+    lat, swapped = latent.ounion(x.lat, y.lat)
 
     if swapped:
-        return lat, [extend_a(op1, lat), pad_a(op2, lat)]
+        return lat, [extend_a(x, lat), pad_a(y, lat)]
     
-    return lat, [pad_a(op1, lat), extend_a(op2, lat)]
+    return lat, [pad_a(x, lat), extend_a(y, lat)]
     
     
 def lift(cls, x):
@@ -641,47 +641,46 @@ def concatenate(cls, arrays, axis=0):
     if len(arrays) == 1:
         return arrays[0]
     elif len(arrays) == 2 and arrays[0].lat is arrays[1].lat:
-        # An optimization targeting uses like concatenate([x.real, x.imag]).
-        op1, op2 = arrays
-        a = np.concatenate([op1.a, op2.a], axis=axis+1)
-        return cls(a, b, op1.lat)
+        # An optimization targeting uses like concatenate([v.real, v.imag]).
+        x, y = arrays
+        a = np.concatenate([x.a, y.a], axis=axis+1)
+        return cls(a, b, x.lat)
 
     dims = [x.a.shape[axis+1] for x in arrays]
-    base_jidx = (slice(None),) * axis
+    jbase = (slice(None),) * axis
 
     if len(arrays) > 2:
-        union_lat = latent.uunion(*[x.lat for x in arrays])
+        ulat = latent.uunion(*[x.lat for x in arrays])
         dtype = np.result_type(*[x.a for x in arrays])
-        a = np.zeros((len(union_lat),) + b.shape, dtype)
+        a = np.zeros((len(ulat),) + b.shape, dtype)
         n1 = 0
         for i, x in enumerate(arrays):
-            idx = [union_lat[k] for k in x.lat]
             n2 = n1 + dims[i]
-            a[idx, *base_jidx, n1: n2] = x.a
+            idx = ([ulat[k] for k in x.lat],) + jbase + (slice(n1, n2),)
+            a[idx] = x.a
             n1 = n2
 
-        return cls(a, b, union_lat)
+        return cls(a, b, ulat)
     
-    # The rest is an optimization for the general case of two operands.
-    op1, op2 = arrays
+    # The rest is an optimization for the case of two operands.
+    x, y = arrays
 
     # Indices along the variable dimension.
-    jidx1 = base_jidx + (slice(None, dims[0]),)
-    jidx2 = base_jidx + (slice(-dims[1], None),)
+    jx = jbase + (slice(dims[0]),)
+    jy = jbase + (slice(-dims[1], None),)
 
-    union_lat, swapped = latent.ounion(op1.lat, op2.lat)
+    ulat, swapped = latent.ounion(x.lat, y.lat)
 
     if swapped:
-        op1, op2 = op2, op1
-        jidx1, jidx2 = jidx2, jidx1
+        x, y = y, x
+        jx, jy = jy, jx
     
-    a = np.zeros((len(union_lat),) + b.shape, 
-                 np.promote_types(op1.a.dtype, op2.a.dtype))
-    a[:len(op1.lat), *jidx1] = op1.a
-    idx = [union_lat[k] for k in op2.lat]
-    a[idx, *jidx2] = op2.a
+    a = np.zeros((len(ulat),) + b.shape, 
+                 dtype=np.promote_types(x.a.dtype, y.a.dtype))
+    a[(slice(len(x.lat)),) + jx] = x.a
+    a[([ulat[k] for k in y.lat],) + jy] = y.a
 
-    return cls(a, b, union_lat)
+    return cls(a, b, ulat)
 
 
 def stack(cls, arrays, axis=0):
@@ -690,43 +689,44 @@ def stack(cls, arrays, axis=0):
     b = np.stack([x.b for x in arrays], axis=axis)
 
     axis = axis if axis >= 0 else b.ndim + axis
-    base_jidx = (slice(None),) * axis
+    jbase = (slice(None),) * axis
 
     if len(arrays) == 1:
-        return arrays[0][*base_jidx, None]
+        return arrays[0][jbase + (None,)]
     elif len(arrays) == 2 and arrays[0].lat is arrays[1].lat:
-        # An optimization targeting uses like stack([x.real, x.imag]).
-        op1, op2 = arrays
-        a = np.stack([op1.a, op2.a], axis=axis+1)
-        return cls(a, b, op1.lat)
+        # An optimization targeting uses like stack([v.real, v.imag]).
+        x, y = arrays
+        a = np.stack([x.a, y.a], axis=axis+1)
+        return cls(a, b, x.lat)
 
     if len(arrays) > 2:
-        union_lat = latent.uunion(*[x.lat for x in arrays])
+        ulat = latent.uunion(*[x.lat for x in arrays])
         dtype = np.result_type(*[x.a for x in arrays])
-        a = np.zeros((len(union_lat),) + b.shape, dtype)
+        a = np.zeros((len(ulat),) + b.shape, dtype)
         for i, x in enumerate(arrays):
-            idx = [union_lat[k] for k in x.lat]
-            a[idx, *base_jidx, i] = x.a
+            idx = ([ulat[k] for k in x.lat],) + jbase + (i,)
+            a[idx] = x.a
 
-        return cls(a, b, union_lat)
+        return cls(a, b, ulat)
     
-    # The rest is an optimization for the general case of two operands.
-    op1, op2 = arrays
-    j1, j2 = 0, 1
+    # The rest is an optimization for the case of two operands.
+    x, y = arrays
+    
+    jx = jbase + (0,)
+    jy = jbase + (1,)
 
-    union_lat, swapped = latent.ounion(op1.lat, op2.lat)
+    ulat, swapped = latent.ounion(x.lat, y.lat)
 
     if swapped:
-        op1, op2 = op2, op1
-        j1, j2 = j2, j1
+        x, y = y, x
+        jx, jy = jy, jx
     
-    a = np.zeros((len(union_lat),) + b.shape, 
-                 np.promote_types(op1.a.dtype, op2.a.dtype))
-    a[:len(op1.lat), *base_jidx, j1] = op1.a
-    idx = [union_lat[k] for k in op2.lat]
-    a[idx, *base_jidx, j2] = op2.a
+    a = np.zeros((len(ulat),) + b.shape, 
+                 dtype=np.promote_types(x.a.dtype, y.a.dtype))
+    a[(slice(x.nlat),) + jx] = x.a
+    a[([ulat[k] for k in y.lat],) + jy] = y.a
 
-    return cls(a, b, union_lat)
+    return cls(a, b, ulat)
 
 
 def solve(cls, x, y):

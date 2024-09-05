@@ -317,7 +317,7 @@ def test_masked_conditioning():
                 v, vc2 = random_correlate([v, vc2])
                 i += 1
 
-                if i > 50:
+                if i > 100:
                     raise Exception("Failed to create correlation.")
                 
             assert np.abs(cov(v, vc2)).max() > 0.1
