@@ -389,8 +389,8 @@ def normal(mu=0., sigmasq=1., size=None):
 
     atol = len(eigvals) * np.max(np.abs(eigvals)) * np.finfo(eigvals.dtype).eps
     if (eigvals < -atol).any():
-        raise ValueError("Not all eigenvalues of the covariance matrix are "
-                         f"non-negative: {eigvals}.")
+        raise ValueError("Negative eigenvalues in the covariance matrix:\n"
+                         f"{eigvals}")
     
     eigvals[eigvals < 0] = 0.
     a2dtr = eigvects * np.sqrt(eigvals)
