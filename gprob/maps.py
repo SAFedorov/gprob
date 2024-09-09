@@ -166,7 +166,7 @@ class LatentMap:
             a = _unsq(self.a, b.ndim) * ((-other) / self.b**2)
             return self.__class__(a, b, self.lat)
         
-        # `other` has been converted to a map, but was not a map initially.
+        # ``other`` has been converted to a map, but was not a map initially.
         return other / self
 
     def __matmul__(self, other):
@@ -274,7 +274,7 @@ class LatentMap:
 
         Args:
             axis (int or None): 
-                Axis along which the cumulative sum is computed. If `None`, 
+                Axis along which the cumulative sum is computed. If ``None``, 
                 the cumulative sum is computed over the flattened array.
 
         Returns:
@@ -390,7 +390,7 @@ class LatentMap:
 
         Args:
             newshape (tuple of int): 
-                The new shape. One dimension can be set to `-1` to infer its
+                The new shape. One dimension can be set to ``-1`` to infer its
                 size from the total number of elements and the other dimensions.
             order (str): 
                 The order in which the array elements are read.
@@ -411,17 +411,17 @@ class LatentMap:
 
         Args:
             axis (int, tuple of int, or None): 
-                Axis or axes along which to sum the elements. If `None`, 
+                Axis or axes along which to sum the elements. If ``None``, 
                 the function sums all elements.
             keepdims (bool): 
-                If `True`, the reduced axes are retained in the output 
+                If ``True``, the reduced axes are retained in the output 
                 as dimensions with size one. This enables the result 
                 to broadcast against the input array.
 
         Returns:
             A new random variable representing the result of the summation. 
             The output variable has the same dimensions as the input, except 
-            the summation axes are removed unless `keepdims` is `True`.
+            the summation axes are removed unless ``keepdims`` is ``True``.
         """
         
         # "where" is absent because its broadcasting is not implemented.
@@ -441,7 +441,7 @@ class LatentMap:
 
         Args:
             axes (tuple of int or None): 
-                The desired axes order. If `None`, the existing axes 
+                The desired axes order. If ``None``, the existing axes 
                 order is reversed.
 
         Returns:
@@ -483,9 +483,9 @@ class LatentMap:
         Args:
             indices_or_sections (int or sequence of int):
                 - If an integer, n, the input variable is to be divided along
-                 `axis` into n equal pieces.
+                  ``axis`` into n equal pieces.
                 - If a sequence of sorted integers, its entries indicate where 
-                along `axis` the input variable is to be split.
+                  along ``axis`` the input variable is to be split.
             axis (int):
                 The axis along which the variable is to be split.
 
@@ -519,8 +519,8 @@ def _axes_a(axes_b):
 
 
 def _unsq(a, ndim):
-    """Unsqueezes `a` so that it can be broadcasted to 
-    the map dimension `ndim`."""
+    """Unsqueezes ``a`` so that it can be broadcasted to 
+    the map dimension ``ndim``."""
 
     dn = ndim - a.ndim + 1
     if dn <= 0:
@@ -541,18 +541,19 @@ def _broadcast(a, shape):
 
 def complete(seq):
     """Extends the transformation arrays of each latent map in 
-    the sequence `seq` to the union of their latent variables.
+    the sequence ``seq`` to the union of their latent variables.
     
     Returns:
-        `(union_lat, [a1, a2, ...])`, where `union_lat` is a combined dictionary 
-        of latent variables, and `[a1, a2, ...]` is a list of new map arrays
-        for each map in `seq` extended to `union_lat` by zero padding.
+        ``(union_lat, [a1, a2, ...])``, where ``union_lat`` is a combined 
+        dictionary of latent variables, and ``[a1, a2, ...]`` is a list of 
+        new map arrays for each map in ``seq`` extended to ``union_lat`` by 
+        zero padding.
     """
 
     def extend_a(x, new_lat):
-        """Extends the map `x` to a new list of latent variables `new_lat` by
-        adding zero entries. All the existing variables from `x.lat` must
-        be present in `new_lat` (in arbitrary order)."""
+        """Extends the map ``x`` to a new list of latent variables ``new_lat``
+        by adding zero entries. All the existing variables from ``x.lat`` must
+        be present in ``new_lat`` (in arbitrary order)."""
         
         new_shape = (len(new_lat),) + x.a.shape[1:]
         new_a = np.zeros(new_shape, dtype=x.a.dtype)
@@ -561,9 +562,9 @@ def complete(seq):
         return new_a
 
     def pad_a(x, new_lat):
-        """Extends the map `x` to a new list of latent variables `new_lat` by
-        padding. `new_lat` must start from the variables of `x.lat`,
-        arranged in the same order as they appear in x.lat."""
+        """Extends the map ``x`` to a new list of latent variables ``new_lat``
+        by padding. ``new_lat`` must start from the variables of ``x.lat``,
+        arranged in the same order as they appear in ``x.lat``."""
 
         new_a = np.zeros((len(new_lat),) + x.a.shape[1:], dtype=x.a.dtype)
         new_a[:len(x.lat)] = x.a        
@@ -591,9 +592,9 @@ def complete(seq):
     
     
 def lift(cls, x):
-    """Converts `x` to a varaible of class `cls`. If `x` is such a variable 
-    already, returns it unchanged. If the conversion cannot be done, 
-    raises a `TypeError`."""
+    """Converts ``x`` to a varaible of class ``cls``. If ``x`` is such 
+    a variable already, returns it unchanged. If the conversion cannot be done, 
+    raises a ``TypeError``."""
 
     if x.__class__ is cls:
         return x
@@ -613,14 +614,16 @@ def lift(cls, x):
 
 
 def match_(cls, x):
-    """Converts `x` to either a numeric array or a variable of class `cls`, 
+    """Converts ``x`` to either a numeric array or a variable of class ``cls``, 
     and returns the converted variable with its type.
 
     Args:
         other: Object to be converted.
     
     Returns:
-        Tuple `(converted_x, isnumeric)`. `isnumeric` is a bool flag.
+        Tuple ``(converted_x, isnumeric)``. ``isnumeric`` is ``True`` if 
+        ``converted_x`` is a numeric array, and ``False`` if it is a random 
+        variable.
     """
     
     if x.__class__ is cls:
@@ -684,7 +687,7 @@ def concatenate(cls, arrays, axis=0):
 
 
 def stack(cls, arrays, axis=0):
-    # Essentially a copy of `concatenate`, with slightly less overhead.
+    # Essentially a copy of ``concatenate``, with slightly less overhead.
 
     b = np.stack([x.b for x in arrays], axis=axis)
 
@@ -866,10 +869,10 @@ def kron_2(cls, x, y):
 
 
 def complete_tensordot_axes(axes):
-    """Converts `axes` to an explicit form compatible with `numpy.tensordot` 
-    function. If `axes` is a sequence, the function returns it unchanged, 
-    and if `axes` is an integer `n`, it returns a tuple of lists
-    `([-n, -n + 1, ..., -1], [0, 1, ..., n-1])`."""
+    """Converts ``axes`` to an explicit form compatible with ``numpy.tensordot`` 
+    function. If ``axes`` is a sequence, the function returns it unchanged, 
+    and if ``axes`` is an integer ``n``, it returns a tuple of lists
+    ``([-n, -n + 1, ..., -1], [0, 1, ..., n-1])``."""
 
     try:
         iter(axes)

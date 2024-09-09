@@ -16,10 +16,10 @@ from .func import condition, logp
 class Normal(LatentMap):
     """Array of normal random variables, 
     
-    x[...] = sum_k a[i...] xi[i] + b[...],
+    ``x[...] = sum_k a[i...] xi[i] + b[...],``
     
-    where `xi[i]` are the independent identically-distributed Gaussian 
-    random variables: `xi[i] ~ N(0, 1)` for all `i`, and `...` is 
+    where ``xi[i]`` are the independent identically-distributed Gaussian 
+    random variables: ``xi[i] ~ N(0, 1)`` for all ``i``, and ``...`` is 
     a multi-dimensional index."""
 
     _mod = import_module(__name__)
@@ -52,7 +52,7 @@ class Normal(LatentMap):
     def icopy(self):
         """Creates a statistically independent copy of the variable."""
 
-        # Copies of `a` and `b` are taken becase if the original variable 
+        # Copies of ``a`` and ``b`` are taken becase if the original variable 
         # is in-place modified later, those modifications should not affect 
         # the new variable.
         return self.__class__(self.a.copy(), self.b.copy())
@@ -62,25 +62,25 @@ class Normal(LatentMap):
         
         Args:
             observations (Normal or dict):
-                A single normal variable or a dictionary of observations
-                of the format 
-                {`variable`: `value`, ...}, where `variable`s are normal 
-                variables, and `value`s can be numerical constants or 
-                normal variables. Specifying a single normal `variable` 
-                is equavalent to specifying {`variable`: `0`}.
+                A single normal variable or a dictionary of observations 
+                of the format ``{variable: value, ...}``, where the variables 
+                are normal variables, and the values are numeric 
+                constants or normal variables. A single normal 
+                variable is equavalent to ``{variable: 0}``.
             mask (optional): 
-                A 2d bool array, in which `mask[i, j] == True` means that 
-                the `i`-th condition applies to the `j`-th variable, and
-                `False` that it does not.
+                A 2d bool array, in which ``mask[i, j] == True`` means that 
+                the ``i``-th condition applies to the ``j``-th variable, and
+                ``False`` that it does not.
                 In the case when the variables have more than one dimension, 
-                the 0th axis of `mask` spans over the 0th axis of each of the 
-                conditions, and the 1st axis of `mask` spans over the 0th axis
+                the 0th axis of ``mask`` spans over the 0th axis of each of the 
+                conditions, and the 1st axis of ``mask`` spans over the 0th axis
                 of the conditioned variable.
                 The mask needs to be generalized upper- or lower- triangular, 
-                meaning that there needs to be a set of indices `i0[j]` such 
-                that either `mask[i, j] == True` for all `i > i0[j]` and 
-                `mask[i, j] == False` for `i < i0[j]`, or `mask[i, j] == True` 
-                for all `i < i0[j]` and `mask[i, j] == False` for `i > i0[j]`.
+                meaning that there needs to be a set of indices ``i0[j]`` such 
+                that either ``mask[i, j] == True`` for all ``i > i0[j]`` and 
+                ``mask[i, j] == False`` for ``i < i0[j]``, or, vice-versa, 
+                ``mask[i, j] == True`` for all ``i < i0[j]`` 
+                and ``mask[i, j] == False`` for ``i > i0[j]``.
         
         Returns:
             Conditional normal variable.
@@ -161,8 +161,8 @@ class Normal(LatentMap):
         return self.b
 
     def var(self):
-        """Variance, `<(x-<x>)(x-<x>)^*>`, where `*` denotes 
-        complex conjugation, and `<...>` is the expectation value of `...`.
+        """Variance, ``<(x-<x>)(x-<x>)^*>``, where ``*`` denotes 
+        complex conjugation, and ``<...>`` is the expectation value of ``...``.
         
         Returns:
             An array of the varaince values with the same shape as 
@@ -172,17 +172,17 @@ class Normal(LatentMap):
         return np.real(np.einsum("i..., i... -> ...", self.a, self.a.conj()))
 
     def cov(self):
-        """Covariance, generalizing `<outer((x-<x>), (x-<x>)^H)>`, 
-        where `H` denotes conjugate transposition, and `<...>` is 
-        the expectation value of `...`.
+        """Covariance, generalizing ``<outer((x-<x>), (x-<x>)^H)>``, 
+        where ``H`` denotes conjugate transposition, and ``<...>`` is 
+        the expectation value of ``...``.
 
         Returns:
-            An array `c` with twice the dimension number as 
+            An array ``c`` with twice the dimension number as 
             the variable, whose components are 
-            `c[ijk... lmn...] = <(x[ijk..] - <x>)(x[lmn..] - <x>)*>`, 
-            where `ijk...` and `lmn...` are indices that run over 
-            the elements of the variable (here `x`), 
-            and `*` denotes complex conjugation.
+            ``c[ijk... lmn...] = <(x[ijk..] - <x>)(x[lmn..] - <x>)*>``, 
+            where ``ijk...`` and ``lmn...`` are indices that run over 
+            the elements of the variable (here ``x``), 
+            and ``*`` denotes complex conjugation.
 
         Examples:
             >>> v = normal(size=(2, 3))
@@ -198,17 +198,18 @@ class Normal(LatentMap):
         return cov2d.reshape(self.shape * 2)
     
     def sample(self, n=None):
-        """Samples the random variable `n` times.
+        """Samples the random variable ``n`` times.
         
         Args:
             n (int or None): 
                 The number of samples.
         
         Returns:
-            A single sample with the same shape as the varaible if `n` is None, 
-            or an array of samples of the lenght `n` if `n` is an integer,
-            in which case the total shape of the array is the shape of 
-            the varaible plus (n,) prepended as the first dimension.
+            A single sample with the same shape as the varaible if ``n`` 
+            is ``None``, or an array of samples of the lenght ``n`` if ``n`` 
+            is an integer, in which case the total shape of the array is 
+            the shape of the varaible plus ``(n,)`` prepended as 
+            the first dimension.
 
         Examples:
             >>> v.shape
@@ -219,7 +220,6 @@ class Normal(LatentMap):
             >>> v.sample(2)
             array([[[-1.78808198,  1.08481027,  0.40414722],
                     [ 0.95298205, -0.42652839,  0.62417706]],
-
                    [[-0.81295799,  1.76126207, -0.36532098],
                     [-0.22637276, -0.67915003, -1.55995937]]])
             >>> v.sample(5).shape

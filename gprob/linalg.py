@@ -5,7 +5,7 @@ from .arrayops import resolve
 
 def solve(a, b):
     """Solves a system of linear equations where the coefficient 
-    matrix is `a` and the constant vector is `b`.
+    matrix is ``a`` and the constant vector is ``b``.
 
     Args:
         a (numeric matrix):
@@ -15,7 +15,7 @@ def solve(a, b):
             or (m, k).
 
     Returns:
-        A new random variable, `a^-1 @ b`, with the same shape as `b`.
+        A new random variable, ``a^-1 @ b``, with the same shape as ``b``.
 
     Note:
         This function operates similarly to `numpy.linalg.solve`, but
@@ -42,7 +42,7 @@ def solve(a, b):
 
 def asolve(a, b):
     """Solves an array of systems of linear equations where the coefficient 
-    matrices are `a` and the constant vectors are `b`.
+    matrices are ``a`` and the constant vectors are ``b``.
 
     Args:
         a (array of numeric matrix):
@@ -52,7 +52,7 @@ def asolve(a, b):
             The random variable to be solved for with the shape (..., m).
 
     Returns:
-        A new random variable with the same shape as `b`.
+        A new random variable with the same shape as ``b``.
     """
 
     if np.ndim(a) < 2:

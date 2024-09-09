@@ -4,7 +4,7 @@ from scipy.linalg import LinAlgError
 
 
 def cholesky_inv(mat):
-    """Inverts the positive-definite symmetric matrix `mat` using Cholesky 
+    """Inverts the positive-definite symmetric matrix ``mat`` using Cholesky 
     decomposition. A bit faster than `linalg.inv` and gives a bit smaller error. 
     """
     
@@ -59,7 +59,7 @@ def dlogp(x, m, cov, dm, dcov):
 
     Returns:
         The gradient vector of the natural logarithm of the probability density 
-        at `x` - an array with the shape (k,).
+        at ``x`` - an array with the shape (k,).
     """
 
     cov_inv = cholesky_inv(cov)
@@ -88,7 +88,7 @@ def d2logp(x, m, cov, dm, dcov, d2m, d2cov):
     
     Returns:
         The Hessian of the natural logarithm of the probability density 
-        at `x` - an array with the shape (k, k).
+        at ``x`` - an array with the shape (k, k).
     """
 
     k, n, _ = dcov.shape
@@ -221,15 +221,15 @@ class ConditionError(Exception):
 
 
 def condition(m, a, mc, ac, mask=None):
-    """Conditions the vandom variable `v` on another random variable, `c`, 
+    """Conditions the vandom variable ``v`` on another random variable, ``c``, 
     being equal to zero. Both variables are defined as Gaussian maps,
 
     v = m + e @ a,
     c = mc + e @ ac,
     
-    where `e` are vectors of independent identically-distributed 
-    normal random variables with zero mean and unit variance, `m` and `mc` are
-    the mean vectors and `a` and `ac` are the map matrices.  
+    where ``e`` are vectors of independent identically-distributed 
+    normal random variables with zero mean and unit variance, ``m`` and ``mc`` 
+    are the mean vectors and `a` and `ac` are the map matrices.  
     
     Args:
         m: The mean vector of the variable to be conditioned, an (n,) array.

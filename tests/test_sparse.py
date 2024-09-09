@@ -1,4 +1,5 @@
 import operator
+import inspect
 
 import pytest
 import itertools
@@ -3993,11 +3994,12 @@ def test_icopy():
 
 
 def test_doc_string_sync():
-    methods = ["mean", "var", "sample", "logp", "__or__"]
+    methods = ["icopy", "mean", "var", "sample", "logp", "__or__"]
 
     for m in methods:
-        assert getattr(Normal, m).__doc__
-        assert getattr(Normal, m).__doc__ == getattr(SparseNormal, m).__doc__
+        assert inspect.getdoc(getattr(Normal, m))
+        assert (inspect.getdoc(getattr(Normal, m)) 
+                == inspect.getdoc(getattr(SparseNormal, m)))
 
 
 def test_array_conversion():

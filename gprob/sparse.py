@@ -15,7 +15,7 @@ from .external import einsubs
 
 def iid(x, n=1, axis=0):
     """Creates a sparse array of independent identically distributed 
-    copies of `x` stacked together along `axis`.
+    copies of ``x`` stacked together along ``axis``.
     
     Args:
         x (random variable): 
@@ -26,7 +26,7 @@ def iid(x, n=1, axis=0):
             The axis in the final array along which the copies are stacked.
 
     Returns:
-        A sparse normal random variable whose elements along `axis` are 
+        A sparse normal random variable whose elements along ``axis`` are 
         statistically independent.
     """
 
@@ -47,7 +47,7 @@ class SparseNormal(Normal):
     # iaxid is a tuple of the length ndim indicating the axes along which 
     # the random variables at different indices are independent of each other. 
     # It contains integer ids at positions corresponding to the independence 
-    # axes, and `None`s at the positions corresponding to regular axes.
+    # axes, and ``None``s at the positions corresponding to regular axes.
 
     _mod = import_module(__name__)
 
@@ -82,7 +82,7 @@ class SparseNormal(Normal):
         # can silently return an empty array of numeric type, because sparse 
         # variables cannot be iterated over along their independence axes. 
 
-        # `dtype` and `copy` are for compatibility with array API.
+        # ``dtype`` and ``copy`` are for compatibility with array API.
         
         return np.fromiter([self], dtype).reshape(tuple())
     
@@ -205,7 +205,7 @@ class SparseNormal(Normal):
         Args:
             axis (int): 
                 Axis along which the cumulative sum is computed. 
-                `None` values are not supported.
+                ``None`` values are not supported.
 
         Returns:
             A new sparse normal variable representing the result of 
@@ -337,17 +337,17 @@ class SparseNormal(Normal):
         Args:
             axis (int, tuple of int): 
                 Axis or axes along which to sum the elements. 
-                `None` is not supported.
+                ``None`` is not supported.
             keepdims (bool):
-                If `True`, the reduced axes are retained in the output 
+                If ``True``, the reduced axes are retained in the output 
                 as dimensions with size one. This enables the result 
                 to broadcast against the input array.
 
         Returns:
             A new sparse normal variable representing the result of 
             the summation. The output variable has the same dimensions as 
-            the input, except the summation axes are removed unless `keepdims` 
-            is `True`.
+            the input, except the summation axes are removed unless 
+            ``keepdims`` is ``True``.
         """
 
         if not isinstance(axis, int) and not isinstance(axis, tuple):
@@ -413,10 +413,10 @@ class SparseNormal(Normal):
             observations (SparseNormal or dict):
                 A single sparse normal variable or a dictionary
                 of observations of the format 
-                {`variable`: `value`, ...}, where `variable`s are sparse normal 
-                variables, and `value`s can be numerical constants or 
-                sparse normal variables. Specifying a single normal `variable` 
-                is equavalent to specifying {`variable`: `0`}.
+                ``{variable: value, ...}``, where the variables are 
+                sparse normal variables, and the values are numeric 
+                constants or sparse normal variables. A single sparse normal 
+                variable is equavalent to ``{variable: 0}``.
         
         Returns:
             Conditional sparse normal variable.
@@ -488,7 +488,7 @@ class SparseNormal(Normal):
         q, r = np.linalg.qr(ac, mode="reduced")
 
         # If there are zero diagonal elements in the triangular matrix, 
-        # some colums of `ac` are linearly dependent.
+        # some colums of ``ac`` are linearly dependent.
         dia_r = np.abs(np.diagonal(r, axis1=-1, axis2=-2))
         tol = np.finfo(r.dtype).eps
         if (dia_r < (tol * np.max(dia_r))).any():
@@ -522,9 +522,9 @@ class SparseNormal(Normal):
         return _finalize(fcv.transpose(t_ax), self._iaxid)
 
     def cov(self):
-        """Covariance, generalizing `<outer((x-<x>), (x-<x>)^H)>`, 
-        where `H` denotes conjugate transposition, and `<...>` is 
-        the expectation value of `...`.
+        """Covariance, generalizing ``<outer((x-<x>), (x-<x>)^H)>``, 
+        where ``H`` denotes conjugate transposition, and ``<...>`` is 
+        the expectation value of ``...``.
 
         Returns:
             An array with the dimension number equal to the doubled 
@@ -535,11 +535,11 @@ class SparseNormal(Normal):
             and the independence dimensions are appended at the end.
             The resulting structure is the same as the structure produced 
             by repeated applications of `np.diagonal` over all the 
-            independence dimensions of the full-sized covariance matrix `c`,
-            `c[ijk... lmn...] = <(x[ijk..] - <x>)(x[lmn..] - <x>)*>`, 
-            where `ijk...` and `lmn...` are indices that run over 
-            the elements of the variable (here `x`), 
-            and `*` denotes complex conjugation.
+            independence dimensions of the full-sized covariance matrix ``c``,
+            ``c[ijk... lmn...] = <(x[ijk..] - <x>)(x[lmn..] - <x>)*>``, 
+            where ``ijk...`` and ``lmn...`` are indices that run over 
+            the elements of the variable (here ``x``), 
+            and ``*`` denotes complex conjugation.
 
         Examples:
             >>> v = iid(normal(size=(3,)), 4)
@@ -579,34 +579,6 @@ class SparseNormal(Normal):
 
     
     def sample(self, n=None):
-        """Samples the random variable `n` times.
-        
-        Args:
-            n (int or None): 
-                The number of samples.
-        
-        Returns:
-            A single sample with the same shape as the varaible if `n` is None, 
-            or an array of samples of the lenght `n` if `n` is an integer,
-            in which case the total shape of the array is the shape of 
-            the varaible plus (n,) prepended as the first dimension.
-
-        Examples:
-            >>> v.shape
-            (2, 3)
-            >>> v.sample()
-            array([[-0.33993954, -0.26758247, -0.33927517],
-                   [-0.36414751,  0.76830802,  0.0997399 ]])
-            >>> v.sample(2)
-            array([[[-1.78808198,  1.08481027,  0.40414722],
-                    [ 0.95298205, -0.42652839,  0.62417706]],
-
-                   [[-0.81295799,  1.76126207, -0.36532098],
-                    [-0.22637276, -0.67915003, -1.55995937]]])
-            >>> v.sample(5).shape
-            (5, 2, 3)
-        """
-        
         if n is None:
             nsh = tuple()
         else:
@@ -633,18 +605,6 @@ class SparseNormal(Normal):
         
 
     def logp(self, x):
-        """Log likelihood of a sample.
-    
-        Args:
-            x (array): 
-                A sample value or a sequence of sample values.
-
-        Returns:
-            Natural logarithm of the probability density at the sample value - 
-            a single number for single sample inputs, and an array for sequence 
-            inputs.
-        """
-
         delta_x = x - self.mean()
         validate_logp_samples(self, delta_x)
 
@@ -710,7 +670,7 @@ class SparseNormal(Normal):
 
 
 def _finalize(x, iaxid):
-    """Assigns `iaxid` to `x` and return `x`. The function is used for 
+    """Assigns ``iaxid`` to ``x`` and return ``x``. The function is used for 
     converting fully-correlated normal variables that have no independence axes 
     to true sparse normal variables."""
 
@@ -787,11 +747,11 @@ def _normalize_axes(axes, ndim):
 
 
 def _validate_iaxid(seq):
-    """Checks that the independence axes of the sparse normal arrays in `seq`
+    """Checks that the independence axes of the sparse normal arrays in ``seq``
     are compatible.
     
     Returns:
-        `iaxid` of the final shape for the broadcasted arrays.
+        ``iaxid`` of the final shape for the broadcasted arrays.
     """
 
     seq = [x if hasattr(x, "_iaxid") else lift(SparseNormal, x) for x in seq]
@@ -850,14 +810,14 @@ def _validate_iaxid(seq):
 
 def _item_iaxid(x, key):
     """Validates the key and calculates iaxid for the result of the indexing 
-    of `x` with `key`.
+    of ``x`` with ``key``.
     
     Args:
         x: 
             Sparse normal variable.
         key: 
             Numpy-syntax array indexing key. Independence axes can only 
-            be indexed by full slices `:` (explicit or implicit via ellipsis). 
+            be indexed by full slices ``:`` (explicit or implicit via ellipsis). 
         
     Returns:
         A tuple of iaxids for the indexing result.
@@ -941,9 +901,9 @@ def cov(x, y):
 
     def find_det_dense_shape(v, d):
         # Tries resolving what the independence axes of the deterministic 
-        # variable `d` could be based on the shape and the independence axes 
-        # of the sparse variable `v`. If the resolution is ambiguous or fails, 
-        # the function throws an error.
+        # variable ``d`` could be based on the shape and the independence axes 
+        # of the sparse variable ``v``. If the resolution is ambiguous 
+        # or fails, the function throws an error.
 
         sparse_shape_v = [s for b, s in zip(v._iaxid, v.shape) if b]
         dense_shape_d = list(d.shape)
@@ -1109,8 +1069,8 @@ def fftfunc_n(cls, name, x, s, axes, norm):
 
 
 def _check_independence(x, op_axes, n):
-    """Checks that the operation axes are not independence axes of `x`.
-    `n` is the operand number, normally 1 or 2, as this function is 
+    """Checks that the operation axes are not independence axes of ``x``.
+    ``n`` is the operand number, normally 1 or 2, as this function is 
     a helper for bilinear functions."""
     
     if any([x._iaxid[ax] for ax in op_axes]):

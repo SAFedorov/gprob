@@ -26,60 +26,61 @@ def fallback_to_normal(func):
 
 @fallback_to_normal
 def icopy(x):
-    """Creates a statistically independent copy of `x`."""
+    """Creates a statistically independent copy of ``x``."""
     return x.icopy()
 
 
 @fallback_to_normal
 def mean(x):
-    """Expectation value, `<x>`."""
+    """Expectation value, ``<x>``."""
     return x.mean()
 
 
 @fallback_to_normal
 def var(x):
-    """Variance, `<(x-<x>)(x-<x>)^*>`, where `*` denotes 
-    complex conjugation, and `<...>` is the expectation value of `...`."""
+    """Variance, ``<(x-<x>)(x-<x>)^*>``, where ``*`` denotes 
+    complex conjugation, and ``<...>`` is the expectation value of ``...``."""
     return x.var()
 
 
 def cov(*args):
-    """Covariance, generalizing `<outer((x-<x>), (y-<y>)^H)>`, 
-    where `H` denotes conjugate transposition, and `<...>` is 
-    the expectation value of `...`.
+    """Covariance, generalizing ``<outer((x-<x>), (y-<y>)^H)>``, 
+    where `H` denotes conjugate transposition, and ``<...>`` is 
+    the expectation value of ``...``.
     
     Args:
         One or two random variables.
 
     Returns:
-        - For one random variable, `x`, the function returns `x.cov()`. 
-        - For two random variables, `x` and `y`, the function returns 
+        - For one random variable, ``x``, the function returns ``x.cov()``. 
+        - For two random variables, ``x`` and ``y``, the function returns 
           their cross-covariance.
         
         The cross-covariance of two normal variables 
-        is an array `c` with the dimension number equal 
-        to the sum of the dimensions of `x` and `y`, whose components are
-        `c[ijk... lmn...] = <(x[ijk..] - <x>)(y[lmn..] - <y>)*>`, 
-        where the indices `ijk...` and `lmn...` run over the elements 
-        of `x` and `y`, respectively, and `*` denotes complex conjugation.
+        is an array ``c`` with the dimension number equal 
+        to the sum of the dimensions of ``x`` and ``y``, whose components are
+        ``c[ijk... lmn...] = <(x[ijk..] - <x>)(y[lmn..] - <y>)*>``, 
+        where the indices ``ijk...`` and ``lmn...`` run over the elements 
+        of ``x`` and ``y``, respectively, and ``*`` denotes complex conjugation.
 
         The cross-covariance of two sparse variables is an array 
         with the dimension number equal to the sum of the dense dimensions 
-        of `x` and `y`, plus the number of their sparse (independence) 
-        dimensions, which should be the same in `x` and `y`. 
+        of ``x`` and ``y``, plus the number of their sparse (independence) 
+        dimensions, which should be the same in ``x`` and ``y``. 
         In the returned array, the regular dimensions 
         go first in the order they appear in the variable shapes, 
         and the independence dimensions are appended at the end.
         The resulting structure is the same as the structure produced 
         by repeated applications of `np.diagonal` over all the 
-        independence dimensions of the full-sized covariance matrix `c` 
-        for `x` and `y`.
+        independence dimensions of the full-sized covariance matrix ``c`` 
+        for ``x`` and ``y``.
 
     Raises:
         TypeError: 
             If the number of input arguments is not 1 or 2.
 
     Examples:
+    
         Normal variables.
 
         >>> v1 = normal(size=(3,))  # shape (3,)
@@ -170,17 +171,17 @@ def sum(x, axis=None, keepdims=False):
         x (random variable): 
             The input array random variable whose elements are to be summed.
         axis (int, tuple of int, or None): 
-            Axis or axes along which to sum the elements. If `None`, 
+            Axis or axes along which to sum the elements. If ``None``, 
             the function sums all elements.
         keepdims (bool): 
-            If `True`, the reduced axes are retained in the output as dimensions 
-            with size one. This enables the result to broadcast against 
-            the input array.
+            If ``True``, the reduced axes are retained in the output 
+            as dimensions with size one. This enables the result to 
+            broadcast against the input array.
 
     Returns:
         A new random variable representing the result of the summation. 
         The output variable has the same dimensions as the input, except 
-        the summation axes are removed unless `keepdims` is `True`.
+        the summation axes are removed unless ``keepdims`` is ``True``.
 
     Note:
         This function is similar to `numpy.sum`.
@@ -196,7 +197,7 @@ def cumsum(x, axis=None):
         x (random variable):
             The input array random variable.
         axis (int or None):
-            Axis along which the cumulative sum is computed. If `None`, 
+            Axis along which the cumulative sum is computed. If ``None``, 
             the cumulative sum is computed over the flattened array.
 
     Returns:
@@ -288,7 +289,7 @@ def transpose(x, axes=None):
         x (random variable): 
             The input array random variable to be transposed.
         axes (tuple of int or None): 
-            The desired axes order. If `None`, the existing axes 
+            The desired axes order. If ``None``, the existing axes 
             order is reversed.
 
     Returns:
@@ -404,7 +405,7 @@ def hstack(arrays):
 
     Returns:
         A new random variable of the type corresponding to the highest type 
-        present in `arrays`.
+        present in ``arrays``.
     
     Note:
         This function is similar to `numpy.hstack`.
@@ -432,7 +433,7 @@ def vstack(arrays):
 
     Returns:
         A new random variable of the type corresponding to the highest type 
-        present in `arrays`.
+        present in ``arrays``.
     
     Note:
         This function is similar to `numpy.vstack`.
@@ -460,7 +461,7 @@ def dstack(arrays):
 
     Returns:
         A new random variable of the type corresponding to the highest type 
-        present in `arrays`.
+        present in ``arrays``.
     
     Note:
         This function is similar to `numpy.dstack`.
@@ -488,10 +489,10 @@ def split(x, indices_or_sections, axis=0):
         x (random variable): 
             The input variable to be split.
         indices_or_sections (int or sequence of int):
-            - If an integer, n, the input variable is to be divided along `axis`
-              into n equal pieces.
+            - If an integer, n, the input variable is to be divided along 
+              ``axis`` into n equal pieces.
             - If a sequence of sorted integers, its entries indicate where 
-              along `axis` the input variable is to be split.
+              along ``axis`` the input variable is to be split.
         axis (int):
             The axis along which the variable is to be split.
 
@@ -613,7 +614,7 @@ def matmul(x, y):
             The second operand.
 
     Returns:
-        A new random variable - the matrix product of `x` and `y`.
+        A new random variable - the matrix product of ``x`` and ``y``.
 
     Note:
         This function is similar to `numpy.matmul`, and follows the same rules 
@@ -633,7 +634,7 @@ def dot(x, y):
             The second operand.
 
     Returns:
-        A new random variable - the dot product of `x` and `y`.
+        A new random variable - the dot product of ``x`` and ``y``.
 
     Note:
         This function is similar to `numpy.dot`, and follows the same rules 
@@ -655,7 +656,7 @@ def inner(x, y):
             The second operand.
 
     Returns:
-        A new random variable - the inner product of `x` and `y`.
+        A new random variable - the inner product of ``x`` and ``y``.
 
     Note:
         This function is similar to `numpy.inner`, and follows the same rules 
@@ -677,7 +678,7 @@ def outer(x, y):
             The second operand.
 
     Returns:
-        A new random variable - the outer product of `x` and `y`.
+        A new random variable - the outer product of ``x`` and ``y``.
 
     Note:
         This function is similar to `numpy.outer`, and follows the same rules 
@@ -699,7 +700,7 @@ def kron(x, y):
             The second operand.
 
     Returns:
-        A new random variable - the Kronecker product of `x` and `y`.
+        A new random variable - the Kronecker product of ``x`` and ``y``.
 
     Note:
         This function is similar to `numpy.kron`, and follows the same rules 
@@ -714,7 +715,7 @@ def tensordot(x, y, axes=2):
     """Tensor dot product between a random variable and a numeric array, 
     or linearized tensor dot product between two random variables.
     
-    The tensor dot product is the sum of the elements of `x` and `y` 
+    The tensor dot product is the sum of the elements of ``x`` and ``y`` 
     along the selected axes.
 
     Args:
@@ -725,14 +726,14 @@ def tensordot(x, y, axes=2):
         axes (int or tuple of two sequences of int):
             The axes to be summed over.
             - If an integer, n, the sum is to be taken over the last n axes
-              of `x` and the first n axes of `y`.
+              of ``x`` and the first n axes of ``y``.
             - If two sequences of int of the same length, the indices of axes 
               to be summed are picked from those sequences.
             In all cases, the axes in the pairs to be summed over must have 
             the same lengths.
 
     Returns:
-        A new random variable - the tensor dot product of `x` and `y`.
+        A new random variable - the tensor dot product of ``x`` and ``y``.
 
     Note:
         This function is similar to `numpy.tensordot`, and follows the same 
@@ -749,7 +750,7 @@ def einsum(subs, x, y):
 
     Args:
         subs (str):
-            The subscripts that define the axes of `x` and `y` to be summed 
+            The subscripts that define the axes of ``x`` and ``y`` to be summed 
             over and the axes arrangement of the output. See `numpy.einsum`
             for more details.
         x (random variable or numeric array): 
@@ -758,8 +759,8 @@ def einsum(subs, x, y):
             The second input operand.
 
     Returns:
-        A new random variable - a result of the Einstein summation 
-        of `x` and `y` according to the subscripts.
+        A new random variable - the result of the Einstein summation 
+        of ``x`` and ``y`` according to the subscripts.
 
     Note:
         This function is similar to `numpy.einsum` and follows the same rules 
