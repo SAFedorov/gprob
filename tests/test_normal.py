@@ -381,7 +381,7 @@ def test_logp():
     # Degenerate covariance matrix. 
     xi1 = normal()
     xi2 = 0 * normal()
-    xi12 = xi1 & xi2
+    xi12 = hstack([xi1, xi2])
     assert xi12.logp([1.2, 0]) == -(1.2)**2/(2) + nc
     assert xi12.logp([1.2, 0.1]) == float("-inf")
 
@@ -1327,29 +1327,3 @@ def test_icopy():
     assert np.max(np.abs(cov(v, v_))) < tol
     assert np.max(np.abs(v.mean() - v_.mean())) < tol
     assert np.max(np.abs(v.cov() - v_.cov())) < tol
-
-
-def test_and():
-    # Tests the combining operation & .
-    
-    tol = 1e-10
-
-    v1 = normal() + 0.1
-    v2 = normal() - v1
-    v = (v2 & v1) & (v1 & v2)
-
-    assert v.shape == (2, 2)
-    assert np.max(np.abs(v.mean() - [[-0.1, 0.1], [0.1, -0.1]])) < tol
-
-    vm = [[v2, v1], [v1, v2]]
-    r2 = range(2)
-    cov_ref = [[[[cov(vm[i][j], vm[k][l]) 
-                  for i in r2] for j in r2] for k in r2] for l in r2]
-
-    assert np.max(np.abs(v.cov() - cov_ref)) < tol
-
-    with pytest.raises(TypeError):
-        normal() & "s"
-
-    with pytest.raises(TypeError):
-        "s" & normal()

@@ -306,7 +306,7 @@ def test_logp_batch():
     # Degenerate covariance matrix. 
     xi1 = normal()
     xi2 = 0 * normal()
-    xi12 = xi1 & xi2
+    xi12 = hstack([xi1, xi2])
     m, cov = xi12.mean(), xi12.cov()
     assert logp([1.2, 0], m, cov) == -(1.2)**2/(2) + nc
     assert logp([1.2, 0.1], m, cov) == float("-inf")

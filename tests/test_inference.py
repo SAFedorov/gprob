@@ -113,7 +113,7 @@ def test_linear_regression():
 
     cond = {f(x): y + n for (x, y, n) in zip(xs, ys, mn)}
 
-    ab = (a & b) | cond
+    ab = hstack([a, b]) | cond
     jointd = hstack([a, b, *mn]) | cond
 
     assert np.max(np.abs(mfull.Sigma - jointd.cov())) < tol
@@ -126,7 +126,7 @@ def test_linear_regression():
     fv = a * xs + b
     mnv = normal(0, 0.1, size=len(xs))
 
-    ab2 = (a & b) | {fv: ys + mnv}
+    ab2 = hstack([a, b]) | {fv: ys + mnv}
     jointd2 = hstack([a, b, mnv]) | {fv: ys + mnv}
 
     assert (np.abs(mfull.Sigma - jointd2.cov()) < tol).all()

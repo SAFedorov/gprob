@@ -30,24 +30,6 @@ class Normal(LatentMap):
     def __or__(self, observations):
         """Conditioning operation."""
         return self.condition(observations)
-    
-    def __and__(self, other):  # TODO: remove this method? or change to hstack --------------------------------------------
-        """Combines two random variables into one vector."""
-        try:
-            other = lift(self.__class__, other)
-        except TypeError:
-            return NotImplemented
-
-        return self._mod.stack(self.__class__, [self, other])  
-    
-    def __rand__(self, other):
-        """Combines two random variables into one vector."""
-        try:
-            other = lift(self.__class__, other)
-        except TypeError:
-            return NotImplemented
-        
-        return self._mod.stack(self.__class__, [other, self])
 
     def icopy(self):
         """Creates a statistically independent copy of the variable."""

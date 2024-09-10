@@ -162,6 +162,12 @@ def test_implicit_type_lifting():
         assert v.shape == y1.shape
         assert np.all(v.mean() ==  op(z.mean(), y1.mean()))
 
+        with pytest.raises(TypeError):
+            op(assparsenormal(normal()), "s")
+
+        with pytest.raises(TypeError):
+            op("s", assparsenormal(normal()))
+
     v = y1 @ x1
     assert isinstance(v, SparseNormal)
     assert v.iaxes == tuple()
@@ -181,6 +187,12 @@ def test_implicit_type_lifting():
     assert isinstance(v, DummyNormal)
     assert v.iaxes == tuple()
     assert len(v._iaxid) == v.ndim
+
+    with pytest.raises(TypeError):
+        assparsenormal(normal()) @ "s"
+
+    with pytest.raises(TypeError):
+        "s" @ assparsenormal(normal())
 
     x = normal()
     y = iid(normal(), 3)
@@ -4011,36 +4023,3 @@ def test_array_conversion():
 
     assert np.array(v).dtype == np.object_
     assert np.asarray(v).dtype == np.object_
-
-
-def test_and():
-    # Tests the combining operation & .
-
-    tol = 1e-10
-
-    v = normal() & assparsenormal(0)
-    assert isinstance(v, SparseNormal)
-    assert v.iaxes == tuple()
-
-    v = assparsenormal(0) & normal()
-    assert isinstance(v, SparseNormal)
-    assert v.iaxes == tuple()
-
-    nv1 = normal() + 0.2
-    nv2 = nv1 - 0.5 * normal()
-    nv = nv1 & nv2
-
-    v1 = iid(normal(), 4) + 0.2
-    v2 = v1 - 0.5 * iid(normal(), 4)
-
-    v = v1 & v2
-    assert v.shape == (2, 4)
-    assert v.iaxes == (1,)
-    assert np.max(np.abs(v.mean() - nv.mean()[..., None])) < tol
-    assert np.max(np.abs(v.cov() - nv.cov()[..., None])) < tol
-
-    with pytest.raises(TypeError):
-        assparsenormal(normal()) & "s"
-
-    with pytest.raises(TypeError):
-        "s" & assparsenormal(normal())
