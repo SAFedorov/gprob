@@ -1207,6 +1207,42 @@ def test_setitem():
         assert np.max(np.abs(v1[:szv].mean() - v3.mean())) < tol
         assert np.max(np.abs(v1[:szv].cov() - v3.cov())) < tol
 
+        # The absence of side effects 1.
+        
+        c = np.array([[2, 1, 0.5], [0.1, 2, 0.1], [0.5, 1, 2]])
+        x = normal(0, c)
+        
+        y = x[:2]
+        cov0 = y.cov()
+
+        assert not x.b.flags.writeable  # Not writeable because of broadcasting.
+
+        x[0] = (2 * x[1] + 3)
+
+        assert np.max(np.abs(x.mean() - [3, 0, 0])) < tol
+        assert np.max(np.abs(x.var() - [8, 2, 2])) < tol
+        assert np.max(np.abs(x[:2].cov() - cov0)) > tol
+        assert np.max(np.abs(y.mean() - [0, 0])) < tol
+        assert np.max(np.abs(y.cov() - cov0)) < tol
+
+        # The absence of side effects 2.
+        
+        c = np.array([[2, 1, 0.5], [0.1, 2, 0.1], [0.5, 1, 2]])
+        x = normal(0, c)
+        
+        y = x[:2]
+        cov0 = y.cov()
+
+        assert not x.b.flags.writeable  # Not writeable because of broadcasting.
+
+        x[0] = (2 * normal(0, 2) + 3)
+
+        assert np.max(np.abs(x.mean() - [3, 0, 0])) < tol
+        assert np.max(np.abs(x.var() - [8, 2, 2])) < tol
+        assert np.max(np.abs(x[:2].cov() - cov0)) > tol
+        assert np.max(np.abs(y.mean() - [0, 0])) < tol
+        assert np.max(np.abs(y.cov() - cov0)) < tol
+
 
 def test_asnormal():
     tol = 1e-8

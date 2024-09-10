@@ -242,23 +242,27 @@ class LatentMap:
         return self.__class__(self.a[key_a], self.b[key], self.lat)
     
     def __setitem__(self, key, value):
+        # Setting at an index has no side effects on other variables, 
+        # which is acheved by requiring the arrays to own their data.
+
         if not isinstance(key, tuple):
             key = (key,)
 
-        if not self.b.flags.writeable:
+        if not self.b.flags.owndata:
             self.b = self.b.copy()
-        
-        if not self.a.flags.writeable:
-            self.a = self.a.copy()
 
         value = self._mod.lift(self.__class__, value)
         self.b[key] = value.b
 
-        key_a = (slice(None),) + key
         if self.lat is not value.lat:
             self.lat, [self.a, av] = complete([self, value])
         else:
             av = value.a
+            
+            if not self.a.flags.owndata:
+                self.a = self.a.copy()
+
+        key_a = (slice(None),) + key
         self.a[key_a] = _unsq(av, self.b[key].ndim)
     
     def conjugate(self):

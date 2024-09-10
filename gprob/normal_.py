@@ -33,11 +33,7 @@ class Normal(LatentMap):
 
     def icopy(self):
         """Creates a statistically independent copy of the variable."""
-
-        # Copies of ``a`` and ``b`` are taken becase if the original variable 
-        # is in-place modified later, those modifications should not affect 
-        # the new variable.
-        return self.__class__(self.a.copy(), self.b.copy())
+        return self.__class__(self.a, self.b)
 
     def condition(self, observations, mask=None):
         """Conditioning operation.
