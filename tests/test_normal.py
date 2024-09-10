@@ -1207,41 +1207,83 @@ def test_setitem():
         assert np.max(np.abs(v1[:szv].mean() - v3.mean())) < tol
         assert np.max(np.abs(v1[:szv].cov() - v3.cov())) < tol
 
-        # The absence of side effects 1.
-        
-        c = np.array([[2, 1, 0.5], [0.1, 2, 0.1], [0.5, 1, 2]])
-        x = normal(0, c)
-        
-        y = x[:2]
-        cov0 = y.cov()
+    # The absence of side effects 1.
+    
+    c = np.array([[2, 1, 0.5], [0.1, 2, 0.1], [0.5, 1, 2]])
+    x = normal(0, c)
+    
+    y = x[:2]
+    cov0 = y.cov()
 
-        assert not x.b.flags.writeable  # Not writeable because of broadcasting.
+    assert not x.b.flags.writeable  # Not writeable because of broadcasting.
 
-        x[0] = (2 * x[1] + 3)
+    x[0] = (2 * x[1] + 3)
 
-        assert np.max(np.abs(x.mean() - [3, 0, 0])) < tol
-        assert np.max(np.abs(x.var() - [8, 2, 2])) < tol
-        assert np.max(np.abs(x[:2].cov() - cov0)) > tol
-        assert np.max(np.abs(y.mean() - [0, 0])) < tol
-        assert np.max(np.abs(y.cov() - cov0)) < tol
+    assert np.max(np.abs(x.mean() - [3, 0, 0])) < tol
+    assert np.max(np.abs(x.var() - [8, 2, 2])) < tol
+    assert np.max(np.abs(x[:2].cov() - cov0)) > tol
+    assert np.max(np.abs(y.mean() - [0, 0])) < tol
+    assert np.max(np.abs(y.cov() - cov0)) < tol
 
-        # The absence of side effects 2.
-        
-        c = np.array([[2, 1, 0.5], [0.1, 2, 0.1], [0.5, 1, 2]])
-        x = normal(0, c)
-        
-        y = x[:2]
-        cov0 = y.cov()
+    # The absence of side effects 2 - extension of the map upon assignement.
+    
+    c = np.array([[2, 1, 0.5], [0.1, 2, 0.1], [0.5, 1, 2]])
+    x = normal(0, c)
+    
+    y = x[:2]
+    cov0 = y.cov()
 
-        assert not x.b.flags.writeable  # Not writeable because of broadcasting.
+    assert not x.b.flags.writeable  # Not writeable because of broadcasting.
 
-        x[0] = (2 * normal(0, 2) + 3)
+    x[0] = (2 * normal(0, 2) + 3)
 
-        assert np.max(np.abs(x.mean() - [3, 0, 0])) < tol
-        assert np.max(np.abs(x.var() - [8, 2, 2])) < tol
-        assert np.max(np.abs(x[:2].cov() - cov0)) > tol
-        assert np.max(np.abs(y.mean() - [0, 0])) < tol
-        assert np.max(np.abs(y.cov() - cov0)) < tol
+    assert np.max(np.abs(x.mean() - [3, 0, 0])) < tol
+    assert np.max(np.abs(x.var() - [8, 2, 2])) < tol
+    assert np.max(np.abs(x[:2].cov() - cov0)) > tol
+    assert np.max(np.abs(y.mean() - [0, 0])) < tol
+    assert np.max(np.abs(y.cov() - cov0)) < tol
+
+    # The ansence of side effects 3 - independent copy.
+
+    c = np.array([[2, 1, 0.5], [0.1, 2, 0.1], [0.5, 1, 2]])
+    x = normal(0, c)
+    x.b = x.b.copy()  # To make it writeable.
+    x.a = x.a.copy()
+
+    assert x.b.flags.writeable
+    assert x.a.flags.writeable
+
+    y = x.icopy()
+    mean0 = y.mean()
+    cov0 = y.cov()
+
+    x[1] = 3 * x[1] - 5
+
+    assert np.max(np.abs(x.mean() - mean0)) > tol
+    assert np.max(np.abs(x.cov() - cov0)) > tol
+    assert np.max(np.abs(y.mean() - mean0)) < tol
+    assert np.max(np.abs(y.cov() - cov0)) < tol
+
+    # The absence of side effects 4 - assignment of a new random variable.
+    
+    c = np.array([[2, 1, 0.5], [0.1, 2, 0.1], [0.5, 1, 2]])
+    x = normal(0, c)
+    x.b = x.b.copy()  # To make it writeable.
+    x.a = x.a.copy()
+
+    assert x.b.flags.writeable
+    assert x.a.flags.writeable
+
+    y = x[...]
+    mean0 = y.mean()
+    cov0 = y.cov()
+
+    x[1] = 3 * normal() - 5
+
+    assert np.max(np.abs(x.mean() - mean0)) > tol
+    assert np.max(np.abs(x.cov() - cov0)) > tol
+    assert np.max(np.abs(y.mean() - mean0)) < tol
+    assert np.max(np.abs(y.cov() - cov0)) < tol
 
 
 def test_asnormal():

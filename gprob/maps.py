@@ -242,16 +242,16 @@ class LatentMap:
         return self.__class__(self.a[key_a], self.b[key], self.lat)
     
     def __setitem__(self, key, value):
-        # Setting at an index has no side effects on other variables, 
-        # which is acheved by requiring the arrays to own their data.
-
         if not isinstance(key, tuple):
             key = (key,)
 
-        if not self.b.flags.owndata:
+        value = self._mod.lift(self.__class__, value)
+        in_place = (self.b.flags.writeable and self.a.flags.writeable 
+                    and self.lat is value.lat)
+
+        if not in_place:
             self.b = self.b.copy()
 
-        value = self._mod.lift(self.__class__, value)
         self.b[key] = value.b
 
         if self.lat is not value.lat:
@@ -259,7 +259,7 @@ class LatentMap:
         else:
             av = value.a
             
-            if not self.a.flags.owndata:
+            if not in_place:
                 self.a = self.a.copy()
 
         key_a = (slice(None),) + key
