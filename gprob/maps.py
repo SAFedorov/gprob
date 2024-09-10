@@ -323,9 +323,9 @@ class LatentMap:
         return self.__class__(a, b, self.lat)
     
     def flatten(self, order="C"):
-        """Flattens a random variable while ensuring that the underying map 
-        is stored contiguously in the memory. The map arrays of the returned 
-        variable are always copies of the map arrays of the original variable. 
+        """Flattens the random variable. 
+        
+        ``x.flatten()`` is equivalen to ``x.reshape((-1,))``.
 
         Args:
             order (str): 
@@ -334,15 +334,11 @@ class LatentMap:
                 - 'F': Fortran-style column-major order.
 
         Returns:
-            A new one-dimensional random variable containing all the elements of 
-            the original variable in the specified order.
+            A new one-dimensional random variable.
         """
-
-        if order not in ["C", "F"]:
-            raise ValueError("Only C and F orders are supported.")
         
-        b = self.b.flatten(order=order)
-        a = self.a.reshape((self.nlat, b.size), order=order).copy()
+        b = self.b.reshape((-1,), order=order)
+        a = self.a.reshape((self.nlat, b.size), order=order)
         return self.__class__(a, b, self.lat)
     
     def moveaxis(self, source, destination):
@@ -363,7 +359,7 @@ class LatentMap:
         return self.__class__(a, b, self.lat)
     
     def ravel(self, order="C"):
-        """Flattens a random variable while ensuring that the underying map 
+        """Flattens the random variable while ensuring that the underying map 
         is stored contiguously in the memory. The map arrays of the returned 
         variable are views of the map arrays of the original variable whenever 
         possible. 
@@ -375,8 +371,7 @@ class LatentMap:
                 - 'F': Fortran-style column-major order.
 
         Returns:
-            A new one-dimensional random variable containing all the elements 
-            of the input variable in the specified order.
+            A new one-dimensional random variable.
         """
         
         b = self.b.ravel(order=order)

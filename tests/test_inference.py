@@ -260,7 +260,7 @@ def test_masked_conditioning():
             vc = random_normal(shc, dtype=dt)
 
             # Ensures correlation.
-            max_tries = 5
+            max_tries = 10
             for i in range(max_tries):            
                 v, vc = random_correlate([v, vc])
                 if np.abs(cov(v, vc)).max() > 1e-3:
