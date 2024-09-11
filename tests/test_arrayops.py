@@ -150,3 +150,13 @@ def test_fallback_to_normal():
     assert np.abs(gp.mean(0)) < tol
     assert np.abs(gp.var(0)) < tol
     assert np.max(np.abs(gp.cov(0))) < tol
+
+
+def test_linearized_unary():
+    # The numeric results of linearized unaries are tested in test_parametric.
+    
+    def jmp_not():
+        pass
+
+    with pytest.raises(ValueError):
+        gp.arrayops.linearized_unary(jmp_not)

@@ -419,7 +419,8 @@ class SparseNormal(Normal):
                 variable is equavalent to ``{variable: 0}``.
         
         Returns:
-            Conditional sparse normal variable.
+            Conditional sparse normal variable with the same shape as 
+            the original variable.
         """
 
         if isinstance(observations, dict):

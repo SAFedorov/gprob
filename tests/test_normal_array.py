@@ -911,18 +911,46 @@ def test_split():
     _test_split_func(split, axis=1, test_shapes="2dmin")
     _test_split_func(split, axis=-2, test_shapes="3dmin")
 
+    v = normal()
+    with pytest.raises(IndexError, ValueError):
+        split(v, [1, 2])
+
 
 def test_hsplit():
     _test_split_func(hsplit, test_axis=0, test_shapes=1)
     _test_split_func(hsplit, test_axis=1, test_shapes="2dmin")
 
+    v = normal()
+    with pytest.raises(ValueError):
+        hsplit(v, [1])
+
 
 def test_vsplit():
     _test_split_func(vsplit, test_axis=0, test_shapes="2dmin")
 
+    v = normal()
+    with pytest.raises(ValueError):
+        vsplit(v, [1])
+
+    v = normal(size=(2,))
+    with pytest.raises(ValueError):
+        vsplit(v, [1])
+
 
 def test_dsplit():
     _test_split_func(dsplit, test_axis=2, test_shapes="3dmin")
+
+    v = normal()
+    with pytest.raises(ValueError):
+        vsplit(v, [1])
+
+    v = normal(size=(2,))
+    with pytest.raises(ValueError):
+        vsplit(v, [1])
+
+    v = normal(size=(2, 4))
+    with pytest.raises(ValueError):
+        vsplit(v, [1])
 
 
 def test_dtype_promotion():

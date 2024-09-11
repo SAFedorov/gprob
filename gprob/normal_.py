@@ -64,7 +64,8 @@ class Normal(LatentMap):
                 and ``mask[i, j] == False`` for ``i > i0[j]``.
         
         Returns:
-            Conditional normal variable.
+            Conditional normal variable with the same shape as 
+            the original variable.
 
         Raises:
             ConditionError: 
@@ -95,6 +96,12 @@ class Normal(LatentMap):
         if mask is None:
             cond = concatenate(Normal, [c.ravel() for c in obs_r])
         else:
+            mask = np.asanyarray(mask)
+
+            if mask.ndim != 2:
+                raise ValueError("The mask array must have 2 dimensions, "
+                                 f"while it has {mask.ndim}.")
+
             # Concatenates the conditions preserving the element order along 
             # the 0th axis, and expands the mask to the right shape.
 

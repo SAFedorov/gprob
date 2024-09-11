@@ -215,7 +215,7 @@ def logp_lstsq(x, m, cov):
     return np.where(valid_idx, llk, float("-inf"))
 
 
-class ConditionError(Exception):
+class ConditionError(LinAlgError):
     """Error raised in conditioning."""
     pass
 
@@ -283,8 +283,8 @@ def condition_qr(m, a, mc, ac, mask=None):
     diatri = np.abs(np.diag(tri))
     tol = np.finfo(tri.dtype).eps
     if (diatri < (tol * np.max(diatri))).any():
-        raise LinAlgError("Conditioning via QR decomposition does not work "
-                          "with degenerate constraints. Use SVD instead.")
+        raise ConditionError("Conditioning via QR decomposition does not work "
+                             "with degenerate constraints. Use SVD instead.")
 
     es = sp.linalg.solve_triangular(tri.T, -mc, lower=(qtri is qu),
                                     check_finite=False)

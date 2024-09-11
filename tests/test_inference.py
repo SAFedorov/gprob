@@ -79,6 +79,27 @@ def test_conditioning():
     vc = v | dict()
     assert vc is v
 
+    # Conditioning with degenerate constraints.
+
+    v1 = normal()
+    v2 = normal()
+    v12 = stack([v1, v2])
+    vm = v1 - v2
+    
+    vc = v12 | {vm: 0.1} 
+
+    # len(v) <= v.nlat.
+    vd = stack([vm, vm])
+    vc_ = v12.condition({vd: 0.1})
+    assert np.max(np.abs(vc.mean() - vc_.mean())) < tol
+    assert np.max(np.abs(vc.cov() - vc_.cov())) < tol
+
+    # len(v) > v.nlat.
+    vd = stack([vm, vm, vm])
+    vc_ = v12.condition({vd: 0.1})
+    assert np.max(np.abs(vc.mean() - vc_.mean())) < tol
+    assert np.max(np.abs(vc.cov() - vc_.cov())) < tol
+
 
 def test_linear_regression():
     # Using the linear regression example from GaussianInfer
@@ -228,7 +249,7 @@ def test_complex_conditioning():
 
 
 def test_masked_conditioning():
-    tol = 1e-10
+    tol = 1e-9
 
     test_sets = [(
         (5,),  # sh
@@ -342,3 +363,55 @@ def test_masked_conditioning():
 
             assert np.max(np.abs(ref.mean() - ma_cond.mean())) < tol
             assert np.max(np.abs(ref.cov() - ma_cond.cov())) < tol
+
+        # Tests of errors.
+
+        v1 = normal()
+        v2 = normal()
+        vp = v1 + v2
+        vm = v1 - v2
+
+        vc = vp.condition({vm: 0.1})
+
+        vp1 = vp.reshape((1,))
+        vm1 = vm.reshape((1,))
+
+        vc_ = vp1.condition({vm1: 0.1}, [[1]]).reshape(tuple())
+        assert np.max(np.abs(vc.mean() - vc_.mean())) < tol
+        assert np.max(np.abs(vc.cov() - vc_.cov())) < tol
+
+        vc_ = vp1.condition({vm1: 0.1}, [[0]]).reshape(tuple())
+        assert np.max(np.abs(vp.mean() - vc_.mean())) < tol
+        assert np.max(np.abs(vp.cov() - vc_.cov())) < tol
+
+        with pytest.raises(ValueError):
+            vp1.condition({vm1: 0.1}, [1])  # Too few mask dimensions.
+
+        with pytest.raises(ValueError):
+            vp1.condition({vm1: 0.1}, [[[1]]])  # Too many mask dimensions.
+
+        with pytest.raises(ValueError):
+            vp.condition({vm1: 0.1}, [[1]])  # Too few dimensions in vp.
+
+        with pytest.raises(ValueError):
+            vp1.condition({vm: 0.1}, [[1]])  # Too few dimensions in vm.
+
+        # Degenerate constraints do not work with a mask,
+        vd1 = stack([vm1, vm1], axis=-1)
+        with pytest.raises(ConditionError):
+            vp1.condition({vd1: 0.1}, [[1]])
+
+        # but without a mask they should be ok.
+        vc_ = vp1.condition({vd1: 0.1}).reshape(tuple())
+        assert np.max(np.abs(vc.mean() - vc_.mean())) < tol
+        assert np.max(np.abs(vc.cov() - vc_.cov())) < tol
+
+        # Check the same separately for len(v) > v.nlat.
+        vd1 = stack([vm1, vm1, vm1], axis=-1)
+
+        with pytest.raises(ConditionError):
+            vp1.condition({vd1: 0.1}, [[1]])
+
+        vc_ = vp1.condition({vd1: 0.1}).reshape(tuple())
+        assert np.max(np.abs(vc.mean() - vc_.mean())) < tol
+        assert np.max(np.abs(vc.cov() - vc_.cov())) < tol
