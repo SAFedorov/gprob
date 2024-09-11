@@ -3,17 +3,17 @@ import numpy as np
 import jax
 from jax import numpy as jnp
 
-from .normal_ import Normal, complete, validate_logp_samples
-from .func import logp, dlogp, fisher
+from gprob.normal_ import Normal, complete, validate_logp_samples
+from gprob.func import logp, dlogp, fisher
 
 
 def jmp(fun, primals, tangents):
-    """Forward mode jacobain-matrix product for `fun`. Spans over the 0-th 
-    dimension of each of the arrays in `tangents`, and stacks the results 
+    """Forward mode jacobain-matrix product for ``fun``. Spans over the 0-th 
+    dimension of each of the arrays in ``tangents``, and stacks the results 
     the along the 0-th dimension of the output.
     
     Args:
-        primals: A list or tuple of positional arguments to `fun` at which its 
+        primals: A list or tuple of positional arguments to ``fun`` at which its 
             Jacobian should be evaluated.
         tangents: A list or tuple of arrays of positional tangent vectors with
             the same structure as primals, and each array shape being augmented 
@@ -36,9 +36,9 @@ def jmp(fun, primals, tangents):
 
 def pnormal(f, input_vs, jit=True):
     """Creates a parametric normal random variable from a function with 
-    the signature `f(p, vs) -> u`, where `p` is a 1D array of parameters, 
-    `vs` is an input array or sequence of arrays whose shapes are consistent 
-    with the input random variables, and `u` is an output array.
+    the signature ``f(p, vs) -> u``, where ``p`` is a 1D array of parameters, 
+    ``vs`` is an input array or sequence of arrays whose shapes are consistent 
+    with the input random variables, and ``u`` is an output array.
     
     Args:
         f: generating function.
@@ -48,9 +48,9 @@ def pnormal(f, input_vs, jit=True):
 
     Returns:
         A parametric normal variable corresponding to the random function 
-        `lambda p: f(p, input_vs)`.
+        ``lambda p: f(p, input_vs)``.
     """
-    # `p` is limited to 1D with the scipy.minimize signature in mind
+    # ``p``` is limited to 1D with the scipy.minimize signature in mind
 
     if isinstance(input_vs, (list, tuple)):
         inbs = tuple(force_float(v.b) for v in input_vs)
@@ -70,10 +70,11 @@ def pnormal(f, input_vs, jit=True):
     dafun = lambda p: jmp(afun, (jnp.array(p),), (jnp.eye(len(p)),))
     dbfun = lambda p: jmp(bfun, (jnp.array(p),), (jnp.eye(len(p)),))
 
-    # Note: above, the conversion of `p` to jnp array is necessary when  
-    # calculating the derivatives over `p`, as the values of `p` will be input 
-    # by the user, and the behavior of jax.jvp is sensitive to the data type. 
-    # In contrast, in `afun` the inputs to jax.jvp are already always arrays.
+    # Note: above, the conversion of ``p`` to jnp array is necessary when  
+    # calculating the derivatives over ``p``, as the values of ``p`` will 
+    # be input by the user, and the behavior of jax.jvp is sensitive to 
+    # the data type. In contrast, in ``afun`` the inputs to jax.jvp are 
+    # already always arrays.
 
     if jit:
         afun = jax.jit(afun)

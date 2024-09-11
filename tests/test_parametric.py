@@ -5,7 +5,7 @@ from gprob import (normal,
                    exp, exp2, log, log2, log10, sqrt, cbrt, sin, cos, 
                    tan, arcsin, arccos, arctan, sinh, cosh, tanh, 
                    arcsinh, arccosh, arctanh, conjugate, conj)
-from gprob import pnormal
+from parametric import pnormal
 from utils import random_normal
 
 np.random.seed(0)

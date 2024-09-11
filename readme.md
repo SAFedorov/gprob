@@ -18,12 +18,9 @@ plt.plot(samples.T, alpha=0.1, color='gray');
 ![brownian readme](./assets/brownian_readme.png)
 
 ## Requirements
-The core fnctionality requires
 * python >= 3.9
 * [numpy](https://numpy.org/) >= 1.25
 * [scipy](https://scipy.org/)
-
-Using differentiable parametric distributions also requires [jax](https://jax.readthedocs.io/).
 
 ## Installation
 
