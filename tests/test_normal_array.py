@@ -174,6 +174,10 @@ def test_ravel():
     _test_array_func(ravel)
     _test_array_func(ravel, order="F")
 
+    x = normal(size=(2, 2))
+    with pytest.raises(ValueError):
+        ravel(x, order="A")
+
 
 def test_transpose():
     _test_array_func(transpose)
@@ -571,6 +575,12 @@ def test_dot():
         _test_array_func2(dot, (3,) + sh, (5, 3) + sh + (7,))
         _test_array_func2(dot, (5, 3) + sh, (5, 1) + sh + (7,))
         _test_array_func2(dot, (5, 1, 3, 2) + sh, (5, 3, 1) + sh + (2,))
+    
+    # Separately checks the case of one scalar operand.
+    _test_array_func2(dot, tuple(), (3,))
+    _test_array_func2(dot, (3,), tuple())
+    _test_array_func2(dot, tuple(), (3, 2))
+    _test_array_func2(dot, (3, 2), tuple())
 
 
 def test_inner():
@@ -585,6 +595,12 @@ def test_inner():
         _test_array_func2(inner, (3,) + sh, (5, 3) + sh)
         _test_array_func2(inner, (5, 3) + sh, (3,) + sh)
         _test_array_func2(inner, (5, 1, 2) + sh, (5, 3, 1) + sh)
+
+    # Separately checks the case of one scalar operand.
+    _test_array_func2(inner, tuple(), (3,))
+    _test_array_func2(inner, (3,), tuple())
+    _test_array_func2(inner, tuple(), (3, 2))
+    _test_array_func2(inner, (3, 2), tuple())
 
 
 def test_tensordot():
@@ -912,8 +928,8 @@ def test_split():
     _test_split_func(split, axis=-2, test_shapes="3dmin")
 
     v = normal()
-    with pytest.raises(IndexError, ValueError):
-        split(v, [1, 2])
+    with pytest.raises(ValueError):
+        split(v, [1])
 
 
 def test_hsplit():
@@ -942,15 +958,15 @@ def test_dsplit():
 
     v = normal()
     with pytest.raises(ValueError):
-        vsplit(v, [1])
+        dsplit(v, [1])
 
     v = normal(size=(2,))
     with pytest.raises(ValueError):
-        vsplit(v, [1])
+        dsplit(v, [1])
 
     v = normal(size=(2, 4))
     with pytest.raises(ValueError):
-        vsplit(v, [1])
+        dsplit(v, [1])
 
 
 def test_dtype_promotion():

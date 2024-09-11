@@ -178,10 +178,7 @@ class SparseNormal(Normal):
         return _finalize(super().__getitem__(key), iaxid)
     
     def __setitem__(self, key, value):
-        try:
-            value, isnumeric = match_(self.__class__, value)
-        except TypeError:
-            return NotImplemented
+        value, isnumeric = match_(self.__class__, value)
 
         if not isnumeric:
             iaxid = _item_iaxid(self, key)
@@ -610,8 +607,8 @@ class SparseNormal(Normal):
         validate_logp_samples(self, delta_x)
 
         if self.iscomplex:
-            delta_x = np.hstack([delta_x.real, delta_x.imag])
-            self = stack(SparseNormal, [self.real, self.imag])
+            delta_x = np.stack([delta_x.real, delta_x.imag], axis=-1)
+            self = stack(SparseNormal, [self.real, self.imag], axis=-1)
         elif np.iscomplexobj(delta_x):
             # Casts to real with a warning.
             delta_x = delta_x.astype(delta_x.real.dtype)
@@ -627,13 +624,11 @@ class SparseNormal(Normal):
         
         # In the remaining, the dimensionality of the dense subspace is >= 1.
 
-        batch_ndim = x.ndim - self.ndim
-
-        if not batch_ndim:
+        batch_dim = delta_x.ndim - self.ndim
+        if not batch_dim:
             delta_x = delta_x[None, ...]
-            nsamples = 1
-        else:
-            nsamples = len(x)
+
+        nsamples = len(delta_x)
 
         # Moves the sparse axes to the beginning and the batch axis to the end.
         sparse_ax = [i + 1 for i, b in enumerate(self._iaxid) if b]
@@ -658,7 +653,7 @@ class SparseNormal(Normal):
         ltr = np.linalg.cholesky(cov)
         z = np.linalg.solve(ltr, delta_x)
 
-        if not batch_ndim:
+        if not batch_dim:
             z = z.squeeze(-1)
         
         sparse_sz = self.size // dense_sz
@@ -874,10 +869,10 @@ def _item_iaxid(x, key):
                     out_axs[i] += delta
 
             out_axs[ep_out: ep_out] = range(ep_in, ep_in + delta)
-            idx[ep_out: ep_out] = (slice(None, None, None) for _ in range(delta))
+            idx[ep_out: ep_out] = (slice(None) for _ in range(delta))
         else:
             out_axs.extend(range(used_dim, used_dim + delta))
-            idx.extend(slice(None, None, None) for _ in range(delta))
+            idx.extend(slice(None) for _ in range(delta))
     elif delta < 0:
         raise IndexError(f"Too many indices: the array is {x.ndim}-dimensional,"
                          f" but {used_dim} indices were given.")
@@ -888,7 +883,7 @@ def _item_iaxid(x, key):
         else:
             oi = out_axs.index(i)
         
-        if b and (oi == -1 or idx[oi] != slice(None, None, None)):
+        if b and (oi == -1 or idx[oi] != slice(None)):
             raise IndexError("Only full slices (':') and ellipses ('...') "
                              "are valid indices for independence axes. "
                              f"Axis {i} is indexed with an invalid key.")
@@ -1026,6 +1021,7 @@ def concatenate(cls, arrays, axis=0):
 
 def stack(cls, arrays, axis=0):
     iaxid = _validate_iaxid(arrays)
+    axis = _normalize_axis(axis, len(iaxid) + 1)
     iaxid = iaxid[:axis] + (None,) + iaxid[axis:]
     return _finalize(normal_.stack(cls, arrays, axis), iaxid)
 

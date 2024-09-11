@@ -491,6 +491,9 @@ class LatentMap:
         Returns:
             A list of new random variables into which the original is split.
         """
+
+        if self.ndim == 0:
+            raise ValueError("Scalar variables cannot be split.")
         
         bs = np.split(self.b, indices_or_sections, axis=axis)
         as_ = np.split(self.a, indices_or_sections, axis=_axes_a([axis])[0])

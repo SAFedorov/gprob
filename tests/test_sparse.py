@@ -92,13 +92,16 @@ def test_implicit_type_lifting():
         pass
 
     x = normal(1, 2)
-    x1 = normal(1, 2, size=(2, 2))
+    x2 = normal(1, 2, size=(2, 2))
+    xl = [normal(1, 2), normal(2, 3)]
 
     y = assparsenormal(normal(3, 0.1))
-    y1 = assparsenormal(normal(3, 0.1, size=(2, 2)))
+    y2 = assparsenormal(normal(3, 0.1, size=(2, 2)))
+    yl = [assparsenormal(normal(3, 0.2)), assparsenormal(normal(4, 0.1))]
     
     z = DummyNormal(y.a, y.b, y.lat)
-    z1 = DummyNormal(y1.a, y1.b, y1.lat)
+    z2 = DummyNormal(y2.a, y2.b, y2.lat)
+    zl = [DummyNormal(y_.a, y_.b, y_.lat) for y_ in yl]
 
     elementwise_ops = [operator.add, operator.sub, operator.mul, 
                        operator.truediv, operator.pow]
@@ -134,33 +137,99 @@ def test_implicit_type_lifting():
         assert v.iaxes == tuple()
         assert v.mean() ==  op(z.mean(), y.mean())
 
-        v = op(x1, y)
+        v = op(x2, y)
         assert isinstance(v, SparseNormal)
         assert v.iaxes == tuple()
         assert len(v._iaxid) == v.ndim
-        assert v.shape == x1.shape
-        assert np.all(v.mean() ==  op(x1.mean(), y.mean()))
+        assert v.shape == x2.shape
+        assert np.all(v.mean() ==  op(x2.mean(), y.mean()))
 
-        v = op(y, x1)
+        v = op(y, x2)
         assert isinstance(v, SparseNormal)
         assert v.iaxes == tuple()
         assert len(v._iaxid) == v.ndim
-        assert v.shape == x1.shape
-        assert np.all(v.mean() ==  op(y.mean(), x1.mean()))
+        assert v.shape == x2.shape
+        assert np.all(v.mean() ==  op(y.mean(), x2.mean()))
 
-        v = op(y1, z)
+        v = op(y2, z)
         assert isinstance(v, DummyNormal)
         assert v.iaxes == tuple()
         assert len(v._iaxid) == v.ndim
-        assert v.shape == y1.shape
-        assert np.all(v.mean() ==  op(y1.mean(), y.mean()))
+        assert v.shape == y2.shape
+        assert np.all(v.mean() ==  op(y2.mean(), y.mean()))
 
-        v = op(z, y1)
+        v = op(z, y2)
         assert isinstance(v, DummyNormal)
         assert v.iaxes == tuple()
         assert len(v._iaxid) == v.ndim
-        assert v.shape == y1.shape
-        assert np.all(v.mean() ==  op(z.mean(), y1.mean()))
+        assert v.shape == y2.shape
+        assert np.all(v.mean() ==  op(z.mean(), y2.mean()))
+
+        v = op(xl, y)
+        assert isinstance(v, SparseNormal)
+        assert v.iaxes == tuple()
+        assert len(v._iaxid) == v.ndim
+        assert v.shape == (2,)
+        assert np.all(v.mean() ==  op([x_.mean() for x_ in xl], y.mean()))
+
+        v = op(y, xl)
+        assert isinstance(v, SparseNormal)
+        assert v.iaxes == tuple()
+        assert len(v._iaxid) == v.ndim
+        assert v.shape == (2,)
+        assert np.all(v.mean() ==  op(y.mean(), [x_.mean() for x_ in xl]))
+
+        v = op(xl, z)
+        assert isinstance(v, SparseNormal)
+        assert v.iaxes == tuple()
+        assert len(v._iaxid) == v.ndim
+        assert v.shape == (2,)
+        assert np.all(v.mean() ==  op([x_.mean() for x_ in xl], z.mean()))
+
+        v = op(z, xl)
+        assert isinstance(v, SparseNormal)
+        assert v.iaxes == tuple()
+        assert len(v._iaxid) == v.ndim
+        assert v.shape == (2,)
+        assert np.all(v.mean() ==  op(z.mean(), [x_.mean() for x_ in xl]))
+
+        v = op(yl, z)
+        assert isinstance(v, SparseNormal)
+        assert v.iaxes == tuple()
+        assert len(v._iaxid) == v.ndim
+        assert v.shape == (2,)
+        assert np.all(v.mean() ==  op([y_.mean() for y_ in yl], z.mean()))
+
+        v = op(z, yl)
+        assert isinstance(v, SparseNormal)
+        assert v.iaxes == tuple()
+        assert len(v._iaxid) == v.ndim
+        assert v.shape == (2,)
+        assert np.all(v.mean() ==  op(z.mean(), [y_.mean() for y_ in yl]))
+
+        # a random variable + list of higher types raises a type error 
+        # currently, although this case could be handled with more complex
+        # lifting resolution.
+
+        with pytest.raises(TypeError):
+            op(x, yl)
+        
+        with pytest.raises(TypeError):
+            op(yl, x)
+        
+        with pytest.raises(TypeError):
+            op(x, zl)
+
+        with pytest.raises(TypeError):
+            op(zl, x)
+
+        with pytest.raises(TypeError):
+            op(y, zl)
+
+        with pytest.raises(TypeError):
+            op(zl, y)
+
+        # More type errors.
 
         with pytest.raises(TypeError):
             op(assparsenormal(normal()), "s")
@@ -168,25 +237,73 @@ def test_implicit_type_lifting():
         with pytest.raises(TypeError):
             op("s", assparsenormal(normal()))
 
-    v = y1 @ x1
+    v = y2 @ x2
     assert isinstance(v, SparseNormal)
     assert v.iaxes == tuple()
     assert len(v._iaxid) == v.ndim
 
-    v = x1 @ y1
+    v = x2 @ y2
     assert isinstance(v, SparseNormal)
     assert v.iaxes == tuple()
     assert len(v._iaxid) == v.ndim
 
-    v = z1 @ y1
+    v = z2 @ y2
     assert isinstance(v, DummyNormal)
     assert v.iaxes == tuple()
     assert len(v._iaxid) == v.ndim
 
-    v = y1 @ z1
+    v = y2 @ z2
     assert isinstance(v, DummyNormal)
     assert v.iaxes == tuple()
     assert len(v._iaxid) == v.ndim
+
+    v = xl @ y2
+    assert isinstance(v, SparseNormal)
+    assert v.iaxes == tuple()
+    assert len(v._iaxid) == v.ndim
+
+    v = y2 @ xl
+    assert isinstance(v, SparseNormal)
+    assert v.iaxes == tuple()
+    assert len(v._iaxid) == v.ndim
+
+    v = xl @ z2
+    assert isinstance(v, DummyNormal)
+    assert v.iaxes == tuple()
+    assert len(v._iaxid) == v.ndim
+    
+    v = z2 @ xl
+    assert isinstance(v, DummyNormal)
+    assert v.iaxes == tuple()
+    assert len(v._iaxid) == v.ndim
+
+    v = yl @ z2
+    assert isinstance(v, DummyNormal)
+    assert v.iaxes == tuple()
+    assert len(v._iaxid) == v.ndim
+
+    v = z2 @ yl
+    assert isinstance(v, DummyNormal)
+    assert v.iaxes == tuple()
+    assert len(v._iaxid) == v.ndim
+
+    with pytest.raises(TypeError):
+        x2 @ yl
+    
+    with pytest.raises(TypeError):
+        yl @ x
+    
+    with pytest.raises(TypeError):
+        x @ zl
+
+    with pytest.raises(TypeError):
+        zl @ x
+
+    with pytest.raises(TypeError):
+        y @ zl
+
+    with pytest.raises(TypeError):
+        zl @ y
 
     with pytest.raises(TypeError):
         assparsenormal(normal()) @ "s"
@@ -386,6 +503,18 @@ def test_properties():
     assert vd.lat == v.lat
     assert np.max(np.abs(vd.mean())) < tol
     assert np.max(np.abs(vd.var() - v.var())) < tol 
+
+
+def test_repr():
+    x = assparsenormal(normal())
+    
+    s = repr(x)
+    assert isinstance(s, str)
+    assert "iaxes" in s
+
+    x = iid(normal(), 3)
+    assert isinstance(s, str)
+    assert "iaxes" in s
 
 
 def test_getitem():
@@ -1284,6 +1413,22 @@ def test_logp():
     check_sparse_vs_normal(snv, nv, x[0])
     check_sparse_vs_normal(snv, nv, x)
 
+    # Scalar dense subspace, complex distribution.
+    sz = 4
+    rs = 2 * np.random.rand(sz) - 1
+    ro = 2 * np.random.rand(sz) - 1
+    nv = gp.stack([o + s * normal() for o, s in zip(ro, rs)])
+    snv = ro + rs * iid(normal(), sz)
+
+    rs = 2 * np.random.rand(sz) - 1
+    ro = 2 * np.random.rand(sz) - 1
+    nv += 1j * gp.stack([o + s * normal() for o, s in zip(ro, rs)])
+    snv += 1j * (ro + rs * iid(normal(), sz))
+
+    x = (2 * np.random.rand(3, sz) - 1) + 1j * (2 * np.random.rand(3, sz) - 1)
+    check_sparse_vs_normal(snv, nv, x[0])
+    check_sparse_vs_normal(snv, nv, x)
+
     # 1D dense subspace.
     sparse_sz = 4
     dense_sz = 3
@@ -1293,6 +1438,26 @@ def test_logp():
     nv = gp.stack([o + s * rv.icopy() for o, s in zip(ro, rs)])
     snv = ro + rs * iid(rv, sparse_sz)
     x = 2 * np.random.rand(2, sparse_sz, dense_sz) - 1
+    check_sparse_vs_normal(snv, nv, x[0])
+    check_sparse_vs_normal(snv, nv, x)
+
+    # 1D dense subspace, complex distribution.
+    sparse_sz = 4
+    dense_sz = 3
+    rs = 2 * np.random.rand(sparse_sz, dense_sz) - 1
+    ro = 2 * np.random.rand(sparse_sz, dense_sz) - 1
+    rv = random_normal((dense_sz,))
+    nv = gp.stack([o + s * rv.icopy() for o, s in zip(ro, rs)])
+    snv = ro + rs * iid(rv, sparse_sz)
+
+    rs = 2 * np.random.rand(sparse_sz, dense_sz) - 1
+    ro = 2 * np.random.rand(sparse_sz, dense_sz) - 1
+    rv = random_normal((dense_sz,))
+    nv += 1j * gp.stack([o + s * rv.icopy() for o, s in zip(ro, rs)])
+    snv += 1j * (ro + rs * iid(rv, sparse_sz))
+
+    x = ((2 * np.random.rand(2, sparse_sz, dense_sz) - 1) 
+         + 1j * (2 * np.random.rand(2, sparse_sz, dense_sz) - 1))
     check_sparse_vs_normal(snv, nv, x[0])
     check_sparse_vs_normal(snv, nv, x)
 
@@ -1382,6 +1547,13 @@ def test_logp():
     with pytest.raises(ValueError):
         iid(normal(), 1).logp([[[1]]])  # Too high dimension of x.
 
+    # A test with non-array input.
+    nv = normal(size=3)
+    snv = iid(normal(), 3)
+    assert np.abs(nv.logp([1, 2, 3]) - snv.logp([1, 2, 3])) < tol
+    assert np.max(np.abs(nv.logp([[0.1, 0.2, 0.3], [1, 2, 3]]) 
+                         - snv.logp([[0.1, 0.2, 0.3], [1, 2, 3]]))) < tol
+
 
 def test_diagonal():
     v = iid(iid(normal(size=(4, 5)), 2, axis=0), 3, axis=0)
@@ -1393,7 +1565,7 @@ def test_diagonal():
     assert v.diagonal(axis1=3, axis2=2).iaxes == (0, 1)
 
     with pytest.raises(ValueError):
-        v.diagonal(axis1=0, axis2=1)
+        v.diagonal(axis1=0, axis2=1)  # Independence axis.
 
     with pytest.raises(ValueError):
         v.diagonal(axis1=1, axis2=2)
@@ -1822,6 +1994,13 @@ def test_sum():
     with pytest.raises(ValueError):
         v.sum(axis=(0, 0))
 
+    # Negative numbers for the axes.
+    tol_ = 1e-9
+    vsum = iid(normal(0.1, 0.2, size=(2, 2)), 4).sum((-1, -2), False)
+    assert vsum.shape == (4,)
+    assert np.max(np.abs(vsum.mean() - 0.1 * 4)) < tol_
+    assert np.max(np.abs(vsum.var() - 0.2 * 4)) < tol_
+
 
 def test_split():
     v = iid(iid(normal(size=(4, 6, 5)), 2, axis=1), 3, axis=1)
@@ -2236,6 +2415,58 @@ def test_stack():
     assert isinstance(v_, SparseNormal)
     assert v_.shape == (3, 2, 4)
     assert v_.iaxes == tuple()
+
+    # Axis out of bounds.
+    x = gp.iid(gp.normal(), 3)
+    y = gp.iid(gp.normal(), 3)
+    with pytest.raises(AxisError):
+        gp.stack([x, y], axis=2)
+
+    # Negative axes.
+    x = gp.iid(gp.normal(), 3)
+    y = gp.iid(gp.normal(), 3)
+
+    v = gp.stack([x, y], axis=-1)
+    assert v.iaxes == (0,)
+
+    v = gp.stack([x, y], axis=-2)
+    assert v.iaxes == (1,)
+
+    with pytest.raises(AxisError):
+        gp.stack([x, y], axis=-3)
+
+    x = gp.iid(gp.normal(size=2), 3)
+    y = gp.iid(gp.normal(size=2), 3)
+    
+    v = gp.stack([x, y], axis=-1)
+    assert v.iaxes == (0,)
+
+    v = gp.stack([x, y], axis=-2)
+    assert v.iaxes == (0,)
+
+    v = gp.stack([x, y], axis=-3)
+    assert v.iaxes == (1,)
+
+    with pytest.raises(AxisError):
+        gp.stack([x, y], axis=-4)
+
+    # A large number of variables with incompatible axes.
+    vs = [iid(iid(normal(size=(1,)), 2), 3) for _ in range(10)]
+    
+    with pytest.raises(ValueError) as e:
+        gp.stack(vs + [iid(normal(size=(2, 1)), 3)])
+
+    assert "numbers of independence" in get_message(e)
+
+    with pytest.raises(ValueError) as e:
+        gp.stack(vs + [iid(iid(normal(size=(2,)), 3), 1, axis=-1)])
+
+    assert "locations of the independence" in get_message(e)
+
+    with pytest.raises(ValueError) as e:
+        gp.stack(vs + [iid(iid(normal(size=(1,)), 3), 2, axis=1)])
+
+    assert "orders of the independence" in get_message(e)
 
 
 def test_solve():
@@ -3895,6 +4126,15 @@ def test_tensordot():
     assert np.max(np.abs(v_.mean() - mean_ref)) < tol
     assert np.max(np.abs(v_.var() - var_ref)) < tol
 
+    # A strange data type for the axes.
+    v_ = gp.tensordot(v, x, axes=(np.array([0, 2]), np.array([1, 0])))
+    mean_ref = np.tensordot(v.mean(), x, axes=((0, 2), (1, 0)))
+    var_ref = np.tensordot(v.var(), x**2, axes=((0, 2), (1, 0)))
+    assert v_.shape == mean_ref.shape
+    assert v_.iaxes == (0,)
+    assert np.max(np.abs(v_.mean() - mean_ref)) < tol
+    assert np.max(np.abs(v_.var() - var_ref)) < tol
+
     v_ = gp.tensordot(v, x, axes=((-3, -1), (-2, 0)))
     mean_ref = np.tensordot(v.mean(), x, axes=((0, 2), (1, 0)))
     var_ref = np.tensordot(v.var(), x**2, axes=((0, 2), (1, 0)))
@@ -4003,6 +4243,24 @@ def test_icopy():
     assert np.max(np.abs(gp.cov(v, v_))) < tol
     assert np.max(np.abs(v.mean() - v_.mean())) < tol
     assert np.max(np.abs(v.cov() - v_.cov())) < tol
+
+
+def test_conjugate():
+    tol = 1e-10
+
+    xs = [assparsenormal(normal(1, 0.3) + 1j * normal(0.1, 3.2)),
+          iid(normal(1, 0.3), 5) + 1j * iid(normal(0.1, 3.2), 5)]
+
+    for x in xs:
+        xc = x.conjugate()
+        assert x.iaxes == xc.iaxes 
+        assert np.max(np.abs(x.a - xc.a.conjugate())) < tol
+        assert np.max(np.abs(x.b - xc.b.conjugate())) < tol
+
+        xc = x.conj()
+        assert x.iaxes == xc.iaxes 
+        assert np.max(np.abs(x.a - xc.a.conjugate())) < tol
+        assert np.max(np.abs(x.b - xc.b.conjugate())) < tol
 
 
 def test_doc_string_sync():
