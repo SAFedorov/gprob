@@ -125,7 +125,7 @@ def parse(subscripts, shapes):
                     raise ValueError("Invalid Ellipses.")
 
                 # Take into account numerical values
-                if shapes[num] == ():
+                if shapes[num] == tuple():
                     ellipse_count = 0
                 else:
                     ellipse_count = max(len(shapes[num]), 1) - (len(sub) - 3)

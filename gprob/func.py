@@ -221,13 +221,14 @@ class ConditionError(LinAlgError):
 
 
 def condition(m, a, mc, ac, mask=None):
-    """Conditions the vandom variable ``v`` on another random variable, ``c``, 
-    being equal to zero. Both variables are defined as Gaussian maps,
+    """Conditions one random varaible on another being equal to zero. 
+    The varaible being conditioned and the condition are denoted, respectively, 
+    by ``v`` and ``c``, and are specified by their Gaussian maps,
 
     v = m + e @ a,
-    c = mc + e @ ac,
+    c = mc + e @ ac.
     
-    where ``e`` are vectors of independent identically-distributed 
+    Here, ``e`` is a vector of independent identically-distributed lantent 
     normal random variables with zero mean and unit variance, ``m`` and ``mc`` 
     are the mean vectors and `a` and `ac` are the map matrices.  
     
@@ -241,7 +242,7 @@ def condition(m, a, mc, ac, mask=None):
             the j-th variable.
         
     Returns:
-        Tuple (conditional mean, conditional map matrix)
+        Tuple: (conditional mean, conditional map matrix)
     """
 
     try:
