@@ -8,6 +8,7 @@ from numpy.exceptions import AxisError
 from numpy.exceptions import ComplexWarning
 
 import gprob as gp
+from gprob.func import ConditionError
 from gprob.normal_ import normal, Normal
 from gprob.sparse import (_item_iaxid, iid, _finalize,
                           SparseNormal, SparseConditionWarning, lift)
@@ -1336,6 +1337,19 @@ def test_condition():
         nvc = (nv1 + nv3) | {nv1 - 1.3 * nv3: 0.2}
         snvc = snv13 | {snv2: 1, snv1 - 1.3 * snv3: 0.2}
         check_sparse_vs_normal(snvc, nvc)
+
+    # Degenerate cases.
+    x = gp.iid(gp.normal(), 4)
+    y = gp.iid(gp.normal(), 4)
+
+    xmy = x - y
+    xy = gp.stack([x, y])
+
+    with pytest.raises(ConditionError):
+        xy | {y: y}
+
+    with pytest.raises(ConditionError):
+        xy | {xmy: 0, 2*xmy: 0}
 
 
 def test_cumsum():

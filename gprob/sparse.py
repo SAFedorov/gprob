@@ -10,6 +10,7 @@ from numpy.exceptions import AxisError
 from . import normal_
 from .normal_ import (Normal, complete, lift, match_, complete_tensordot_axes,
                       validate_logp_samples, print_)
+from .func import ConditionError
 from .external import einsubs
 
 
@@ -418,6 +419,9 @@ class SparseNormal(Normal):
         Returns:
             Conditional sparse normal variable with the same shape as 
             the original variable.
+
+        Raises:
+            ConditionError: If conditions are degenerate.
         """
 
         if isinstance(observations, dict):
@@ -490,10 +494,16 @@ class SparseNormal(Normal):
         dia_r = np.abs(np.diagonal(r, axis1=-1, axis2=-2))
         tol = np.finfo(r.dtype).eps
         if (dia_r < (tol * np.max(dia_r))).any():
-            raise LinAlgError("Degenerate conditions.")
+            raise ConditionError("Degenerate conditions are not supported "
+                                 "for sparse varaibles.")
 
         t_ax = tuple(range(niax)) + (-1, -2)
-        es = np.linalg.solve(r.transpose(t_ax), -mc[..., None]).squeeze(-1)
+
+        try:
+            es = np.linalg.solve(r.transpose(t_ax), -mc[..., None]).squeeze(-1)
+        except LinAlgError as e:
+            raise ConditionError(str(e))
+        
         aproj = q.transpose(t_ax) @ av
 
         cond_a = av - q @ aproj
