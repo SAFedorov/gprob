@@ -494,7 +494,7 @@ class SparseNormal(Normal):
 
         t_ax = tuple(range(niax)) + (-1, -2)
         es = np.linalg.solve(r.transpose(t_ax), -mc[..., None]).squeeze(-1)
-        aproj = (q.transpose(t_ax) @ av)
+        aproj = q.transpose(t_ax) @ av
 
         cond_a = av - q @ aproj
         cond_m = mv + np.einsum("...i, ...ij -> ...j", es, aproj)
@@ -575,7 +575,6 @@ class SparseNormal(Normal):
         subs = f"{''.join(in_symb1)},{''.join(in_symb2)}->{''.join(out_symb)}"
         return np.einsum(subs, self.a, self.a.conj())
 
-    
     def sample(self, n=None):
         if n is None:
             nsh = tuple()
@@ -769,37 +768,22 @@ def _validate_iaxid(seq):
     msg = ("Combining sparse normal variables requires them to have "
            "the same numbers of independence axes at the same "
            "positions in the shape and in the same order.")
-    max_disp = 10  # Maximum number of values to display.
 
     ns = set((len(ids) - ids.count(None)) for ids in iaxids)
     if len(ns) > 1:
-        if len(ns) < max_disp:
-            valstr = (": " + ", ".join(str(n) for n in ns))
-        else:
-            valstr = ""
-
+        valstr = ": " + ", ".join(str(n) for n in ns)
         raise ValueError("Mismatching numbers of independence axes "
                          f"in the operands{valstr}. {msg}")
 
     get_iax_numbers = lambda ids: tuple([i for i, b in enumerate(ids) if b])
     locs = set(get_iax_numbers(ids) for ids in iaxids)
     if len(locs) > 1:
-        if len(ns) < max_disp:
-            valstr = (": " + ", ".join(str(loc) for loc in locs))
-        else:
-            valstr = ""
-        
+        valstr = ": " + ", ".join(str(loc) for loc in locs)
         raise ValueError("Incompatible locations of the independence axes "
                          f"of the operands{valstr}. {msg}")
 
     orders = set(tuple([ax for ax in ids if ax is not None]) for ids in iaxids)
-    assert len(orders) > 1
-
-    if len(ns) < max_disp:
-        valstr = (": " + ", ".join(str(order) for order in orders))
-    else:
-        valstr = ""
-
+    valstr = ": " + ", ".join(str(order) for order in orders)
     raise ValueError("Incompatible orders of the independence axes "
                      f"of the operands{valstr}. {msg}")
     

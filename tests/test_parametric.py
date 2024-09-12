@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 from numpy.exceptions import ComplexWarning
-from gprob import (normal,
+from gprob import (normal, iid,
                    exp, exp2, log, log2, log10, sqrt, cbrt, sin, cos, 
                    tan, arcsin, arccos, arctan, sinh, cosh, tanh, 
                    arcsinh, arccosh, arctanh, conjugate, conj)
@@ -123,3 +123,67 @@ def test_linearized_unaries():
 
             assert np.allclose(vout.b, vout_p.b, rtol=tol, atol=tol)
             assert np.allclose(vout.a, vout_p.a, rtol=tol, atol=tol)
+
+
+def test_sparse_linearized_unaries():
+    tol = 1e-8
+
+    fn_list = [exp, exp2, log, log2, log10, sqrt, sin, cos, tan, arcsin, 
+               arccos, arctan, sinh, cosh, tanh, arcsinh, arctanh, 
+               conjugate, conj]
+
+    ro = np.random.rand(3, 2)  # should be in [0, 1] 
+    rs = np.random.rand(3, 2) - 0.5
+
+    vin = ro + rs * normal(size=(3, 2))
+    svin = ro + rs * iid(normal(size=2), 3)
+
+    for fn in fn_list + [cbrt]:
+        vout = fn(vin)
+        svout = fn(svin)
+
+        assert np.max(np.abs(vout.mean() - svout.mean())) < tol
+        assert np.max(np.abs(vout.var() - svout.var())) < tol
+        assert svout.iaxes == svin.iaxes
+
+    # Complex numbers.
+    ro = np.random.rand(3, 2) + 1j * np.random.rand(3, 2)
+    rs = (np.random.rand(3, 2) - 0.5) + 1j * (np.random.rand(3, 2) - 0.5)
+
+    vin = ro + rs * normal(size=(3, 2))
+    svin = ro + rs * iid(normal(size=2), 3)
+
+    for fn in fn_list:
+        vout = fn(vin)
+        svout = fn(svin)
+
+        assert np.max(np.abs(vout.mean() - svout.mean())) < tol
+        assert np.max(np.abs(vout.var() - svout.var())) < tol
+        assert svout.iaxes == svin.iaxes
+
+    # arccosh - a special case because it needs the input mean to be > 1.
+    ro = 1 + np.random.rand(3, 2)
+    rs = np.random.rand(3, 2) - 0.5
+
+    vin = ro + rs * normal(size=(3, 2))
+    svin = ro + rs * iid(normal(size=2), 3)
+
+    vout = arccosh(vin)
+    svout = arccosh(svin)
+
+    assert np.max(np.abs(vout.mean() - svout.mean())) < tol
+    assert np.max(np.abs(vout.var() - svout.var())) < tol
+    assert svout.iaxes == svin.iaxes
+
+    ro = 1 + np.random.rand(3, 2) + 1j * np.random.rand(3, 2)
+    rs = (np.random.rand(3, 2) - 0.5) + 1j * (np.random.rand(3, 2) - 0.5)
+
+    vin = ro + rs * normal(size=(3, 2))
+    svin = ro + rs * iid(normal(size=2), 3)
+
+    vout = arccosh(vin)
+    svout = arccosh(svin)
+
+    assert np.max(np.abs(vout.mean() - svout.mean())) < tol
+    assert np.max(np.abs(vout.var() - svout.var())) < tol
+    assert svout.iaxes == svin.iaxes

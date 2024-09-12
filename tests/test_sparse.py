@@ -533,6 +533,9 @@ def test_getitem():
     assert v[1, :, :, ...].shape == (3, 2, 5)
     assert v[1, :, :, ...].iaxes == (0, 1)
 
+    assert v[..., :, :, 1].shape == (4, 3, 2)
+    assert v[..., :, :, 1].iaxes == (1, 2)
+
     assert v[1, :, :, 0].shape == (3, 2)
     assert v[1, :, :, 0].iaxes == (0, 1)
 
@@ -548,11 +551,17 @@ def test_getitem():
     assert v[1, :, ...].shape == (3, 2, 5)
     assert v[1, :, ...].iaxes == (0, 1)
 
+    assert v[..., :, 1].shape == (4, 3, 2)
+    assert v[..., :, 1].iaxes == (1, 2)
+
     assert v[None, None, ...].shape == (1, 1, 4, 3, 2, 5)
     assert v[None, None, ...].iaxes == (3, 4)
 
     assert v[None, :, :, None, ..., 2].shape == (1, 4, 3, 1, 2)
     assert v[None, :, :, None, ..., 2].iaxes == (2, 4)
+
+    assert v[None, :, ..., :, None, 2].shape == (1, 4, 3, 2, 1)
+    assert v[None, :, ..., :, None, 2].iaxes == (2, 3)
 
     assert v[1, :, None, :, 0].shape == (3, 1, 2)
     assert v[1, :, None, :, 0].iaxes == (0, 2)
@@ -3407,6 +3416,15 @@ def test_dot():
     assert np.max(np.abs(v_.mean() - nv_ref_.mean())) < tol
     assert np.max(np.abs(v_.cov() - 
                          dense_to_sparse_cov(nv_ref_.cov(), (0, 1)))) < tol
+
+    # Two sparse normal variables currently cannot be used in bilinear 
+    # operations.
+    v = assparsenormal(normal(size=(3,)))
+    u = assparsenormal(normal(size=(3,)))
+    assert gp.dot(v.mean(), u.mean()).shape == tuple()
+
+    with pytest.raises(ValueError):
+        gp.dot(v, u)
 
 
 def test_inner():
