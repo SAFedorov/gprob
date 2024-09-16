@@ -404,6 +404,23 @@ class LatentMap:
         a = self.a.reshape((self.nlat,) + b.shape, order=order)
         return self.__class__(a, b, self.lat)
     
+    def squeeze(self, axis=None):
+        """Removes axis or axes of length one from the variable.
+        
+        Args:
+            axis (None, int, or tuple of ints):
+                The axis or axes to be removed. If ``None``, all axes of 
+                length one are removed.
+        
+        Returns:
+            A new random variable with the shape identical to that of the 
+            original, except the removed axes.  
+        """
+        
+        b = self.b.squeeze(axis=axis)
+        a = self.a.reshape((self.nlat,) + b.shape)
+        return self.__class__(a, b, self.lat)
+    
     def sum(self, axis=None, keepdims=False):
         """Computes the sum of all elements of the variable along an axis 
         or axes.

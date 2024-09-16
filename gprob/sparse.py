@@ -327,6 +327,16 @@ class SparseNormal(Normal):
         
         iaxid = tuple(iaxid)
         return _finalize(x, iaxid)
+    
+    def squeeze(self, axis=None):
+        if axis is None:
+            axis = tuple([i for i, s in enumerate(self.shape) if s == 1])
+        elif isinstance(axis, int):
+            axis = (axis,)
+
+        axis = _normalize_axes(axis, self.ndim)
+        iaxid = tuple([b for i, b in enumerate(self._iaxid) if i not in axis])
+        return _finalize(super().squeeze(axis), iaxid)
 
     def sum(self, axis, keepdims=False):
         """Computes the sum of all elements of the variable along an axis 
@@ -725,7 +735,7 @@ def _normalize_axes(axes, ndim):
     and without duplicates.
 
     Returns:
-        Tuple of normalized axes indices.
+        Tuple: positive axes indices.
     
     Raises:
         AxisError:

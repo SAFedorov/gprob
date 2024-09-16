@@ -1964,6 +1964,118 @@ def test_reshape():
     assert (v1_ + v2_.transpose((1, 0, 2, 3))).iaxes == (0, 1, 3)
 
 
+def test_squeeze():
+    # 0 independence axes.
+
+    v = assparsenormal(normal())
+    v_ = v.squeeze()
+
+    assert v_.shape == tuple()
+    assert v_.iaxes == tuple()
+
+    v = assparsenormal(normal(size=(1, 2, 1)))
+    v_ = v.squeeze()
+
+    assert v_.shape == (2,)
+    assert v_.iaxes == tuple()
+
+    v = assparsenormal(normal(size=(1, 2, 1)))
+    v_ = v.squeeze(axis=-1)
+
+    assert v_.shape == (1, 2)
+    assert v_.iaxes == tuple()
+
+    v = assparsenormal(normal(size=(1, 2, 1)))
+    v_ = v.squeeze(axis=0)
+
+    assert v_.shape == (2, 1)
+    assert v_.iaxes == tuple()
+
+    v = assparsenormal(normal(size=(1, 2, 1, 3, 1)))
+    v_ = v.squeeze(axis=(0, 2))
+
+    assert v_.shape == (2, 3, 1)
+    assert v_.iaxes == tuple()
+
+    with pytest.raises(ValueError):
+        v.squeeze(axis=(1,))
+
+    with pytest.raises(ValueError):
+        v.squeeze(axis=(0, 1))
+
+    # 1 independence axis.
+
+    v = iid(normal(size=2), 3)
+    v_ = v.squeeze()
+
+    assert v_.shape == (3, 2)
+    assert v_.iaxes == (0,)
+
+    v = iid(normal(size=(1, 2, 1)), 3, axis=1)  # shape (1, 3, 2, 1)
+    v_ = v.squeeze()
+
+    assert v_.shape == (3, 2)
+    assert v.iaxes == (1,)
+
+    v = iid(normal(size=(1, 2, 1)), 3, axis=1)  # shape (1, 3, 2, 1)
+    v_ = v.squeeze(axis=3)
+
+    assert v_.shape == (1, 3, 2)
+    assert v_.iaxes == (1,)
+
+    v = iid(normal(size=(1, 2, 1, 4, 1, 1)), 3, axis=-1)  # shape (1, 2, 1, 4, 1, 1, 3)
+    v_ = v.squeeze()
+
+    assert v_.shape == (2, 4, 3)
+    assert v_.iaxes == (2,)
+
+    v = iid(normal(size=(1, 2, 1, 4, 1, 1)), 3, axis=-1)  # shape (1, 2, 1, 4, 1, 1, 3)
+    v_ = v.squeeze(axis=(2, 4))
+
+    assert v_.shape == (1, 2, 4, 1, 3)
+    assert v_.iaxes == (4,)
+
+    v = iid(normal(size=(1, 2, 1)), 3, axis=1)  # shape (1, 3, 2, 1)
+    
+    with pytest.raises(ValueError):
+        v.squeeze(axis=1)
+
+    with pytest.raises(ValueError):
+        v.squeeze(axis=(0, 2))
+
+    # 2 independence axes.
+
+    v = iid(iid(normal(size=2), 3), 4, axis=-1)
+    v_ = v.squeeze()
+
+    assert v_.shape == (3, 2, 4)
+    assert v_.iaxes == (0, 2)
+    
+    v = iid(iid(normal(size=(1, 2, 1)), 3), 4, axis=-1)
+    v_ = v.squeeze()
+
+    assert v_.shape == (3, 2, 4)
+    assert v_.iaxes == (0, 2)
+
+    v = iid(iid(normal(size=(1, 2, 1)), 3), 4, axis=-1)
+    v_ = v.squeeze(axis=1)
+
+    assert v_.shape == (3, 2, 1, 4)
+    assert v_.iaxes == (0, 3)
+
+    v = iid(iid(normal(size=(1, 2, 1)), 3), 4, axis=-1)
+    v_ = v.squeeze(axis=(1, 3))
+
+    assert v_.shape == (3, 2, 4)
+    assert v_.iaxes == (0, 2)
+
+    with pytest.raises(ValueError):
+        v.squeeze(axis=0)
+
+    with pytest.raises(ValueError):
+        v.squeeze(axis=(1, 2))
+
+
 def test_sum():
     v = iid(iid(normal(size=(4, 5)), 2, axis=1), 3, axis=1)
     # v.shape is (4, 3, 2, 5), v.iaxes are (1, 2)

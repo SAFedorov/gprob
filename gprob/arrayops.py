@@ -282,6 +282,24 @@ def reshape(x, newshape, order="C"):
 
 
 @fallback_to_normal
+def squeeze(x, axis=None):
+    """Removes axis or axes of length one from the variable.
+    
+    Args:
+        x (random variable): 
+            The input array random variable to be squeezed.
+        axis (None, int, or tuple of ints):
+            The axis or axes to be removed. If ``None``, all axes of 
+            length one are removed.
+    
+    Returns:
+        A new random variable with the shape identical to that of the 
+        input, except the removed axes.  
+    """
+    return x.squeeze(axis=axis)
+
+
+@fallback_to_normal
 def transpose(x, axes=None):
     """Permutes the axes of a random variable.
 

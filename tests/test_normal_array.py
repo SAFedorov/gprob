@@ -8,7 +8,7 @@ np.random.seed(0)
 from gprob import maps
 from gprob import (normal,
                    stack, hstack, vstack, dstack, concatenate,
-                   split, hsplit, vsplit, dsplit,
+                   split, hsplit, vsplit, dsplit, squeeze,
                    sum, cumsum, trace, diagonal, reshape, moveaxis, ravel, 
                    transpose, add, subtract, multiply, divide, power, 
                    einsum, dot, matmul, inner, outer, kron, tensordot)
@@ -235,6 +235,22 @@ def test_reshape():
             _test_array_func(reshape, [new_sh], test_shapes=[sh])
             _test_array_func(reshape, [new_sh], test_shapes=[sh], order="F")
             _test_array_func(reshape, [new_sh], test_shapes=[sh], order="A")
+
+
+def test_squeeze():
+    _test_array_func(squeeze, tuple(), 
+                     test_shapes=[tuple(), (2,), (1, 2), (1, 2, 1), 
+                                  (2, 1, 1, 3, 1, 4)])
+    
+    _test_array_func(squeeze, axis=1, 
+                     test_shapes=[(2, 1), (2, 1, 3), (2, 1, 3, 1), 
+                                  (2, 1, 1, 3, 1, 4)])
+    
+    _test_array_func(squeeze, axis=(1, -2), 
+                     test_shapes=[(2, 1, 3, 1, 2), (2, 1, 1, 3, 1, 4)])
+    
+    _test_array_func(squeeze, axis=(1, 3, 4), 
+                     test_shapes=[(2, 1, 3, 1, 1, 2), (2, 1, 1, 1, 1, 4, 1)])
 
 
 def test_fft():
