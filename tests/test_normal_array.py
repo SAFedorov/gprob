@@ -254,8 +254,8 @@ def test_squeeze():
 
 
 def test_fft():
-    cfft_funcs = [fft, ifft, hfft]
-    rfft_funcs = [rfft, irfft, ihfft]
+    cfft_funcs = [fft, ifft, irfft, hfft]
+    rfft_funcs = [rfft, ihfft]
 
     ts = [(2,), (4,), (16,), (128,), (3, 32), (3, 2, 7)]
 
@@ -296,8 +296,8 @@ def test_fft():
 
 
 def test_fft2():
-    cfft_funcs = [fft2, ifft2]
-    rfft_funcs = [rfft2, irfft2]
+    cfft_funcs = [fft2, ifft2, irfft2]
+    rfft_funcs = [rfft2]
 
     ts = [(2, 2), (4, 2), (5, 3), (3, 17), (2, 8, 4)]
 
@@ -339,8 +339,8 @@ def test_fft2():
 def test_fftn():
     # tests for 3 fft dimensions max
 
-    cfft_funcs = [fftn, ifftn]
-    rfft_funcs = [rfftn, irfftn]
+    cfft_funcs = [fftn, ifftn, irfftn]
+    rfft_funcs = [rfftn]
 
     ts = [(16, 3, 2), (2, 4, 7, 2)]
 

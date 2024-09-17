@@ -18,7 +18,8 @@ def ifft(x, n=None, axis=-1, norm=None):
 
 
 def rfft(x, n=None, axis=-1, norm=None):
-    """One-dimensional discrete Fourier Transform of a real array ``x``.
+    """One-dimensional discrete Fourier Transform of a real-valued random 
+    variable ``x``.
     
     See `numpy.fft.rfft` for more details.
     """
@@ -34,8 +35,8 @@ def irfft(x, n=None, axis=-1, norm=None):
 
 
 def hfft(x, n=None, axis=-1, norm=None):
-    """One-dimensional discrete Fourier Transform of a hermitian array ``x`` 
-    that has real spectrum.
+    """One-dimensional discrete Fourier Transform of a hermitian-valued random 
+    variable ``x`` (i.e. a variable that has a real spectrum).
     
     See `numpy.fft.hfft` for more details.
     """
@@ -72,6 +73,23 @@ def ifft2(x, s=None, axes=(-2, -1), norm=None):
     return _fftfunc_n("ifft2", x, s, axes, norm)
 
 
+def rfft2(x, s=None, axes=(-2, -1), norm=None):
+    """Two-dimensional discrete Fourier Transform of a real-valued random 
+    variable ``x``.
+    
+    See `numpy.fft.rfft2` for more details.
+    """
+    return _fftfunc_n("rfft2", x, s, axes, norm)
+
+
+def irfft2(x, s=None, axes=(-2, -1), norm=None):
+    """Inverse of `rfft2`.
+    
+    See `numpy.fft.irfft2` for more details.
+    """
+    return _fftfunc_n("irfft2", x, s, axes, norm)
+
+
 def fftn(x, s=None, axes=None, norm=None):
     """n-dimensional discrete Fourier Transform of ``x``.
     
@@ -88,24 +106,9 @@ def ifftn(x, s=None, axes=None, norm=None):
     return _fftfunc_n("ifftn", x, s, axes, norm)
 
 
-def rfft2(x, s=None, axes=(-2, -1), norm=None):
-    """Two-dimensional discrete Fourier Transform of a real array ``x``.
-    
-    See `numpy.fft.rfft2` for more details.
-    """
-    return _fftfunc_n("rfft2", x, s, axes, norm)
-
-
-def irfft2(x, s=None, axes=(-2, -1), norm=None):
-    """Inverse of `rfft2`.
-    
-    See `numpy.fft.irfft2` for more details.
-    """
-    return _fftfunc_n("irfft2", x, s, axes, norm)
-
-
 def rfftn(x, s=None, axes=None, norm=None):
-    """n-dimensional discrete Fourier Transform of a real array ``x``.
+    """n-dimensional discrete Fourier Transform of a real-valued random 
+    variable ``x``.
     
     See `numpy.fft.rfftn` for more details.
     """
