@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "gprob"
 version = "0.7.1"
 description = "Probabilistic programming with arrays of Gaussian variables."
-requires-python = ">=3.9"
+requires-python = ">= 3.9"
 readme = "readme.md"
 license = {file = "LICENSE"}
 authors = [
@@ -16,6 +16,7 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python",
+    "Operating System :: OS Independent",
 ]
 keywords = [
     "Gaussian distribution",
@@ -28,9 +29,32 @@ keywords = [
     "Numpy",
     "Scipy",
 ]
-dependencies = []
+dependencies = [
+    "numpy >= 1.25", 
+    "scipy",
+]
+
+[project.urls]
+Source = "https://github.com/SAFedorov/gprob"
 
 [tool.setuptools]
 packages=[
-    "gprob"
+    "gprob",
+]
+
+[tool.coverage.run]
+source = ["gprob"]
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.ruff]
+include = ["*.py", "pyproject.toml"]
+extend-exclude = ["tests/external"]
+
+[tool.ruff.lint]
+extend-ignore = [
+  "F401",
+  "E731",
+  "E741",
 ]
