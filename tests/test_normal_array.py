@@ -3,8 +3,6 @@ import copy
 import numpy as np
 import pytest
 
-np.random.seed(0)
-
 from gprob import maps
 from gprob import (normal,
                    stack, hstack, vstack, dstack, concatenate,
@@ -22,6 +20,9 @@ from gprob.fft import (fft, fft2, fftn,
 from gprob.linalg import solve, asolve
 
 from utils import random_normal, random_det_normal, random_correlate
+
+
+np.random.seed(0)
 
 
 def _gts(ndim = None):

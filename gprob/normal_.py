@@ -48,20 +48,21 @@ class Normal(LatentMap):
                 are normal variables, and the values are numeric 
                 constants or normal variables. A single normal 
                 variable is equavalent to ``{variable: 0}``.
-            mask (optional): 
-                A 2d bool array, in which ``mask[i, j] == True`` means that 
-                the ``i``-th condition applies to the ``j``-th variable, and
-                ``False`` that it does not.
-                In the case when the variables have more than one dimension, 
-                the 0th axis of ``mask`` spans over the 0th axis of each of the 
-                conditions, and the 1st axis of ``mask`` spans over the 0th axis
+            mask (optional):
+                A 2d bool array with generalized upper- or lower- triangular 
+                structure that specifies which conditions apply to which 
+                variables. ``True`` ``mask[i, j]`` means that 
+                the ``i``-th condition applies to the ``j``-th variable, 
+                and ``False`` that it does not.
+                In the case of many conditions and higher dimensions, 
+                the 0th axis of ``mask`` spans over the 0th axis of all 
+                conditions, and its 1st axis spans over the 0th axis
                 of the conditioned variable.
-                The mask needs to be generalized upper- or lower- triangular, 
-                meaning that there needs to be a set of indices ``i0[j]`` such 
-                that either ``mask[i, j] == True`` for all ``i > i0[j]`` and 
-                ``mask[i, j] == False`` for ``i < i0[j]``, or, vice-versa, 
-                ``mask[i, j] == True`` for all ``i < i0[j]`` 
-                and ``mask[i, j] == False`` for ``i > i0[j]``.
+                The mask has to be generalized upper- or lower- triangular, i.e.
+                for some set of indices ``i0[j]`` the mask has to either be 
+                ``True`` for all ``i > i0[j]`` and ``False`` for ``i < i0[j]``, 
+                or, vice-versa, 
+                ``False`` for all ``i > i0[j]`` and ``True`` for ``i < i0[j]``.
         
         Returns:
             Conditional normal variable with the same shape as 

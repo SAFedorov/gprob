@@ -281,25 +281,25 @@ def test_properties():
     # Checks the complex flag.
 
     v = normal(1, 2.)
-    assert v.iscomplex == False
+    assert v.iscomplex is False
 
     v = normal(1 + 2j, 2.)
-    assert v.iscomplex == True
+    assert v.iscomplex is True
 
     v = normal(1, 2.) + 1j * normal(size=(2, 2))
-    assert v.iscomplex == True
+    assert v.iscomplex is True
 
     # either a or b need to be complex, not both
     v.b = v.b.real
-    assert v.iscomplex == True
+    assert v.iscomplex is True
 
     v.a = v.a.real
-    assert v.iscomplex == False
+    assert v.iscomplex is False
 
 
 def test_repr():
     for v in [normal(), normal(size=(2, 3))]:
-        assert type(repr(v)) == type("")
+        assert type(repr(v)) is type("")
     
     assert "\n" not in repr(5 + normal(size=(3,)))
     assert "\n" in repr(normal(size=(2, 3)))

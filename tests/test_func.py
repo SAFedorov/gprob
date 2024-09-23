@@ -2,14 +2,15 @@ import pytest
 import numpy as np
 from scipy.stats import multivariate_normal as mvn
 
-np.random.seed(0)
-
 from gprob import normal, hstack
 from gprob.func import logp, logp_lstsq, dlogp, d2logp, fisher
 
 from reffunc import logp as logp_
 from reffunc import dlogp_eigh as dlogp_
 from reffunc import d2logp as d2logp_
+
+
+np.random.seed(0)
 
 
 def num_dlogp(x, m, cov, dm, dcov, delta=1e-7):

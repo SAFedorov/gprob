@@ -238,7 +238,7 @@ def condition(m, a, mc, ac, mask=None):
         mc: The mean vector of the variable conditioned on, an (nc,) array.
         ac: The map matrix of the variable conditioned on, a (ne, nc) 2d array.
         mask (bool array, optional): A 2d mask with the shape (nc, n), where
-            mask[i, j] == False means than the i-th condition does not affect 
+            mask[i, j] is False means than the i-th condition does not affect 
             the j-th variable.
         
     Returns:
@@ -322,8 +322,8 @@ def condition_svd(m, a, mc, ac):
 
         if nsq > 0 and (d @ d) > (tol**2 * nsq):
             raise ConditionError("The conditions could not be satisfied. "
-                                    f"Got {(d @ d):0.3e} for the residual and "
-                                    f"{nsq:0.5e} for |mu_c|**2.")
+                                 f"Got {(d @ d):0.3e} for the residual and "
+                                 f"{nsq:0.5e} for |mu_c|**2.")
             # nsq=0 is always solvable
 
     cond_a = a - u @ (u.T @ a)

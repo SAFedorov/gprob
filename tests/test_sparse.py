@@ -15,6 +15,7 @@ from gprob.sparse import (_item_iaxid, iid, _finalize,
 
 from utils import random_normal, get_message, assparsenormal
 
+
 np.random.seed(0)
 
 
@@ -440,19 +441,6 @@ def test_iid():
         iid(normal(), 7, axis=22)
 
 
-def test_icopy():
-    tol = 1e-10
-    
-    v = iid(iid(normal(size=(3,)), 4), 5, axis=-1)
-    w = v.icopy()
-
-    assert v.shape == w.shape
-    assert v.iaxes == w.iaxes
-    assert np.abs(np.max(v.b - w.b)) < tol
-    assert np.abs(np.max(v.a - w.a)) < tol
-    assert np.abs(np.max(gp.cov(v, w))) < tol
-
-
 def test_properties():
     # size, shape, ndim, iscomplex, real, imag, iaxes, T
 
@@ -463,8 +451,8 @@ def test_properties():
 
     vc = v1 + 1j * v2
 
-    assert v1.iscomplex == False
-    assert vc.iscomplex == True
+    assert v1.iscomplex is False
+    assert vc.iscomplex is True
 
     for v in [v1, vc]:
         assert v.size == 4 * 8
@@ -482,13 +470,13 @@ def test_properties():
         vr = v.real
         assert isinstance(vr, SparseNormal)
         assert vr.shape == (8, 4)
-        assert vr.iscomplex == False
+        assert vr.iscomplex is False
         assert np.max(np.abs(vr.mean() - v.mean().real)) < tol
 
         vi = v.imag
         assert isinstance(vi, SparseNormal)
         assert vi.shape == (8, 4)
-        assert vi.iscomplex == False
+        assert vi.iscomplex is False
         assert np.max(np.abs(vi.mean() - v.mean().imag)) < tol
 
         assert np.max(np.abs(vr.var() + vi.var() - v.var())) < tol
@@ -4366,7 +4354,7 @@ def test_tensordot():
 
 
 def test_icopy():
-    tol = 1e-8
+    tol = 1e-10
 
     v = iid(random_normal((3, 4)), 5, axis=1)
     v = iid(v, 6, axis=-1)
@@ -4387,6 +4375,15 @@ def test_icopy():
     assert np.max(np.abs(gp.cov(v, v_))) < tol
     assert np.max(np.abs(v.mean() - v_.mean())) < tol
     assert np.max(np.abs(v.cov() - v_.cov())) < tol
+    
+    v = iid(iid(normal(size=(3,)), 4), 5, axis=-1)
+    w = v.icopy()
+
+    assert v.shape == w.shape
+    assert v.iaxes == w.iaxes
+    assert np.abs(np.max(v.b - w.b)) < tol
+    assert np.abs(np.max(v.a - w.a)) < tol
+    assert np.abs(np.max(gp.cov(v, w))) < tol
 
 
 def test_conjugate():
