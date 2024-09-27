@@ -294,20 +294,20 @@ def validate_logp_samples(v, x):
             s = f"The the sample shape {x.shape}"
 
         raise ValueError(f"{s} is not consistent "
-                            f"with the variable shape {v.shape}.")
+                         f"with the variable shape {v.shape}.")
 
 
 def normal(mu=0., sigmasq=1., size=None):
-    """Creates a new normal random variable.
+    """Creates a normally-distributed random variable.
     
     Args:
-        mu: Scalar mean value or array of mean values.
+        mu: Scalar mean or array of mean values.
         sigmasq: Scalar variance or matrix covariance.
-        size (optional): Integer or sequence of integers specifying the shape 
+        size (optional): Integer or tuple of integers specifying the shape 
             of the variable. Only has an effect with scalar mean and variance. 
 
     Returns:
-        A Normal random variable.
+        Normal: a new random variable.
 
     Examples:
         >>> v = normal(1, 3, size=2)
