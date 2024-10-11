@@ -1,6 +1,10 @@
 from . import fft
 from . import linalg
 from . import func
+from . import maps
+from . import normal_
+from . import sparse
+
 from .normal_ import Normal, normal
     
 from .arrayops import (icopy, mean, var, cov, 
