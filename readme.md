@@ -1,7 +1,7 @@
 # gprob
-gprob is a probabilistic programming language for Gaussian random variables with exact conditioning. It is implemented as a python package, and is built around the idea that arrays of Gaussian random variables can be handled in the same way as numerical numpy arrays.
+gprob is a python package that implements a probabilistic programming language for Gaussian random variables with exact conditioning. It is built around the idea that arrays of Gaussian random variables can be handled in the same way as numerical numpy arrays.
 
-To give a flavor of it, the first example shows a few operations on scalar variables and inference
+To give a flavor of it, the first example shows a few operations on scalar variables and conditioning
 ```python
 >>> import gprob as gp
 >>> x = gp.normal()
@@ -49,7 +49,8 @@ pip install git+https://github.com/SAFedorov/gprob.git
 Have a look at the notebooks in the [examples](examples) folder, starting from the tutorials on
 1. [Random variables](examples/1-random-variables.ipynb)
 2. [Array operations](examples/2-array-operations.ipynb)
-3. [Sparse arrays](examples/3-sparse-arrays.ipynb) 
+3. [Sparse arrays](examples/3-sparse-arrays.ipynb)
+4. [Likelihood fitting](examples/4-likelihood-fitting-fisher.ipynb)
 
 roughly in this order.
 
@@ -59,9 +60,9 @@ General multivariate Gaussian distributions of *n* variables require memory quad
 If the Gaussian variables are such that their joint distribution is a direct product of independent distributions, they can be packed into sparse arrays. For those, memory and computational requirements grow linearly with the number of independent distributions, and the total number of variables can be larger. 
 
 ## Acknowledgements
-gprob was inspired by (but works differently from) [GaussianInfer](https://github.com/damast93/GaussianInfer). See the corresponding paper
+gprob was inspired by (but works differently from) [GaussianInfer](https://github.com/damast93/GaussianInfer). See the corresponding paper,
 
-D. Stein and S. Staton, "Compositional Semantics for Probabilistic Programs with Exact Conditioning," 2021 36th Annual ACM/IEEE Symposium on Logic in Computer Science (LICS), Rome, Italy, 2021, pp. 1-13, doi: 10.1109/LICS52264.2021.9470552
+D. Stein and S. Staton, "Compositional Semantics for Probabilistic Programs with Exact Conditioning," 2021 36th Annual ACM/IEEE Symposium on Logic in Computer Science (LICS), Rome, Italy, 2021, pp. 1-13, doi: 10.1109/LICS52264.2021.9470552 .
 
 gprob uses the subscript parser from [opt-einsum](https://github.com/dgasmith/opt_einsum). Some linearization tricks and choices of tooling follow [autograd](https://github.com/HIPS/autograd).
 
