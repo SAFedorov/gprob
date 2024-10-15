@@ -1,10 +1,8 @@
 import pytest
 import numpy as np
 from numpy.exceptions import ComplexWarning
-from gprob import (normal, iid,
-                   exp, exp2, log, log2, log10, sqrt, cbrt, sin, cos, 
-                   tan, arcsin, arccos, arctan, sinh, cosh, tanh, 
-                   arcsinh, arccosh, arctanh, conjugate, conj)
+import gprob as gp
+from gprob import normal, iid
 from parametric import pnormal
 from utils import random_normal
 
@@ -85,23 +83,121 @@ def test_parametric_methods():
         vp.logp(p0, 1+0.j)
 
 
-@pytest.mark.skipif(not have_jax, reason="jax is not installed")
-def test_linearized_unaries():
-    tol = 1e-8
-
-    fn_list = [exp, exp2, log, log2, log10, sqrt, cbrt, sin, cos, tan, arcsin, 
-               arccos, arctan, sinh, cosh, tanh, arcsinh, arctanh, 
-               conjugate, conj]
+def test_unary_definitions():
+    # Checks that all the unary functions are defined in 
+    # the top-level name space
     
+    global FN_LIST
+    FN_LIST = [gp.exp, gp.exp2, gp.log, gp.log2, gp.log10, gp.sqrt, 
+               gp.sin, gp.cos, gp.tan, gp.arcsin, gp.arccos, gp.arctan, 
+               gp.sinh, gp.cosh, gp.tanh, gp.arcsinh, gp.arctanh, 
+               gp.conjugate, gp.conj, gp.absolute, gp.abs]
+
+
+def test_linearized_unaries_1():
+    # Tests some basic properties of the linearized unary functions 
+    # without using jax.
+
+    assert gp.conjugate is gp.conj
+    assert gp.absolute is gp.abs
+    
+    tol = 1e-8
     sh_list = [tuple(), (2,), (2, 3)]
     dt_list = [np.float64, np.complex128]
 
     for dt in dt_list:
         for sh in sh_list:
-            for fn in fn_list:
+            vin = 0.99 * np.pi * random_normal(sh, dtype=dt)
+            
+            vout1 = gp.abs(vin) ** 2
+            vout2 = vin * gp.conj(vin)
+
+            assert np.allclose(vout1.b, vout2.b, rtol=tol, atol=tol)
+            assert np.allclose(vout1.a, vout2.a, rtol=tol, atol=tol)
+
+            vout1 = gp.exp(2 * vin)
+            vout2 = gp.exp(vin) * gp.exp(vin)
+
+            assert np.allclose(vout1.b, vout2.b, rtol=tol, atol=tol)
+            assert np.allclose(vout1.a, vout2.a, rtol=tol, atol=tol)
+
+            vout1 = gp.exp(np.log(2.) * vin)
+            vout2 = gp.exp2(vin)
+
+            assert np.allclose(vout1.b, vout2.b, rtol=tol, atol=tol)
+            assert np.allclose(vout1.a, vout2.a, rtol=tol, atol=tol)
+
+            vout1 = gp.sin(2 * vin)
+            vout2 = 2 * gp.sin(vin) * gp.cos(vin)
+
+            assert np.allclose(vout1.b, vout2.b, rtol=tol, atol=tol)
+            assert np.allclose(vout1.a, vout2.a, rtol=tol, atol=tol)
+
+            vout1 = gp.tan(vin)
+            vout2 = gp.sin(vin) / gp.cos(vin)
+
+            assert np.allclose(vout1.b, vout2.b, rtol=tol, atol=tol)
+            assert np.allclose(vout1.a, vout2.a, rtol=tol, atol=tol)
+
+            vout1 = gp.tanh(vin)
+            vout2 = gp.sinh(vin) / gp.cosh(vin)
+
+            assert np.allclose(vout1.b, vout2.b, rtol=tol, atol=tol)
+            assert np.allclose(vout1.a, vout2.a, rtol=tol, atol=tol)
+
+            vin = 0.49 * np.pi * random_normal(sh, dtype=dt)
+            vout1 = vin
+            vout2 = gp.arcsin(gp.sin(vin))
+
+            assert np.allclose(vout1.b, vout2.b, rtol=tol, atol=tol)
+            assert np.allclose(vout1.a, vout2.a, rtol=tol, atol=tol)
+
+            vout1 = vin
+            vout2 = gp.arctan(gp.tan(vin))
+
+            assert np.allclose(vout1.b, vout2.b, rtol=tol, atol=tol)
+            assert np.allclose(vout1.a, vout2.a, rtol=tol, atol=tol)
+
+            vin = 0.49 * np.pi * (1 + random_normal(sh, dtype=dt))
+            vout1 = vin
+            vout2 = gp.arccos(gp.cos(vin))
+
+            assert np.allclose(vout1.b, vout2.b, rtol=tol, atol=tol)
+            assert np.allclose(vout1.a, vout2.a, rtol=tol, atol=tol)
+
+            vin = random_normal(sh, dtype=dt)
+            vout1 = vin
+            vout2 = gp.arcsinh(gp.sinh(vin))
+
+            assert np.allclose(vout1.b, vout2.b, rtol=tol, atol=tol)
+            assert np.allclose(vout1.a, vout2.a, rtol=tol, atol=tol)
+
+            vout1 = vin
+            vout2 = gp.arctanh(gp.tanh(vin))
+
+            assert np.allclose(vout1.b, vout2.b, rtol=tol, atol=tol)
+            assert np.allclose(vout1.a, vout2.a, rtol=tol, atol=tol)
+
+            vin = 1 + random_normal(sh, dtype=dt)
+            vout1 = vin
+            vout2 = gp.arccosh(gp.cosh(vin))
+
+            assert np.allclose(vout1.b, vout2.b, rtol=tol, atol=tol)
+            assert np.allclose(vout1.a, vout2.a, rtol=tol, atol=tol)
+
+
+@pytest.mark.skipif(not have_jax, reason="jax is not installed")
+def test_linearized_unaries_2():
+    tol = 1e-8
+    sh_list = [tuple(), (2,), (2, 3)]
+    dt_list = [np.float64, np.complex128]
+
+    for dt in dt_list:
+        for sh in sh_list:
+            for fn in FN_LIST:
                 jfn = getattr(jnp, fn.__name__)
 
-                if dt is np.complex128 and fn in (cbrt,):
+                if dt is np.complex128 and fn in (gp.cbrt,):
                     # Cubic root in numpy is not supported for complex types.
                     continue
 
@@ -112,7 +208,7 @@ def test_linearized_unaries():
                 assert np.allclose(vout.b, vout_p.b, rtol=tol, atol=tol)
                 assert np.allclose(vout.a, vout_p.a, rtol=tol, atol=tol)
             
-            fn = arccosh  
+            fn = gp.arccosh  
             jfn = getattr(jnp, fn.__name__)
             # This function is special because it needs the inputs 
             # to be greater than 1.
@@ -128,17 +224,13 @@ def test_linearized_unaries():
 def test_sparse_linearized_unaries():
     tol = 1e-8
 
-    fn_list = [exp, exp2, log, log2, log10, sqrt, sin, cos, tan, arcsin, 
-               arccos, arctan, sinh, cosh, tanh, arcsinh, arctanh, 
-               conjugate, conj]
-
     ro = np.random.rand(3, 2)  # should be in [0, 1] 
     rs = np.random.rand(3, 2) - 0.5
 
     vin = ro + rs * normal(size=(3, 2))
     svin = ro + rs * iid(normal(size=2), 3)
 
-    for fn in fn_list + [cbrt]:
+    for fn in FN_LIST + [gp.cbrt]:
         vout = fn(vin)
         svout = fn(svin)
 
@@ -153,7 +245,7 @@ def test_sparse_linearized_unaries():
     vin = ro + rs * normal(size=(3, 2))
     svin = ro + rs * iid(normal(size=2), 3)
 
-    for fn in fn_list:
+    for fn in FN_LIST:
         vout = fn(vin)
         svout = fn(svin)
 
@@ -168,8 +260,8 @@ def test_sparse_linearized_unaries():
     vin = ro + rs * normal(size=(3, 2))
     svin = ro + rs * iid(normal(size=2), 3)
 
-    vout = arccosh(vin)
-    svout = arccosh(svin)
+    vout = gp.arccosh(vin)
+    svout = gp.arccosh(svin)
 
     assert np.max(np.abs(vout.mean() - svout.mean())) < tol
     assert np.max(np.abs(vout.var() - svout.var())) < tol
@@ -181,8 +273,8 @@ def test_sparse_linearized_unaries():
     vin = ro + rs * normal(size=(3, 2))
     svin = ro + rs * iid(normal(size=2), 3)
 
-    vout = arccosh(vin)
-    svout = arccosh(svin)
+    vout = gp.arccosh(vin)
+    svout = gp.arccosh(svin)
 
     assert np.max(np.abs(vout.mean() - svout.mean())) < tol
     assert np.max(np.abs(vout.var() - svout.var())) < tol

@@ -829,6 +829,12 @@ def arctanh_jmp(x, ans, a): return a / (1 - x**2)
 def conjugate_jmp(x, ans, a): return a.conj()
 
 
+def absolute_jmp(x, ans, a):
+    if np.iscomplexobj(x):
+        return (np.real(x) * np.real(a) + np.imag(x) * np.imag(a)) / ans
+    return np.sign(x) * a
+
+
 exp = linearized_unary(exp_jmp)
 exp2 = linearized_unary(exp2_jmp)
 log = linearized_unary(log_jmp)
@@ -849,3 +855,4 @@ arcsinh = linearized_unary(arcsinh_jmp)
 arccosh = linearized_unary(arccosh_jmp)
 arctanh = linearized_unary(arctanh_jmp)
 conjugate = conj = linearized_unary(conjugate_jmp)
+absolute = abs = linearized_unary(absolute_jmp)
