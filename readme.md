@@ -54,10 +54,13 @@ Have a look at the notebooks in the [examples](examples) folder, starting from t
 
 roughly in this order.
 
-## How many variables?
-General multivariate Gaussian distributions of *n* variables require memory quadratic in *n* for their storage, and computational time cubic in *n* for their exact conditioning. My laptop can typically handle arrays of random variables whose sizes count in thousands.
+## How it works
+There is a supplementary [note](https://safedorov.github.io/gprob-note/) that presents some of the underying theory, especially the theory of inference.
 
-If the Gaussian variables are such that their joint distribution is a direct product of independent distributions, they can be packed into sparse arrays. For those, memory and computational requirements grow linearly with the number of independent distributions, and the total number of variables can be larger. 
+## How many variables it can handle
+General multivariate Gaussian distributions of *n* variables require memory quadratic in *n* for their storage, and computational time cubic in *n* for their exact conditioning. My laptop can typically handle arrays whose sizes count in thousands.
+
+If the Gaussian variables are such that their joint distribution is a direct product, they can be packed into sparse arrays. For those, memory and computational requirements grow linearly with the number of independent distributions, and the total number of variables can be larger. 
 
 ## Acknowledgements
 gprob was inspired by (but works differently from) [GaussianInfer](https://github.com/damast93/GaussianInfer). See the corresponding paper,

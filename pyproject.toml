@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gprob"
-version = "0.7.1"
+version = "1.0.0"
 description = "Probabilistic programming with arrays of Gaussian variables."
 requires-python = ">= 3.9"
 readme = "readme.md"
@@ -30,7 +30,7 @@ keywords = [
     "Scipy",
 ]
 dependencies = [
-    "numpy >= 1.25", 
+    "numpy >= 1.25",
     "scipy",
 ]
 
