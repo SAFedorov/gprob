@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gprob"
-version = "1.0.0"
+version = "1.0.1"
 description = "Probabilistic programming with arrays of Gaussian variables."
 requires-python = ">= 3.9"
 readme = "readme.md"
@@ -40,6 +40,7 @@ Source = "https://github.com/SAFedorov/gprob"
 [tool.setuptools]
 packages=[
     "gprob",
+    "gprob.external"
 ]
 
 [tool.coverage.run]
