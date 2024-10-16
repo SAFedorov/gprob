@@ -3,7 +3,6 @@ import numpy as np
 from numpy.exceptions import ComplexWarning
 import gprob as gp
 from gprob import normal, iid
-from parametric import pnormal
 from utils import random_normal
 
 np.random.seed(0)
@@ -13,6 +12,8 @@ try:
     import jax
     import jax.numpy as jnp
     jax.config.update("jax_enable_x64", True)
+
+    from parametric import pnormal
 
     have_jax = True
 except ImportError:
