@@ -177,6 +177,25 @@ def flip(x, axis=None):
         A new random variable with the same shape as the original and 
         reordered elements.
 
+    Examples:
+    
+        Normal variables.
+
+        >>> x = normal(size=3)
+        >>> cov(x, flip(x))
+        array([[0., 0., 1.],
+               [0., 1., 0.],
+               [1., 0., 0.]])
+
+        Sparse normal variables.
+
+        >>> x = iid(normal(size=2), 3)
+        >>> cov(x, flip(x, axis=1))
+        array([[[0., 0., 0.],
+                [1., 1., 1.]],
+              [[1., 1., 1.],
+                [0., 0., 0.]]])
+
     Note:
         This function is similar to `numpy.flip`.
     """

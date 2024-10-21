@@ -262,8 +262,8 @@ class SparseNormal(Normal):
                              "a tuple of integers.")
 
         if any(self._iaxid[ax] for ax in _normalize_axes(axis, self.ndim)):
-            ValueError("Flipping arrays along their independence axes is "
-                       "not supported.")
+            raise ValueError("Flipping arrays along their independence axes is "
+                             "not supported.")
             
         return _finalize(super().flip(axis), self._iaxid)
         

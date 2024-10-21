@@ -61,7 +61,7 @@ roughly in this order.
 There is a [supplementary note](https://safedorov.github.io/gprob-note/) that presents some of the underying theory, focusing on the theory of inference.
 
 ## On the number of variables
-General multivariate Gaussian distributions of *n* variables require memory quadratic in *n* for their storage and computation time cubic in *n* for their exact conditioning, meaning that the necessary resources increase fast with the random variable size. 
+General multivariate Gaussian distributions of *n* variables require memory quadratic in *n* for their storage and computational time cubic in *n* for their exact conditioning, meaning that the necessary resources increase fast with the size of the random variable. 
 My laptop can typically handle arrays of random variables whose sizes count in thousands.
 
 If the Gaussian variables are such that their joint distribution is a direct product, they can be packed into sparse arrays. For those, memory and computational requirements grow linearly with the number of independent distributions, and the total number of variables can be larger. 

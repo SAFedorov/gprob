@@ -1758,13 +1758,18 @@ def test_flip():
     snv = snv.transpose((2, 0, 3, 1))
     nv = nv.transpose((2, 0, 3, 1))
     
-    check_sparse_vs_normal(snv, nv, axis=1)
-    check_sparse_vs_normal(snv, nv, axis=-1)
-    check_sparse_vs_normal(snv, nv, axis=(-1,))
-    check_sparse_vs_normal(snv, nv, axis=(1, 3))
+    check_sparse_vs_normal(snv, nv, axis=0)
+    check_sparse_vs_normal(snv, nv, axis=-2)
+    check_sparse_vs_normal(snv, nv, axis=(-2,))
+    check_sparse_vs_normal(snv, nv, axis=(0, 2))
 
     # Errors.
     v = iid(normal(size=(2, 3)), 4)
+
+    # Flipping along independence axes is not allowed.
+    with pytest.raises(ValueError) as e:
+        v.flip(axis=0)
+    "independence" in get_message(e)
 
     # Nothing except integers and tuples is allowed as axis.
     with pytest.raises(ValueError):
