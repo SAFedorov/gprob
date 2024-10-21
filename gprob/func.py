@@ -221,8 +221,8 @@ class ConditionError(LinAlgError):
 
 
 def condition(m, a, mc, ac, mask=None):
-    """Conditions one random varaible on another being equal to zero. 
-    The varaible being conditioned and the condition are denoted, respectively, 
+    """Conditions one random variable on another being equal to zero. 
+    The variable being conditioned and the condition are denoted, respectively, 
     by ``v`` and ``c``, and are specified by their Gaussian maps,
 
     v = m + e @ a,

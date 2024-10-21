@@ -303,7 +303,7 @@ class LatentMap:
         return self.__class__(a, b, self.lat)
     
     def diagonal(self, offset=0, axis1=0, axis2=1):
-        """Extracts a diagonal from the varaible.
+        """Extracts a diagonal from the variable.
 
         Args:
             offset (int): 
@@ -339,6 +339,31 @@ class LatentMap:
         
         b = self.b.reshape((-1,), order=order)
         a = self.a.reshape((self.nlat, b.size), order=order)
+        return self.__class__(a, b, self.lat)
+    
+    def flip(self, axis=None):
+        """Reverses the order of elements in the random variable along an axis.
+
+        Args:
+            axis (int, tuple of int, or None):
+                The axis or axes along which to reverse the order. ``None``
+                means all axes.
+
+        Returns:
+            A new random variable with the same shape as the original and 
+            reordered elements. 
+        """
+
+        b = np.flip(self.b, axis)
+
+        if axis is None:
+            axes_b = range(self.ndim)
+        elif isinstance(axis, int):
+            axes_b = (axis,)
+        else:
+            axes_b = axis
+        
+        a = np.flip(self.a, _axes_a(axes_b))
         return self.__class__(a, b, self.lat)
     
     def moveaxis(self, source, destination):
@@ -611,7 +636,7 @@ def complete(seq):
     
     
 def lift(cls, x):
-    """Converts ``x`` to a varaible of class ``cls``. If ``x`` is such 
+    """Converts ``x`` to a variable of class ``cls``. If ``x`` is such 
     a variable already, returns it unchanged. If the conversion cannot be done, 
     raises a ``TypeError``."""
 

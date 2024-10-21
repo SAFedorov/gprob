@@ -163,6 +163,27 @@ def diagonal(x, offset=0, axis1=0, axis2=1):
 
 
 @fallback_to_normal
+def flip(x, axis=None):
+    """Reverses the order of elements in a random variable along an axis.
+
+    Args:
+        x (random variable): 
+            The input array random variable.
+        axis (int, tuple of int, or None):
+            The axis or axes along which to reverse the order. ``None``
+            means all axes.
+
+    Returns:
+        A new random variable with the same shape as the original and 
+        reordered elements.
+
+    Note:
+        This function is similar to `numpy.flip`.
+    """
+    return x.flip(axis=axis)
+
+
+@fallback_to_normal
 def sum(x, axis=None, keepdims=False):
     """Computes the sum of all elements of a random variable along an axis 
     or axes.

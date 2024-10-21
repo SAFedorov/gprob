@@ -13,7 +13,7 @@ from gprob.normal_ import normal, Normal
 from gprob.sparse import (_item_iaxid, iid, _finalize,
                           SparseNormal, SparseConditionWarning, lift)
 
-from utils import random_normal, get_message, assparsenormal
+from utils import random_normal, get_message, asnormal, assparsenormal
 
 
 np.random.seed(0)
@@ -746,7 +746,7 @@ def test_broadcast_to():
     with pytest.raises(ValueError):
         gp.broadcast_to(v, (4, 1))
 
-    # 1 Independence axis.
+    # 1 independence axis.
 
     v = iid(normal(), 4)
     v = gp.reshape(v, (1, 4, 1))
@@ -1198,7 +1198,7 @@ def test_condition():
     check_sparse_vs_normal(snvc, nvc)
     del snvc, nvc
 
-    # The varaible is complex.
+    # The variable is complex.
     nv = sum(nv_list) + 5j * nv_list[1]
     snv = sum(snv_list) + 5j * snv_list[1]
 
@@ -1687,6 +1687,95 @@ def test_flatten_ravel():
             v_ = getattr(v, nm)()
 
 
+def test_flip():
+    def check_sparse_vs_normal(snv, nv, **kwargs):
+        tol = 1e-8
+
+        snv_ = snv.flip(**kwargs)
+        nv_ = nv.flip(**kwargs)
+
+        assert snv_.shape == nv_.shape
+        assert np.max(np.abs(snv_.mean() - nv_.mean())) < tol
+        assert np.max(np.abs(snv_.cov() - 
+                             dense_to_sparse_cov(nv_.cov(), snv_.iaxes))) < tol
+    
+    # 0 independence axes.
+    sz = 3
+    ro = 2 * np.random.rand(sz, 2 * sz) - 1
+    nv = asnormal(ro)
+    snv = assparsenormal(ro)
+
+    check_sparse_vs_normal(snv, nv, axis=0)
+    check_sparse_vs_normal(snv, nv, axis=1)
+    check_sparse_vs_normal(snv, nv, axis=(0, -1))
+
+    sz = 3
+    rs = 2 * np.random.rand(sz, 2 * sz) - 1
+    ro = 2 * np.random.rand(sz, 2 * sz) - 1
+    nv = ro + rs * normal(size=(sz, 2 * sz))
+    snv = assparsenormal(nv)
+
+    check_sparse_vs_normal(snv, nv, axis=0)
+    check_sparse_vs_normal(snv, nv, axis=1)
+    check_sparse_vs_normal(snv, nv, axis=(0, -1))
+
+    # 1 independence axis, 1d dense subspace.
+    sz1, sz2 = 4, 3
+    rs = 2 * np.random.rand(sz1, sz2) - 1
+    ro = 2 * np.random.rand(sz1, sz2) - 1
+    rn = random_normal((sz2,))
+    snv = ro + rs * iid(rn, sz1)
+    nv = gp.stack([o + s * rn for o, s in zip(ro, rs)])
+    
+    check_sparse_vs_normal(snv, nv, axis=1)
+    check_sparse_vs_normal(snv, nv, axis=-1)
+    check_sparse_vs_normal(snv, nv, axis=(1,))
+
+    # 1 independence axis, 2d dense subspace.
+    sz1, sz2, sz3 = 4, 3, 5
+    rs = 2 * np.random.rand(sz1, sz2, sz3) - 1
+    ro = 2 * np.random.rand(sz1, sz2, sz3) - 1
+    rn = random_normal((sz2, sz3))
+    snv = ro + rs * iid(rn, sz1)
+    nv = gp.stack([o + s * rn for o, s in zip(ro, rs)])
+
+    snv = snv.transpose((1, 0, 2))
+    nv = nv.transpose((1, 0, 2))
+    
+    check_sparse_vs_normal(snv, nv, axis=0)
+    check_sparse_vs_normal(snv, nv, axis=-1)
+    check_sparse_vs_normal(snv, nv, axis=(0, 2))
+
+    # 2 independence axes, 2d dense subspace.
+    sz1, sz2, sz3, sz4 = 4, 3, 5, 2
+    rs = 2 * np.random.rand(sz1, sz2, sz3, sz4) - 1
+    ro = 2 * np.random.rand(sz1, sz2, sz3, sz4) - 1
+    rn = random_normal((sz3, sz4))
+    snv = ro + rs * iid(iid(rn, sz2), sz1)
+    nv = gp.stack([gp.stack([o + s * rn for o, s in zip(ro_, rs_)]) 
+                   for ro_, rs_ in zip(ro, rs)])
+
+    snv = snv.transpose((2, 0, 3, 1))
+    nv = nv.transpose((2, 0, 3, 1))
+    
+    check_sparse_vs_normal(snv, nv, axis=1)
+    check_sparse_vs_normal(snv, nv, axis=-1)
+    check_sparse_vs_normal(snv, nv, axis=(-1,))
+    check_sparse_vs_normal(snv, nv, axis=(1, 3))
+
+    # Errors.
+    v = iid(normal(size=(2, 3)), 4)
+
+    # Nothing except integers and tuples is allowed as axis.
+    with pytest.raises(ValueError):
+        v.flip(axis=range(2))
+
+    # None is not allowed, and produces its own error message.
+    with pytest.raises(ValueError) as e:
+        v.flip(axis=None)
+    assert "None" in get_message(e)
+
+
 def test_moveaxis():
     v = iid(iid(normal(size=(4, 6, 5)), 2, axis=1), 3, axis=1)
     # v.shape is (4, 3, 2, 6, 5), v.iaxes are (1, 2)
@@ -2101,9 +2190,14 @@ def test_sum():
     with pytest.raises(ValueError):
         v.sum(axis=(0, 2))
 
-    # None is not allowed.
+    # Nothing except integers and tuples is allowed as axis.
     with pytest.raises(ValueError):
+        v.sum(axis=range(1))
+
+    # None is not allowed, and produces its own error message.
+    with pytest.raises(ValueError) as e:
         v.sum(axis=None)
+    assert "None" in get_message(e)
 
     # Axes out of bound.
     with pytest.raises(AxisError):

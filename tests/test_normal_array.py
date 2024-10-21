@@ -6,7 +6,7 @@ import pytest
 from gprob import maps
 from gprob import (normal,
                    stack, hstack, vstack, dstack, concatenate,
-                   split, hsplit, vsplit, dsplit, squeeze,
+                   split, hsplit, vsplit, dsplit, squeeze, flip,
                    sum, cumsum, trace, diagonal, reshape, moveaxis, ravel, 
                    transpose, add, subtract, multiply, divide, power, 
                    einsum, dot, matmul, inner, outer, kron, tensordot)
@@ -178,6 +178,16 @@ def test_ravel():
     x = normal(size=(2, 2))
     with pytest.raises(ValueError):
         ravel(x, order="A")
+
+
+def test_flip():
+    _test_array_func(flip)
+    _test_array_func(flip, axis=0, test_shapes="1dmin")
+    _test_array_func(flip, axis=2, test_shapes="3dmin")
+    _test_array_func(flip, axis=-2, test_shapes="2dmin")
+    _test_array_func(flip, axis=(1, 0), test_shapes="2dmin")
+    _test_array_func(flip, axis=(-1, 0), test_shapes="2dmin")
+    _test_array_func(flip, axis=(-1, -3), test_shapes="3dmin")
 
 
 def test_transpose():

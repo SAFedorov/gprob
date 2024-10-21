@@ -252,6 +252,22 @@ class SparseNormal(Normal):
                          "all their dimensions except maybe one have size <=1, "
                          "or they have no independence axes.")
     
+    def flip(self, axis):
+        if not isinstance(axis, int) and not isinstance(axis, tuple):
+            if axis is None:
+                raise ValueError("`None` axis value is not supported "
+                                 "for sparse normal variables.")
+
+            raise ValueError("`axis` must be an integer or "
+                             "a tuple of integers.")
+
+        if any(self._iaxid[ax] for ax in _normalize_axes(axis, self.ndim)):
+            ValueError("Flipping arrays along their independence axes is "
+                       "not supported.")
+            
+        return _finalize(super().flip(axis), self._iaxid)
+        
+    
     def moveaxis(self, source, destination):
         source = _normalize_axis(source, self.ndim)
         destination = _normalize_axis(destination, self.ndim)
@@ -359,6 +375,10 @@ class SparseNormal(Normal):
         """
 
         if not isinstance(axis, int) and not isinstance(axis, tuple):
+            if axis is None:
+                raise ValueError("`None` axis value is not supported "
+                                 "for sparse normal variables.")
+
             raise ValueError("`axis` must be an integer or "
                              "a tuple of integers.")
             # None, the default value for non-sparse arrays, is not supported,
@@ -505,7 +525,7 @@ class SparseNormal(Normal):
         tol = np.finfo(r.dtype).eps
         if (dia_r < (tol * np.max(dia_r))).any():
             raise ConditionError("Degenerate conditions are not supported "
-                                 "for sparse varaibles.")
+                                 "for sparse variables.")
 
         t_ax = tuple(range(niax)) + (-1, -2)
 
@@ -733,6 +753,12 @@ def _normalize_axis(axis, ndim):
 def _normalize_axes(axes, ndim):
     """Ensures that the axes indices are positive, within the array dimension,
     and without duplicates.
+
+    Args:
+        axes (int, iterable of int):
+            The axes index or indices to be normalized.
+        ndim (int):
+            The number of dimensions in the indexed array.
 
     Returns:
         Tuple: positive axes indices.

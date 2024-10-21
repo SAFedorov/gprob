@@ -194,10 +194,10 @@ class Normal(LatentMap):
                 The number of samples.
         
         Returns:
-            A single sample with the same shape as the varaible if ``n`` 
+            A single sample with the same shape as the variable if ``n`` 
             is ``None``, or an array of samples of the lenght ``n`` if ``n`` 
             is an integer, in which case the total shape of the array is 
-            the shape of the varaible plus ``(n,)`` prepended as 
+            the shape of the variable plus ``(n,)`` prepended as 
             the first dimension.
 
         Examples:
