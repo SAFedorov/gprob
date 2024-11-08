@@ -645,6 +645,8 @@ class SparseNormal(Normal):
         delta_x = x - self.mean()
         validate_logp_samples(self, delta_x)
 
+        batch_dim = delta_x.ndim - self.ndim
+
         if self.iscomplex:
             delta_x = np.stack([delta_x.real, delta_x.imag], axis=-1)
             self = stack(SparseNormal, [self.real, self.imag], axis=-1)
@@ -663,45 +665,19 @@ class SparseNormal(Normal):
         
         # In the remaining, the dimensionality of the dense subspace is >= 1.
 
-        batch_dim = delta_x.ndim - self.ndim
-        if not batch_dim:
-            delta_x = delta_x[None, ...]
-
-        nsamples = len(delta_x)
-
         # Moves the sparse axes to the beginning and the batch axis to the end.
-        sparse_ax = [i + 1 for i, b in enumerate(self._iaxid) if b]
-        dense_ax = [i + 1 for i, b in enumerate(self._iaxid) if not b]
-
-        delta_x = delta_x.transpose(tuple(sparse_ax + dense_ax + [0]))
-
-        # Covariance with the sparse axes first.
-        cov = self.cov()
-        t = tuple(range(cov.ndim))        
-        cov = cov.transpose(t[cov.ndim - niax:] + t[:cov.ndim - niax])
-
-        # Flattens the dense subspace.
-        dense_sh = [n for n, i in zip(self.shape, self._iaxid) if not i]
-        dense_sz = reduce(mul, dense_sh, 1)
-
-        cov = cov.reshape(cov.shape[:niax] + (dense_sz, dense_sz))
-
-        new_x_sh = delta_x.shape[:niax] + (dense_sz,) + (nsamples,)
-        delta_x = delta_x.reshape(new_x_sh)
+        delta_x, cov = _flatten_sdb(delta_x, self.cov(), self._iaxid)
 
         ltr = np.linalg.cholesky(cov)
         z = np.linalg.solve(ltr, delta_x)
 
         if not batch_dim:
             z = z.squeeze(-1)
-        
-        sparse_sz = self.size // dense_sz
-        rank = cov.shape[-1] * sparse_sz  # The rank is full.
-        log_sqrt_det = np.sum(np.log(np.diagonal(ltr, axis1=-1, axis2=-2)))
-        norm = 0.5 * np.log(2 * np.pi) * rank + log_sqrt_det
 
-        idx = "".join([einsubs.get_symbol(i) for i in range(niax + 1)])
-        return -0.5 * np.einsum(f"{idx}..., {idx}... -> ...", z, z) - norm
+        log_sqrt_det = np.sum(np.log(np.diagonal(ltr, axis1=-1, axis2=-2)))
+        norm = 0.5 * np.log(2 * np.pi) * self.size + log_sqrt_det
+
+        return -0.5 * np.einsum("ij..., ij... -> ...", z, z) - norm
 
 
 def _finalize(x, iaxid):
@@ -789,7 +765,7 @@ def _normalize_axes(axes, ndim):
 
 def _validate_iaxid(seq):
     """Checks that the independence axes of the sparse normal arrays in ``seq``
-    are compatible.
+    are identical for the broadcasted shapes.
     
     Returns:
         ``iaxid`` of the final shape for the broadcasted arrays.
@@ -920,7 +896,48 @@ def _item_iaxid(x, key):
     
     # Returns iaxid for the indexing result.
     return tuple([None if ax is None else x._iaxid[ax] for ax in out_axs])
+
+
+def _flatten_sdb(u, w, iaxid):
+    """ Transforms the arrays ``u`` and ``w`` so that they have flattened 
+    sparse-dense-batch sub-dimensions in this order.
+
+    Args:
+        u: An array shaped as some variable's mean with an option batch axis
+            prepended in the beginning of the shape. If ``u`` has no batch axis, 
+            a batch axis of size 1 is added.
+        w: An array shaped as the variable's covariance.
     
+    Returns:
+        Tuple: (u, w), where 
+        the shape of u is (sparse_sz, dense_sz, batch_sz), and 
+        the shape of w is (sparse_sz, dense_sz, dense_sz).
+    """
+
+    if u.ndim == len(iaxid):
+        u = u[None, ...]
+
+    sparse_ax = [i + 1 for i, b in enumerate(iaxid) if b]
+    dense_ax = [i + 1 for i, b in enumerate(iaxid) if not b]
+
+    sparse_sh = [n for n, i in zip(u.shape[1:], iaxid) if i]
+    dense_sh = [n for n, i in zip(u.shape[1:], iaxid) if not i]
+
+    sparse_sz = reduce(mul, sparse_sh, 1)
+    dense_sz = reduce(mul, dense_sh, 1)
+
+    # Moves the sparse axes to the beginning and the batch axis to the end.
+    u = np.transpose(u, tuple(sparse_ax + dense_ax + [0]))
+
+    # Flattens separately the dense and sparse subspaces.
+    u = np.reshape(u, (sparse_sz, dense_sz, u.shape[-1]))
+
+    # Covariance with the sparse axes first.
+    w = np.reshape(w, (dense_sz, dense_sz, sparse_sz))
+    w = np.transpose(w, (2, 0, 1))  # TODO: make contigious? -----------------------------------------
+
+    return u, w
+
 
 def cov(x, y):
     """The sparse implementation of the covariance between two variables."""
@@ -1030,6 +1047,37 @@ def cov(x, y):
     subs = f"{''.join(in_symb1)},{''.join(in_symb2)}->{''.join(out_symb)}"
     _, [ax, ay] = complete([x, y])
     return np.einsum(subs, ax, ay.conj())
+
+
+def dkl(x, y):
+    """The sparse implementation of the the Kullback-Leibler divergence 
+    between two variables."""
+
+    iaxid = _validate_iaxid([x, y])
+
+    m1, cov1 = _flatten_sdb(x.mean(), x.cov(), iaxid)
+    m2, cov2 = _flatten_sdb(y.mean(), y.cov(), iaxid)
+
+    dm = m1 - m2
+
+    try:
+        ltr2 = np.linalg.cholesky(cov2)
+        z = np.linalg.solve(ltr2, dm)
+    except LinAlgError:
+        raise ValueError("The second distribution is degenerate.")
+    
+    zdot = np.einsum("ijk, ijk -> ", z, z)
+
+    try:
+        ltr1 = np.linalg.cholesky(cov1)
+    except LinAlgError:
+        return float("-inf")
+
+    s = np.linalg.solve(ltr2, ltr1)
+    strace = np.einsum("ijk, ijk ->", s, s)
+    
+    log_det = 2 * np.sum(np.log(np.diagonal(ltr2, axis1=-1, axis2=-2)))
+    return 0.5 * (strace + zdot - log_det - dm.size)
 
 
 class SparseConditionWarning(RuntimeWarning):

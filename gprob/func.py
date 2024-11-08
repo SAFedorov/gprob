@@ -44,6 +44,44 @@ def fisher(cov, dm, dcov):
     return dm @ cov_inv @ dm.T + 0.5 * prod2
 
 
+def dkl(m1, cov1, m2, cov2):
+    """Calculates the Kullback-Leibler divergence between two normal 
+    distributions of the same size.
+
+    Args:
+        m1: The mean vector of the first distribution, (n,).
+        cov1: The covariance matrix of the first distribution, (n, n), 
+            can be degenerate.
+        m2: The mean vector of the second distribution, (n,).
+        cov2: The covariance matrix of the second distribution, (n, n), 
+            non-degenerate.
+    
+    Returns:
+        The divergence, a scalar number.
+    """
+
+    dm = m1 - m2
+
+    try:
+        ltr2, _ = sp.linalg.cho_factor(cov2, check_finite=False, lower=True)
+        z = sp.linalg.solve_triangular(ltr2, dm, check_finite=False, lower=True)
+    except LinAlgError:
+        raise ValueError("The second distribution is degenerate.") 
+
+    try:
+        ltr1 = sp.linalg.cholesky(cov1, check_finite=False)
+        # Here, we use cholesky and not cho_factor because further we need
+        # the full matrix, not only its lower triangular part.
+    except LinAlgError:
+        return float("-inf")
+
+    s = sp.linalg.solve_triangular(ltr2, ltr1, check_finite=False, lower=True)
+    strace = np.einsum("ij, ij -> ", s, s)
+    
+    log_det = 2 * np.sum(np.log(np.diagonal(ltr2)))
+    return 0.5 * (strace + z @ z - log_det - len(dm))
+
+
 def dlogp(x, m, cov, dm, dcov):
     """Calculates the derivatives of the logarithmic probability density of 
     an n-dimensional normal distribution depending on k parameters with 

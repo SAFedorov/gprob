@@ -11,6 +11,7 @@ from .maps import (LatentMap, complete, lift, match_, concatenate, stack,
     kron_1, kron_2, complete_tensordot_axes, tensordot_1, tensordot_2, a2d)
 
 from .func import condition, logp
+from .func import dkl as dkl_
 
 
 class Normal(LatentMap):
@@ -405,3 +406,27 @@ def cov(x, y):
     _, [ax, ay] = complete([x.ravel(), y.ravel()])
     cov2d = ax.T @ ay.conj()
     return cov2d.reshape(x.shape + y.shape)
+
+
+def dkl(x, y):
+    """The normal implementation of the Kullback-Leibler divergence."""
+
+    m_x = x.b.ravel()
+    m_y = y.b.ravel()
+
+    a_x = a2d(x)
+    a_y = a2d(y)
+
+    if x.iscomplex or y.iscomplex:
+        # Converts to real by doubling the space size.
+
+        m_x = np.concatenate([m_x.real, m_x.imag])
+        m_y = np.concatenate([m_y.real, m_y.imag])
+
+        a_x = np.concatenate([a_x.real, a_x.imag], axis=-1)
+        a_y = np.concatenate([a_y.real, a_y.imag], axis=-1)
+    
+    cov_x = a_x.T @ a_x 
+    cov_y = a_y.T @ a_y
+
+    return dkl_(m_x, cov_x, m_y, cov_y)

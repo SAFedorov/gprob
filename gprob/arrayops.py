@@ -139,6 +139,42 @@ def cov(*args):
     return mod.cov(*args)  # len(args) == 2.
 
 
+def dkl(x, y):
+    """Kullback-Leibler divergence between two random variables.
+    
+    Args:
+        x: The first random variable.
+        y: The second random variable, must be non-degenerate and have the 
+            same shape as ``x``.
+
+    Returns:
+        Divergence: a scalar number.
+
+    Raises:
+        ValueError:
+            If the second input variable has a degenerate covariance matrix, 
+            or if the shapes of the input variables are not the same.
+    """
+
+    mod, cls = resolve([x, y])
+    
+    x, x_is_numeric = mod.match_(cls, x)
+    y, y_is_numeric = mod.match_(cls, y)
+    
+    if x.shape != y.shape:
+        raise ValueError("The input variables have mismatching shapes: "
+                         f"{x.shape} and {y.shape}.")
+
+    if y_is_numeric:
+        raise ValueError("The second random variable is a numeric constant "
+                         "and hence has a degenerate distribution.")
+    
+    if x_is_numeric:
+        return float("-inf")
+
+    return mod.dkl(x, y)
+
+
 @fallback_to_normal
 def diagonal(x, offset=0, axis1=0, axis2=1):
     """Extracts a diagonal from a multi-dimensional random variable.

@@ -7,7 +7,7 @@ from . import sparse
 
 from .normal_ import Normal, normal
     
-from .arrayops import (icopy, mean, var, cov, 
+from .arrayops import (icopy, mean, var, cov, dkl,
     broadcast_to, stack, hstack, vstack, dstack, concatenate,
     split, hsplit, vsplit, dsplit, sum, cumsum, trace, diagonal, reshape, flip,
     squeeze, moveaxis, ravel, transpose, add, subtract, multiply, divide, power, 
