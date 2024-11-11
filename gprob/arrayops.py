@@ -141,6 +141,8 @@ def cov(*args):
 
 def dkl(x, y):
     """Kullback-Leibler divergence between two random variables.
+
+    D_KL(p_x || p_y)
     
     Args:
         x: The first random variable.
@@ -171,6 +173,10 @@ def dkl(x, y):
     
     if x_is_numeric:
         return float("-inf")
+    
+    if x.iscomplex or y.iscomplex:
+        x = mod.stack(cls, [x.real, x.imag], axis=-1)
+        y = mod.stack(cls, [y.real, y.imag], axis=-1)
 
     return mod.dkl(x, y)
 

@@ -48,6 +48,8 @@ def dkl(m1, cov1, m2, cov2):
     """Calculates the Kullback-Leibler divergence between two normal 
     distributions of the same size.
 
+    D_KL(p_1 || p_2)
+
     Args:
         m1: The mean vector of the first distribution, (n,).
         cov1: The covariance matrix of the first distribution, (n, n), 
@@ -69,7 +71,7 @@ def dkl(m1, cov1, m2, cov2):
         raise ValueError("The second distribution is degenerate.") 
 
     try:
-        ltr1 = sp.linalg.cholesky(cov1, check_finite=False)
+        ltr1 = sp.linalg.cholesky(cov1, check_finite=False, lower=True)
         # Here, we use cholesky and not cho_factor because further we need
         # the full matrix, not only its lower triangular part.
     except LinAlgError:
@@ -78,7 +80,7 @@ def dkl(m1, cov1, m2, cov2):
     s = sp.linalg.solve_triangular(ltr2, ltr1, check_finite=False, lower=True)
     strace = np.einsum("ij, ij -> ", s, s)
     
-    log_det = 2 * np.sum(np.log(np.diagonal(ltr2)))
+    log_det = 2 * np.sum(np.log(np.diagonal(ltr1)) - np.log(np.diagonal(ltr2)))
     return 0.5 * (strace + z @ z - log_det - len(dm))
 
 

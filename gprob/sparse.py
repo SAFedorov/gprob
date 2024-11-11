@@ -900,7 +900,7 @@ def _item_iaxid(x, key):
 
 def _flatten_sdb(u, w, iaxid):
     """ Transforms the arrays ``u`` and ``w`` so that they have flattened 
-    sparse-dense-batch sub-dimensions in this order.
+    sparse, dense and batch sub-dimensions in this order.
 
     Args:
         u: An array shaped as some variable's mean with an option batch axis
@@ -934,7 +934,7 @@ def _flatten_sdb(u, w, iaxid):
 
     # Covariance with the sparse axes first.
     w = np.reshape(w, (dense_sz, dense_sz, sparse_sz))
-    w = np.transpose(w, (2, 0, 1))  # TODO: make contigious? -----------------------------------------
+    w = np.transpose(w, (2, 0, 1))
 
     return u, w
 
@@ -1076,7 +1076,8 @@ def dkl(x, y):
     s = np.linalg.solve(ltr2, ltr1)
     strace = np.einsum("ijk, ijk ->", s, s)
     
-    log_det = 2 * np.sum(np.log(np.diagonal(ltr2, axis1=-1, axis2=-2)))
+    log_det = 2 * np.sum(np.log(np.diagonal(ltr1, axis1=-1, axis2=-2))
+                         - np.log(np.diagonal(ltr2, axis1=-1, axis2=-2)))
     return 0.5 * (strace + zdot - log_det - dm.size)
 
 

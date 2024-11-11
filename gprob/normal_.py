@@ -336,7 +336,7 @@ def normal(mu=0., sigmasq=1., size=None):
         sigma = np.sqrt(sigmasq)
     
         if mu.ndim == 0:
-            if not size:
+            if size is None:
                 return Normal(sigma[None], mu)  # expanding sigma to 1d
             elif isinstance(size, int):
                 b = np.broadcast_to(mu, (size,))
@@ -411,22 +411,7 @@ def cov(x, y):
 def dkl(x, y):
     """The normal implementation of the Kullback-Leibler divergence."""
 
-    m_x = x.b.ravel()
-    m_y = y.b.ravel()
+    x = x.ravel()
+    y = y.ravel()
 
-    a_x = a2d(x)
-    a_y = a2d(y)
-
-    if x.iscomplex or y.iscomplex:
-        # Converts to real by doubling the space size.
-
-        m_x = np.concatenate([m_x.real, m_x.imag])
-        m_y = np.concatenate([m_y.real, m_y.imag])
-
-        a_x = np.concatenate([a_x.real, a_x.imag], axis=-1)
-        a_y = np.concatenate([a_y.real, a_y.imag], axis=-1)
-    
-    cov_x = a_x.T @ a_x 
-    cov_y = a_y.T @ a_y
-
-    return dkl_(m_x, cov_x, m_y, cov_y)
+    return dkl_(x.mean(), x.cov(), y.mean(), y.cov())
