@@ -3,11 +3,13 @@ import numpy as np
 from scipy.stats import multivariate_normal as mvn
 
 from gprob import normal, hstack
-from gprob.func import logp, logp_lstsq, dlogp, d2logp, fisher
+from gprob.func import logp, logp_lstsq, dlogp, d2logp, fisher, dkl
 
 from reffunc import logp as logp_
 from reffunc import dlogp_eigh as dlogp_
 from reffunc import d2logp as d2logp_
+from reffunc import dkl as dkl_
+from reffunc import dkl_qr
 
 
 np.random.seed(0)
@@ -60,28 +62,44 @@ def num_d2logp(x, m, cov, dm, dcov, d2m, d2cov, delta=1e-10):
 
 
 def random_d(sz):
-    """Random covariance matrix, mean, and sample."""
+    """Random arrays for testing formulas involving a distribution, defined by 
+    its mean and covariance, and a sample.
+    
+    Returns:
+        Tuple: (x, m, cov) - sample, mean, and covariance.
+    """
+
     mat1 = 2 * np.random.rand(sz, sz) - 1
     msq1 = mat1 @ mat1.T
     
     v = 2 * np.random.rand(sz) - 1
     v1 = 2 * np.random.rand(sz) - 1
 
-    return v, v1, msq1  # x, m, cov
+    return v, v1, msq1
 
 
 def random_d1(sz, npar):
-    """Random matrices for testing formulas using 1st derivatives."""
+    """Random arrays for testing formulas involving the 1st derivatives 
+    of the mean and covariance.
+    
+    Returns:
+        Tuple: (x, m, cov, dm, dcov)
+    """
 
     mat2 = 2 * np.random.rand(npar, sz, sz) - 1
     msq2 = np.einsum('ijk, ilk -> ijl', mat2, mat2)
     v2 = 2 * np.random.rand(npar, sz) - 1
 
-    return random_d(sz) + (v2, msq2)  # x, m, cov, dm, dcov
+    return random_d(sz) + (v2, msq2)
 
 
 def random_d2(sz, npar):
-    """Random matrices for testing formulas using 2nd derivatives."""
+    """Random arrays for testing formulas involving the 2nd derivatives 
+    of the mean and covariance.
+    
+    Returns:
+        Tuple: (x, m, cov, dm, dcov, d2m, d2cov)
+    """
 
     mat3 = 2 * np.random.rand(npar, npar, sz, sz) - 1
     msq3 = np.einsum('ijkl, ijrl -> ijkr', mat3, mat3)
@@ -90,7 +108,7 @@ def random_d2(sz, npar):
     v3 = 2 * np.random.rand(npar, npar, sz) - 1
     v3 = v3.transpose(1, 0, 2) + v3  # Symmetrizes the Hessian of cov
 
-    return random_d1(sz, npar) + (v3, msq3)  # x, m, cov, dm, dcov, d2m, d2cov
+    return random_d1(sz, npar) + (v3, msq3)
 
 
 def test_logp():
@@ -238,6 +256,67 @@ def test_fisher():
     fi = fisher(msq1, v2, msq2)
 
     assert np.mean(np.abs((fi - dllk.T @ dllk / ns) / np.abs(fi))) < 0.2
+
+
+def test_dkl():
+    def dkl_diag(m1, cov_diag1, m2, cov_diag2):
+        # D_KL when both covariance matrices are diagonal.
+        return (-len(m1) + np.sum((cov_diag1 + (m1 - m2) ** 2) / cov_diag2 
+                                  - np.log(cov_diag1) + np.log(cov_diag2))) / 2
+        
+    for sz in [1, 5, 200]:
+        # Tests against the reference functions.
+        tol = 1e-9
+
+        _, m1, cov1 = random_d(sz)
+        _, m2, cov2 = random_d(sz)
+
+        val = dkl(m1, cov1, m2, cov2)
+        ref = dkl_(m1, cov1, m2, cov2)
+        assert np.abs(val / ref - 1) < tol
+
+        # Tests for the diagonal case.
+        m1 = 2 * np.random.rand(sz) - 1
+        m2 = 2 * np.random.rand(sz) - 1
+
+        cov_diag1 = (2 * np.random.rand(sz) - 1) ** 2
+        cov_diag2 = (2 * np.random.rand(sz) - 1) ** 2
+
+        cov1 = np.diag(cov_diag1)
+        cov2 = np.diag(cov_diag2)
+
+        val = dkl(m1, cov1, m2, cov2)
+        ref = dkl_diag(m1, cov_diag1, m2, cov_diag2)
+        assert np.abs(val / ref - 1) < tol
+
+        # Calculation of the Fisher information.
+        tol = 1e-5
+        delta = 1e-5
+
+        m = 2 * np.random.rand(sz) - 1
+        dm = 2 * np.random.rand(sz) - 1
+
+        a = 2 * np.random.rand(sz, sz) - 1
+        da = 2 * np.random.rand(sz, sz) - 1
+
+        m1 = m + delta * dm
+        m2 = m - delta * dm
+
+        a1 = a + delta * da
+        a2 = a - delta * da
+
+        cov = a.T @ a
+        cov1 = a1.T @ a1
+        cov2 = a2.T @ a2
+
+        dcov = (a.T @ da + da.T @ a)
+
+        dcov = dcov[None, ...]
+        dm = dm[None, ...]
+
+        fi = fisher(cov, dm, dcov)[0, 0]
+        fi_num = (dkl(m, cov, m1, cov1) + dkl(m, cov, m2, cov2)) / delta**2
+        assert np.abs(1 - fi_num / fi) < tol
 
 
 def test_logp_batch():

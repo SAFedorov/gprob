@@ -15,6 +15,38 @@ def fisher(cov, dm, dcov):
     return dm @ cov_inv @ dm.T + 0.5 * prod2
 
 
+def dkl(m1, cov1, m2, cov2):
+    term1   = np.trace(np.linalg.solve(cov2, cov1))
+
+    dm = m2 - m1
+    term2 = dm.T @ np.linalg.solve(cov2, dm)
+
+    _, logdet1 = np.linalg.slogdet(cov1)
+    _, logdet2 = np.linalg.slogdet(cov2)
+
+    return (term1 + term2 + logdet2 - logdet1 - len(dm)) / 2
+
+
+def dkl_qr(m1, a1, m2, a2):
+    # KL divergence using the qr decomposition of the map matrices rather than
+    # the Cholesky decomposition of the covariances. About 2 times slower than 
+    # the Cholesky-based approach, but can be more precise sometimes. 
+
+    dm = m1 - m2
+
+    _, r1 = sp.linalg.qr(a1, mode="economic", check_finite=False)
+    _, r2 = sp.linalg.qr(a2, mode="economic", check_finite=False)
+
+    z = sp.linalg.solve_triangular(r2.T, dm, check_finite=False, lower=True)
+
+    s = sp.linalg.solve_triangular(r2.T, r1.T, check_finite=False, lower=True)
+    strace = np.einsum("ij, ij -> ", s, s)
+    
+    log_det = 2 * np.sum(np.log(np.abs(np.diagonal(r1))) 
+                         - np.log(np.abs(np.diagonal(r2))))
+    return 0.5 * (strace + z @ z - log_det - len(dm))
+
+
 def logp(x, m, cov):
     
     # A simple implementation with no batching

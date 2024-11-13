@@ -943,6 +943,134 @@ def test_cov_det():
         gp.cov(np.ones((4, 2, 4, 4)), v)
 
 
+def test_dkl():
+    tol = 1e-7
+    shapes = [tuple(), (2,), (3, 2)]
+
+    for sh in shapes:
+        # Heterogeneous data types.
+        sparse_sz = 3
+        x = iid(random_normal(shape=sh, dtype=np.float64), sparse_sz)
+        y = iid(random_normal(shape=sh, dtype=np.complex128), sparse_sz)
+
+        assert np.isneginf(gp.dkl(x, y))
+
+        with pytest.raises(ValueError) as e:
+            assert np.isneginf(gp.dkl(y, x))
+
+        assert "degenerate" in get_message(e)
+
+        for dt in [np.float64, np.complex128]:
+            xn = random_normal(shape=sh, dtype=dt)
+            yn = random_normal(shape=sh, dtype=dt)
+
+            # No iaxes.
+            x = assparsenormal(xn)
+            y = assparsenormal(yn)
+
+            val = gp.dkl(x, y)
+            ref = gp.dkl(xn, yn)
+            assert np.abs(val / ref - 1) < tol
+
+            x = assparsenormal(xn)
+            y = np.ones(shape=sh)
+
+            with pytest.raises(ValueError) as e:
+                gp.dkl(x, y)
+
+            assert "degenerate" in get_message(e)
+
+            assert np.isneginf(gp.dkl(y, x))
+
+            # One iaxis.
+
+            sparse_sz = 4
+            rs = 2 * np.random.rand(sparse_sz, *sh) - 1
+            ro = 2 * np.random.rand(sparse_sz, *sh) - 1
+            xns = [gp.icopy(o + s * xn) for o, s in zip(ro, rs)]
+            x = ro + rs * iid(xn, sparse_sz)
+
+            rs = 2 * np.random.rand(sparse_sz, *sh) - 1
+            ro = 2 * np.random.rand(sparse_sz, *sh) - 1
+            yns = [gp.icopy(o + s * yn) for o, s in zip(ro, rs)]
+            y = ro + rs * iid(yn, sparse_sz)
+
+            val = gp.dkl(x, y)
+            ref = sum(gp.dkl(xn, yn) for xn, yn in zip(xns, yns))
+            assert np.abs(val / ref - 1) < tol
+
+            # Two iaxes.
+
+            sparse_sz1 = 3
+            sparse_sz2 = 4
+
+            rs = 2 * np.random.rand(sparse_sz1, sparse_sz2, *sh) - 1
+            ro = 2 * np.random.rand(sparse_sz1, sparse_sz2, *sh) - 1
+            xns = [[gp.icopy(o + s * xn) for o, s in zip(ro_, rs_)] 
+                   for ro_, rs_ in zip(ro, rs)]
+            x = ro + rs * iid(iid(xn, sparse_sz2), sparse_sz1)
+
+            rs = 2 * np.random.rand(sparse_sz1, sparse_sz2, *sh) - 1
+            ro = 2 * np.random.rand(sparse_sz1, sparse_sz2, *sh) - 1
+            yns = [[gp.icopy(o + s * yn) for o, s in zip(ro_, rs_)] 
+                   for ro_, rs_ in zip(ro, rs)]
+            y = ro + rs * iid(iid(yn, sparse_sz2), sparse_sz1)
+
+            val = gp.dkl(x, y)
+            ref = sum(gp.dkl(xn, yn) for xn, yn in zip(xns, yns))
+            assert np.abs(val / ref - 1) < tol
+
+            if x.ndim == 4:
+                # Permuting iaxes.
+                x = gp.transpose(x, (2, 0, 1, 3))
+                y = gp.transpose(y, (2, 0, 1, 3))
+                val = gp.dkl(x, y)
+                assert np.abs(val / ref - 1) < tol
+
+                perm_tested = True
+
+            # Mismatching shapes.
+            x = iid(normal(size=(2,)), 3)
+            y = iid(normal(size=(1,)), 3)
+            
+            with pytest.raises(ValueError) as e:
+                gp.dkl(x, y)
+
+            assert "shape" in get_message(e)
+
+            # Mismatching numbers of iaxes.
+            x = normal(size=(3, 2))
+            y = iid(normal(size=(2,)), 3)
+            
+            with pytest.raises(ValueError) as e:
+                gp.dkl(x, y)
+
+            assert "number" in get_message(e)
+            assert "independence axes" in get_message(e)
+
+            # Mismatching locations of iaxes.
+            x = iid(normal(size=(3,)), 2, axis=-1)
+            y = iid(normal(size=(2,)), 3)
+            
+            with pytest.raises(ValueError) as e:
+                gp.dkl(x, y)
+
+            assert "location" in get_message(e)
+            assert "independence axes" in get_message(e)
+
+            # Mismatching orders of iaxes.
+            x = iid(iid(normal(size=(3,)), 2), 4, axis=-1)  # (2, 3, 4)
+            y = iid(iid(normal(size=(3,)), 4, axis=-1), 2)  # also (2, 3, 4)
+            
+            with pytest.raises(ValueError) as e:
+                gp.dkl(x, y)
+
+            assert "order" in get_message(e)
+            assert "independence axes" in get_message(e)
+    
+    assert perm_tested
+
+
 def test_sample():
     v = assparsenormal(1)
     assert v.sample().shape == v.shape

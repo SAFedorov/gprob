@@ -3,10 +3,11 @@ import numpy as np
 from scipy.stats import multivariate_normal as mvn
 from numpy.linalg import LinAlgError
 from numpy.exceptions import ComplexWarning
-from gprob import hstack, vstack, icopy, broadcast_to, cov
+from gprob import stack, hstack, vstack, icopy, broadcast_to, cov, dkl
 from gprob.normal_ import normal, Normal, safer_cholesky
 from gprob.sparse import iid
-from utils import random_normal, random_correlate, asnormal
+from utils import random_normal, random_correlate, asnormal, get_message
+from reffunc import dkl_qr
 
 np.random.seed(0)
 
@@ -59,6 +60,11 @@ def test_creation():
     xi = normal(0, 0)
     assert (xi.a == np.array([0.])).all()
     assert (xi.b == np.array(0.)).all()
+
+    # Zero size.
+    xi = normal(size=0)
+    assert xi.a.size == 0
+    assert xi.b.size == 0
 
     # Creation from a full-rank real covariance matrix.
     cov = [[2.1, 0.5], [0.5, 1.3]]
@@ -1375,6 +1381,101 @@ def test_cov_func():
         # Too many input arguments.
         with pytest.raises(TypeError):
             cov(normal(), normal(), normal())
+
+
+def test_dkl():
+    tol = 1e-7
+
+    shapes = [tuple(), (3,), (2, 3), (2, 4, 3, 5)]
+    wrong_sh = (2, 2)  # does not coincide with any of the shapes
+
+    for sh in shapes:
+        # Regular cases.
+
+        # Real-real.
+        x = random_normal(shape=sh, dtype=np.float64)
+        y = random_normal(shape=sh, dtype=np.float64)
+        val = dkl(x, y)
+
+        x_ = x.ravel()
+        y_ = y.ravel()
+        ref = dkl_qr(x_.b, x_.a, y_.b, y_.a)
+
+        assert np.abs(val / ref - 1) < tol
+
+        # Complex-complex.
+        x = random_normal(shape=sh, dtype=np.complex128)
+        y = random_normal(shape=sh, dtype=np.complex128)
+        val = dkl(x, y)
+
+        x_ = x.ravel()
+        x_ = hstack([x_.imag, x_.real])
+        y_ = y.ravel()
+        y_ = hstack([y_.imag, y_.real])
+        ref = dkl_qr(x_.b, x_.a, y_.b, y_.a)
+
+        assert np.abs(val / ref - 1) < tol
+
+        # Heterogeneous data types.
+        x = random_normal(shape=sh, dtype=np.float64)
+        y = random_normal(shape=sh, dtype=np.complex128)
+
+        assert np.isneginf(dkl(x, y))
+
+        with pytest.raises(ValueError) as e:
+            assert np.isneginf(dkl(y, x))
+
+        assert "degenerate" in get_message(e)
+
+        for dt in [np.float64, np.complex128]:
+
+            # Additivity for independent distributions.
+            x1 = random_normal(shape=sh, dtype=dt)
+            x2 = random_normal(shape=sh, dtype=dt)
+
+            y1 = random_normal(shape=sh, dtype=dt)
+            y2 = random_normal(shape=sh, dtype=dt)
+
+            val = dkl(stack([x1, x2]), stack([y1, y2]))
+            ref = dkl(x1, y1) + dkl(x2, y2)
+            assert np.abs(val / ref - 1) < tol
+            
+            # Mismatching shapes.
+            x = normal(size=sh)
+            y = normal(size=wrong_sh)
+
+            with pytest.raises(ValueError) as e:
+                dkl(x, y)
+
+            assert "shape" in get_message(e)
+
+            # second distribution is degenerate - numeric constant
+            x = normal(size=sh)
+            y = np.ones(shape=sh)
+
+            with pytest.raises(ValueError) as e:
+                dkl(x, y)
+
+            assert "degenerate" in get_message(e)
+
+            # first distribution is degenerate - numeric constant
+            assert np.isneginf(dkl(y, x))
+
+            # second distribution is degenerate - covariance matrix
+            x = normal(size=sh)
+
+            if x.ndim == 0:
+                y = asnormal(np.ones(shape=sh))
+            else:
+                y = np.ones(shape=sh) + normal(size=x.shape[1:])
+
+            with pytest.raises(ValueError) as e:
+                dkl(x, y)
+
+            assert "degenerate" in get_message(e)
+
+            # first distribution is degenerate - covariance matrix
+            assert np.isneginf(dkl(y, x))
 
 
 def test_icopy():
