@@ -943,6 +943,38 @@ def test_cov_det():
         gp.cov(np.ones((4, 2, 4, 4)), v)
 
 
+def test_std():
+    tol = 1e-9
+
+    shapes = [(3,), (2, 3), (2, 4, 3, 5)]
+
+    for sh in shapes:
+        for dt in [np.float64, np.complex128]:
+            vn = random_normal(sh, dtype=dt)
+
+            v = assparsenormal(vn)
+            assert np.max(np.abs(np.sqrt(v.var()) - v.std())) < tol
+            assert np.max(np.abs(np.sqrt(gp.var(v)) - gp.std(v))) < tol
+
+            v = iid(vn, 4)
+            assert np.max(np.abs(np.sqrt(v.var()) - v.std())) < tol
+            assert np.max(np.abs(np.sqrt(gp.var(v)) - gp.std(v))) < tol
+
+            v = iid(iid(vn, 4), 2)
+            assert np.max(np.abs(np.sqrt(v.var()) - v.std())) < tol
+            assert np.max(np.abs(np.sqrt(gp.var(v)) - gp.std(v))) < tol
+
+            if v.ndim == 4:
+                # Permuting iaxes.
+                v = gp.transpose(v, (2, 0, 1, 3))
+                assert np.max(np.abs(np.sqrt(v.var()) - v.std())) < tol
+                assert np.max(np.abs(np.sqrt(gp.var(v)) - gp.std(v))) < tol
+
+                perm_tested = True
+
+    assert perm_tested
+
+
 def test_dkl():
     tol = 1e-7
     shapes = [tuple(), (2,), (3, 2)]

@@ -3,7 +3,8 @@ import numpy as np
 from scipy.stats import multivariate_normal as mvn
 from numpy.linalg import LinAlgError
 from numpy.exceptions import ComplexWarning
-from gprob import stack, hstack, vstack, icopy, broadcast_to, cov, dkl, entropy
+from gprob import (stack, hstack, vstack, icopy, broadcast_to, var, std, cov, 
+                   dkl, entropy)
 from gprob.normal_ import normal, Normal, safer_cholesky
 from gprob.sparse import iid
 from utils import random_normal, random_correlate, asnormal, get_message
@@ -88,7 +89,7 @@ def test_creation():
     assert (xi.cov() == np.array(cov)).all()
     assert (xi.b == mu).all()
 
-    # High-dimensional covaraince arrays.
+    # High-dimensional covariance arrays.
 
     mu = 0.1 
     sh = (3, 7, 2)
@@ -124,7 +125,7 @@ def test_creation():
     assert (xi.mean() == mu).all()
     assert np.allclose(xi.cov(), cov, rtol=tol, atol=tol)
 
-    # Inputs for the covaraince array with inappropriate shapes.
+    # Inputs for the covariance array with inappropriate shapes.
     with pytest.raises(ValueError):
         normal(0, np.zeros((3,)))
 
@@ -1578,3 +1579,16 @@ def test_icopy():
     assert np.max(np.abs(cov(v, v_))) < tol
     assert np.max(np.abs(v.mean() - v_.mean())) < tol
     assert np.max(np.abs(v.cov() - v_.cov())) < tol
+
+
+def test_std():
+    tol = 1e-9
+
+    shapes = [(3,), (2, 3), (2, 4, 3, 5)]
+
+    for sh in shapes:
+        for dt in [np.float64, np.complex128]:
+            v = random_normal(sh, dtype=dt)
+
+            assert np.max(np.abs(np.sqrt(v.var()) - v.std())) < tol
+            assert np.max(np.abs(np.sqrt(var(v)) - std(v))) < tol

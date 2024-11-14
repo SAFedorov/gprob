@@ -44,6 +44,12 @@ def var(x):
 
 
 @fallback_to_normal
+def std(x):
+    """Standard deviation, ``sqrt(var(x))``."""
+    return x.std()
+
+
+@fallback_to_normal
 def entropy(x):
     """Entropy, ``<log p(x)>``, where ``p`` is the probability density of ``x``.
     """

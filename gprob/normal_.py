@@ -145,8 +145,9 @@ class Normal(LatentMap):
         """Mean.
         
         Returns:
-            An array of the mean values with the same shape as 
-            the random variable.
+            An array of the mean values for the elements of the random 
+            variable. The shape of the array is the same as the shape of 
+            the variable.
         """
         return self.b
 
@@ -155,11 +156,21 @@ class Normal(LatentMap):
         complex conjugation, and ``<...>`` is the expectation value of ``...``.
         
         Returns:
-            An array of the varaince values with the same shape as 
-            the random variable.
+            An array of the variance values for the elements of the random 
+            variable. The shape of the array is the same as the shape of 
+            the variable.
         """
-      
         return np.real(np.einsum("i..., i... -> ...", self.a, self.a.conj()))
+    
+    def std(self):
+        """Standard deviation, ``sqrt(var(x))``.
+        
+        Returns:
+            An array of the standard deviation values for the elements of 
+            the random variable. The shape of the array is the same as 
+            the shape of the variable.
+        """
+        return np.sqrt(self.var())
 
     def cov(self):
         """Covariance, generalizing ``<outer((x-<x>), (x-<x>)^H)>``, 
@@ -377,7 +388,7 @@ def normal(mu=0., sigmasq=1., size=None):
     
     vnd = sigmasq.ndim // 2
     if sigmasq.shape[:vnd] != sigmasq.shape[vnd:]:
-        raise ValueError("The first and the second halves of the covaraince "
+        raise ValueError("The first and the second halves of the covariance "
                          "matrix shape must be identical, while they are "
                          f"{sigmasq.shape[:vnd]} and {sigmasq.shape[vnd:]}.")
     

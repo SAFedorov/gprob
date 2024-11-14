@@ -106,7 +106,7 @@ def test_fallback_to_normal():
 
     excl_names = {"reshape", "moveaxis", "broadcast_to",  # require arguments
                   "split", "hsplit", "vsplit", "dsplit",
-                  "mean", "var", "cov", "entropy"  # always numerical outputs
+                  "mean", "var", "std", "cov", "entropy"  # numerical outputs
                   }
 
     for fn in func_names:
@@ -149,6 +149,8 @@ def test_fallback_to_normal():
 
     assert np.abs(gp.mean(0)) < tol
     assert np.abs(gp.var(0)) < tol
+    assert np.abs(gp.std(0)) < tol
+    assert np.max(np.abs(gp.std([0, 0, 1]))) < tol
     assert np.isneginf(gp.entropy(0))
     assert np.isneginf(gp.entropy([[1, 2], [3, 4]]))
     assert np.max(np.abs(gp.cov(0))) < tol
