@@ -3,7 +3,7 @@ import numpy as np
 from scipy.stats import multivariate_normal as mvn
 from numpy.linalg import LinAlgError
 from numpy.exceptions import ComplexWarning
-from gprob import stack, hstack, vstack, icopy, broadcast_to, cov, dkl
+from gprob import stack, hstack, vstack, icopy, broadcast_to, cov, dkl, entropy
 from gprob.normal_ import normal, Normal, safer_cholesky
 from gprob.sparse import iid
 from utils import random_normal, random_correlate, asnormal, get_message
@@ -1476,6 +1476,78 @@ def test_dkl():
 
             # first distribution is degenerate - covariance matrix
             assert np.isneginf(dkl(y, x))
+
+
+def test_entropy():
+    def num_entropy_1d(x):
+        # One-dimensional formula using numerical integration.
+
+        rng = 7 * np.sqrt(x.var())
+        npt = 10**5
+        grid = np.linspace(-rng + x.mean(), rng + x.mean(), npt)
+        lp = x.logp(grid)
+        return -np.sum(lp * np.exp(lp)) * 2 * rng / (npt - 1)
+
+    tol = 1e-8
+
+    # A scalar variable - test against numerical integration.
+    v = random_normal(tuple())
+    ref = num_entropy_1d(v)
+
+    val = v.entropy()
+    assert np.abs(val / ref - 1) < tol
+
+    val = entropy(v)
+    assert np.abs(val / ref - 1) < tol
+
+    # Degenerate case.
+    v = 1.1 + 0 * normal()
+    assert np.isneginf(v.entropy())
+    assert np.isneginf(entropy(v))
+
+    shapes = [(3,), (2, 3), (2, 4, 3, 5)]
+
+    for sh in shapes:
+        # A real product distribution.
+        rs = (2 * np.random.rand(*sh) - 1)
+        ro = (2 * np.random.rand(*sh) - 1)
+        v = ro + rs * normal(size=sh)
+        ref = sum(num_entropy_1d(v_) for v_ in v.flatten())
+
+        val = v.entropy()
+        assert np.abs(val / ref - 1) < tol
+
+        val = entropy(v)
+        assert np.abs(val / ref - 1) < tol
+
+        # Degenerate product distribution.
+        v_ = stack([v, v])
+        assert np.isneginf(v_.entropy())
+
+        # A complex product distribution.
+        rs = (2 * np.random.rand(*sh) - 1)
+        ro = (2 * np.random.rand(*sh) - 1)
+        vi = ro + rs * normal(size=sh)
+        vc = v + 1j * vi
+        ref += sum(num_entropy_1d(v_) for v_ in vi.flatten())
+
+        val = vc.entropy()
+        assert np.abs(val / ref - 1) < tol
+
+        val = entropy(vc)
+        assert np.abs(val / ref - 1) < tol
+
+        # Degenerate complex product distributions.
+        vc_ = stack([vc, vc])
+        assert np.isneginf(vc_.entropy())
+
+        for dt in [np.float64, np.complex128]:
+            # Test additivity for independent distributions.
+            v1 = random_normal(sh, dtype=dt)
+            v2 = random_normal(sh, dtype=dt)
+            ref = entropy(v1) + entropy(v2)
+            val = entropy(stack([v1, v2]))
+            assert np.abs(val / ref - 1) < tol
 
 
 def test_icopy():

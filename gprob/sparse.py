@@ -640,7 +640,6 @@ class SparseNormal(Normal):
         subs = f"{''.join(in_symb1)},{''.join(in_symb2)}->{''.join(out_symb)}"
         return np.einsum(subs, r, self.a) + self.mean()
         
-
     def logp(self, x):
         delta_x = x - self.mean()
         validate_logp_samples(self, delta_x)
@@ -678,6 +677,14 @@ class SparseNormal(Normal):
         norm = 0.5 * np.log(2 * np.pi) * self.size + log_sqrt_det
 
         return -0.5 * np.einsum("ij..., ij... -> ...", z, z) - norm
+    
+    def entropy(self):
+        if self.iscomplex:
+            self = stack(SparseNormal, [self.real, self.imag], axis=-1)
+        
+        _, cov = _flatten_sdb(self.mean(), self.cov(), self._iaxid)
+        logdet = np.sum(np.linalg.slogdet(cov)[1])
+        return (logdet + (1 + np.log(2 * np.pi)) * self.size) / 2
 
 
 def _finalize(x, iaxid):

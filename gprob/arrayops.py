@@ -43,6 +43,13 @@ def var(x):
     return x.var()
 
 
+@fallback_to_normal
+def entropy(x):
+    """Entropy, ``<log p(x)>``, where ``p`` is the probability density of ``x``.
+    """
+    return x.entropy()
+
+
 def cov(*args):
     """Covariance, generalizing ``<outer((x-<x>), (y-<y>)^H)>``, 
     where `H` denotes conjugate transposition, and ``<...>`` is 

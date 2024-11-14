@@ -106,7 +106,7 @@ def test_fallback_to_normal():
 
     excl_names = {"reshape", "moveaxis", "broadcast_to",  # require arguments
                   "split", "hsplit", "vsplit", "dsplit",
-                  "mean", "var", "cov"  # always produce numerical outputs
+                  "mean", "var", "cov", "entropy"  # always numerical outputs
                   }
 
     for fn in func_names:
@@ -116,7 +116,7 @@ def test_fallback_to_normal():
         f = getattr(gp, fn)
         assert isinstance(f([[1, 2], [2, 3]]), Normal)
 
-    # The separate tests for the cases that require input arguments.
+    # The separate tests for the special cases.
 
     v = gp.reshape([1, 2, 3, 4], (2, 2))
     assert isinstance(v, Normal)
@@ -149,6 +149,8 @@ def test_fallback_to_normal():
 
     assert np.abs(gp.mean(0)) < tol
     assert np.abs(gp.var(0)) < tol
+    assert np.isneginf(gp.entropy(0))
+    assert np.isneginf(gp.entropy([[1, 2], [3, 4]]))
     assert np.max(np.abs(gp.cov(0))) < tol
 
 

@@ -1071,6 +1071,73 @@ def test_dkl():
     assert perm_tested
 
 
+def test_entropy():
+    tol = 1e-7
+    shapes = [tuple(), (2,), (3, 2)]
+
+    for sh in shapes:
+        for dt in [np.float64, np.complex128]:
+            xn = random_normal(shape=sh, dtype=dt)
+
+            # No iaxes.
+            x = assparsenormal(xn)
+
+            ref = gp.entropy(xn)
+            val = gp.entropy(x)
+            assert np.abs(val / ref - 1) < tol
+
+            val = x.entropy()
+            assert np.abs(val / ref - 1) < tol
+
+            x = assparsenormal(np.ones(shape=sh, dtype=dt))
+            assert np.isneginf(x.entropy())
+
+            # One iaxis.
+            sparse_sz = 4
+            rs = 2 * np.random.rand(sparse_sz, *sh) - 1
+            ro = 2 * np.random.rand(sparse_sz, *sh) - 1
+            xns = [gp.icopy(o + s * xn) for o, s in zip(ro, rs)]
+            x = ro + rs * iid(xn, sparse_sz)
+
+            ref = sum(gp.entropy(xn) for xn in xns)
+            val = gp.entropy(x)
+            assert np.abs(val / ref - 1) < tol
+
+            val = x.entropy()
+            assert np.abs(val / ref - 1) < tol
+
+            assert np.isneginf(gp.entropy(gp.stack([x, x])))  # Degenerate case.
+
+            # Two iaxes.
+
+            sparse_sz1 = 3
+            sparse_sz2 = 4
+
+            rs = 2 * np.random.rand(sparse_sz1, sparse_sz2, *sh) - 1
+            ro = 2 * np.random.rand(sparse_sz1, sparse_sz2, *sh) - 1
+            xns = [[gp.icopy(o + s * xn) for o, s in zip(ro_, rs_)] 
+                   for ro_, rs_ in zip(ro, rs)]
+            x = ro + rs * iid(iid(xn, sparse_sz2), sparse_sz1)
+
+            ref = sum(gp.entropy(xn) for xn in xns)
+            val = gp.entropy(x)
+            assert np.abs(val / ref - 1) < tol
+
+            val = x.entropy()
+            assert np.abs(val / ref - 1) < tol
+
+            assert np.isneginf(gp.entropy(gp.stack([x, x])))  # Degenerate case.
+
+            if x.ndim == 4:
+                # Permuting iaxes.
+                x = gp.transpose(x, (2, 0, 1, 3))
+                assert np.abs(x.entropy() / ref - 1) < tol
+
+                perm_tested = True
+
+    assert perm_tested
+
+
 def test_sample():
     v = assparsenormal(1)
     assert v.sample().shape == v.shape

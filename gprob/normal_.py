@@ -255,6 +255,25 @@ class Normal(LatentMap):
         
         cov = a.T @ a 
         return logp(x, m, cov)
+    
+    def entropy(self):
+        """Entropy, ``<log p(x)>``, where ``p`` is the probability density 
+        of the variable values.
+
+        Returns:
+            Scalar value of the distribution entropy.
+        """
+
+        m = self.b.ravel()
+        a = a2d(self)
+
+        if self.iscomplex:
+            m = np.concatenate([m.real, m.imag], axis=-1)
+            a = np.concatenate([a.real, a.imag], axis=-1)
+        
+        cov = a.T @ a
+        logdet = np.linalg.slogdet(cov)[1]
+        return (logdet + (1 + np.log(2 * np.pi)) * len(m)) / 2
 
 
 def print_(x, extra_attrs=tuple()):
