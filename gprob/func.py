@@ -17,6 +17,13 @@ def cholesky_inv(mat):
 def fisher(cov, dm, dcov):
     """Calculates the Fisher information matrix of an n-dimensional normal
     distribution depending on k parameters.
+
+    The input derivatives are arranged such that the first dimension 
+    spans the parameters:
+
+    dcov[i, j, k] = d cov[j, k] / d p[i],
+
+    where p is the k-dimensional parameter vector.
     
     Args:
         cov: Covariance matrix, (n, n), non-degenerate.
@@ -89,6 +96,15 @@ def dlogp(x, m, cov, dm, dcov):
     an n-dimensional normal distribution depending on k parameters with 
     respect to the parameters.
 
+    The input derivatives are arranged such that the first dimension 
+    spans the parameters:
+
+    dm[i, j] = d m[j] / d p[i],
+
+    dcov[i, j, k] = d cov[j, k] / d p[i],
+
+    where p is the k-dimensional parameter vector.
+
     Args:
         x: Sample value, (n,).
         m: Mean vector, (n,).
@@ -113,6 +129,19 @@ def d2logp(x, m, cov, dm, dcov, d2m, d2cov):
     """Calculates the second derivatives of the logarithmic probability density 
     of an n-dimensional normal distribution depending on k parameters with 
     respect to the parameters.
+
+    The input derivatives are arranged such that the first dimensions 
+    span the parameters:
+
+    dm[i, j] = d m[j] / d p[i],
+
+    d2m[i, j, k] = d^2 m[k] / d p[i] d p[j],
+
+    dcov[i, j, k] = d cov[j, k] / d p[i],
+
+    d2cov[i, j, k, l] = d^2 cov[k, l] / d p[i] d p[j],
+
+    where p is the k-dimensional parameter vector.
 
     Args:
         x: Sample value, (n,).
