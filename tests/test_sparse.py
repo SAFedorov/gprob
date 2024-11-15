@@ -943,6 +943,79 @@ def test_cov_det():
         gp.cov(np.ones((4, 2, 4, 4)), v)
 
 
+def test_var():
+    tol = 1e-9
+
+    shapes = [(2,), (2, 3), (2, 3, 4, 5)]
+
+    for sh in shapes:
+        for dt in [np.float64, np.complex128]:
+            vn = random_normal(sh, dtype=dt)
+            vnr = vn.ravel()
+
+            v = assparsenormal(vn)
+            ref = np.diagonal(vnr.cov())
+
+            val = v.var()
+            assert val.shape == v.shape
+            assert np.isrealobj(val)
+            assert np.max(np.abs(val.ravel() - ref)) < tol
+
+            val = gp.var(v)
+            assert val.shape == v.shape
+            assert np.isrealobj(val)
+            assert np.max(np.abs(val.ravel() - ref)) < tol
+
+            rs = 2 * np.random.rand(4) - 1
+            v = rs * iid(vn, 4, axis=-1)
+            ref = np.ravel(np.diagonal(vnr.cov())[..., None] * rs**2)
+
+            val = v.var()
+            assert val.shape == v.shape
+            assert np.isrealobj(val)
+            assert np.max(np.abs(val.ravel() - ref)) < tol
+
+            val = gp.var(v)
+            assert val.shape == v.shape
+            assert np.isrealobj(val)
+            assert np.max(np.abs(val.ravel() - ref)) < tol
+            
+            rs = 2 * np.random.rand(3, 2) - 1
+            v = rs * iid(iid(vn, 3, axis=-1), 2, axis=-1)
+            ref = np.ravel(np.diagonal(vnr.cov())[..., None, None] * rs**2)
+
+            val = v.var()
+            assert val.shape == v.shape
+            assert np.isrealobj(val)
+            assert np.max(np.abs(val.ravel() - ref)) < tol
+
+            val = gp.var(v)
+            assert val.shape == v.shape
+            assert np.isrealobj(val)
+            assert np.max(np.abs(val.ravel() - ref)) < tol
+
+            if v.ndim == 4:
+                # Permuting iaxes.
+                v = gp.transpose(v, (2, 0, 1, 3))
+
+                ref = np.ravel(np.diagonal(vnr.cov())[None, :, None] 
+                               * (rs**2) [:, None, :])
+
+                val = v.var()
+                assert val.shape == v.shape
+                assert np.isrealobj(val)
+                assert np.max(np.abs(val.ravel() - ref)) < tol
+
+                val = gp.var(v)
+                assert val.shape == v.shape
+                assert np.isrealobj(val)
+                assert np.max(np.abs(val.ravel() - ref)) < tol
+                
+                perm_tested = True
+
+    assert perm_tested
+
+
 def test_std():
     tol = 1e-9
 

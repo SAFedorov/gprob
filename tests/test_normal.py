@@ -1581,6 +1581,27 @@ def test_icopy():
     assert np.max(np.abs(v.cov() - v_.cov())) < tol
 
 
+def test_var():
+    tol = 1e-9
+
+    shapes = [(2,), (3, 2), (2, 3, 4, 5)]
+
+    for sh in shapes:
+        for dt in [np.float64, np.complex128]:
+            v = random_normal(sh, dtype=dt)
+            ref = np.diagonal(v.ravel().cov())
+
+            val = v.var()
+            assert val.shape == v.shape
+            assert np.isrealobj(val)
+            assert np.max(np.abs(val.ravel() - ref)) < tol
+
+            val = var(v)
+            assert val.shape == v.shape
+            assert np.isrealobj(val)
+            assert np.max(np.abs(val.ravel() - ref)) < tol
+
+
 def test_std():
     tol = 1e-9
 

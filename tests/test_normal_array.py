@@ -189,6 +189,10 @@ def test_flip():
     _test_array_func(flip, axis=(-1, 0), test_shapes="2dmin")
     _test_array_func(flip, axis=(-1, -3), test_shapes="3dmin")
 
+    # An extra test against slicing ::-1
+    x = [1, 2, 3] * normal(size=(3,))
+    assert np.max(np.abs(flip(x).var() - x[::-1].var())) < 1e-9
+
 
 def test_transpose():
     _test_array_func(transpose)
