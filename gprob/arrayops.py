@@ -185,7 +185,7 @@ def dkl(x, y):
                          "and hence has a degenerate distribution.")
     
     if x_is_numeric:
-        return float("-inf")
+        return float("inf")
     
     if x.iscomplex or y.iscomplex:
         x = mod.stack(cls, [x.real, x.imag], axis=-1)

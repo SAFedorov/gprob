@@ -1058,10 +1058,10 @@ def test_dkl():
         x = iid(random_normal(shape=sh, dtype=np.float64), sparse_sz)
         y = iid(random_normal(shape=sh, dtype=np.complex128), sparse_sz)
 
-        assert np.isneginf(gp.dkl(x, y))
+        assert np.isposinf(gp.dkl(x, y))
 
         with pytest.raises(ValueError) as e:
-            assert np.isneginf(gp.dkl(y, x))
+            assert np.isposinf(gp.dkl(y, x))
 
         assert "degenerate" in get_message(e)
 
@@ -1085,7 +1085,7 @@ def test_dkl():
 
             assert "degenerate" in get_message(e)
 
-            assert np.isneginf(gp.dkl(y, x))
+            assert np.isposinf(gp.dkl(y, x))
 
             # One iaxis.
 

@@ -82,7 +82,7 @@ def dkl(m1, cov1, m2, cov2):
         # Here, we use cholesky and not cho_factor because further we need
         # the full matrix, not only its lower triangular part.
     except LinAlgError:
-        return float("-inf")
+        return float("inf")
 
     s = sp.linalg.solve_triangular(ltr2, ltr1, check_finite=False, lower=True)
     strace = np.einsum("ij, ij -> ", s, s)

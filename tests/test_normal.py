@@ -1421,10 +1421,10 @@ def test_dkl():
         x = random_normal(shape=sh, dtype=np.float64)
         y = random_normal(shape=sh, dtype=np.complex128)
 
-        assert np.isneginf(dkl(x, y))
+        assert np.isposinf(dkl(x, y))
 
         with pytest.raises(ValueError) as e:
-            assert np.isneginf(dkl(y, x))
+            assert np.isposinf(dkl(y, x))
 
         assert "degenerate" in get_message(e)
 
@@ -1460,7 +1460,7 @@ def test_dkl():
             assert "degenerate" in get_message(e)
 
             # first distribution is degenerate - numeric constant
-            assert np.isneginf(dkl(y, x))
+            assert np.isposinf(dkl(y, x))
 
             # second distribution is degenerate - covariance matrix
             x = normal(size=sh)
@@ -1476,7 +1476,7 @@ def test_dkl():
             assert "degenerate" in get_message(e)
 
             # first distribution is degenerate - covariance matrix
-            assert np.isneginf(dkl(y, x))
+            assert np.isposinf(dkl(y, x))
 
 
 def test_entropy():

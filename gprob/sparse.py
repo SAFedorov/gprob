@@ -1078,7 +1078,7 @@ def dkl(x, y):
     try:
         ltr1 = np.linalg.cholesky(cov1)
     except LinAlgError:
-        return float("-inf")
+        return float("inf")
 
     s = np.linalg.solve(ltr2, ltr1)
     strace = np.einsum("ijk, ijk ->", s, s)
