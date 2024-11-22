@@ -50,6 +50,15 @@ def std(x):
 
 
 @fallback_to_normal
+def logp(x, y):
+    """Log likelihood for the random variable ``x`` to take the value(s) ``y``.
+    The shape of ``y`` must be the same as the shape of ``x`` or have one
+    extra dimension in the beginning for the batch size.
+    """
+    return x.logp(y)
+
+
+@fallback_to_normal
 def entropy(x):
     """Entropy, ``<log p(x)>``, where ``p`` is the probability density of ``x``.
     """

@@ -4,7 +4,7 @@ from scipy.stats import multivariate_normal as mvn
 from numpy.linalg import LinAlgError
 from numpy.exceptions import ComplexWarning
 from gprob import (stack, hstack, vstack, icopy, broadcast_to, var, std, cov, 
-                   dkl, entropy)
+                   dkl, entropy, logp)
 from gprob.normal_ import normal, Normal, safer_cholesky
 from gprob.sparse import iid
 from utils import random_normal, random_correlate, asnormal, get_message
@@ -362,10 +362,16 @@ def test_logp():
     assert np.abs(xi.logp(x) - logpref) < tol_
     assert xi.logp(x).shape == x.shape[:-xi.ndim]
 
+    assert np.abs(logp(xi, x) - logpref) < tol_
+    assert logp(xi, x).shape == x.shape[:-xi.ndim]
+
     x = np.random.rand(3, *sh)
     logpref = mvn.logpdf(x.reshape(-1, xif.size), xif.mean(), xif.cov())
     assert np.max(np.abs(xi.logp(x) - logpref)) < tol_
     assert xi.logp(x).shape == x.shape[:-xi.ndim]
+
+    assert np.max(np.abs(logp(xi, x) - logpref)) < tol_
+    assert logp(xi, x).shape == x.shape[:-xi.ndim]
 
     # Degenerate cases.
         
