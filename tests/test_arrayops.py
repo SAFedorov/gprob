@@ -107,7 +107,7 @@ def test_fallback_to_normal():
     excl_names = {"reshape", "moveaxis", "broadcast_to",  # require arguments
                   "split", "hsplit", "vsplit", "dsplit",
                   "mean", "var", "std", "cov", "logp",  # numerical outputs
-                  "entropy"}
+                  "sample", "entropy"}
 
     for fn in func_names:
         if fn in excl_names:

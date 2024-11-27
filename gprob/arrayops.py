@@ -65,6 +65,37 @@ def entropy(x):
     return x.entropy()
 
 
+def sample(x, n=None):
+    """Samples one or several random variable ``n`` times.
+    
+    Args:
+        x (random variable or sequence of random variables):
+            The variable(s) to sample.
+        n (int or None):
+            The number of samples.
+
+    Returns:
+        - If ``x`` is a single variable, returns an array of samples.
+        - If ``x`` is a sequence of varaibles, returns a list of arrays 
+        of samples.
+
+        The arrays of samples have the same shape(s) as the variable(s) if 
+        ``n`` is ``None``, and have one extra dimension of the size ``n`` if 
+        ``n`` is an integer. The extra dimensions are added as the 0-th axes.
+    """
+
+    if hasattr(x, "sample"):
+        return x.sample(n)
+    
+    if hasattr(x, '__iter__'):
+        mod, cls = resolve(x)
+        x = [mod.lift(cls, arg) for arg in x]
+        return mod.sample(x, n)
+    
+    x_ = normal_.lift(Normal, x)
+    return x_.sample(n)
+
+
 def cov(*args):
     """Covariance, generalizing ``<outer((x-<x>), (y-<y>)^H)>``, 
     where `H` denotes conjugate transposition, and ``<...>`` is 

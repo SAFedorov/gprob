@@ -4,7 +4,7 @@ from scipy.stats import multivariate_normal as mvn
 from numpy.linalg import LinAlgError
 from numpy.exceptions import ComplexWarning
 from gprob import (stack, hstack, vstack, icopy, broadcast_to, var, std, cov, 
-                   dkl, entropy, logp)
+                   dkl, entropy, logp, sample)
 from gprob.normal_ import normal, Normal, safer_cholesky
 from gprob.sparse import iid
 from utils import random_normal, random_correlate, asnormal, get_message
@@ -575,8 +575,7 @@ def test_len():
 
 
 def test_sample():
-    
-    # Checks the formats returned by sample()
+    # Tests the sample() method of Normal.
     
     v = normal(0, 1)
     s = v.sample()
@@ -591,6 +590,104 @@ def test_sample():
 
     s = v.sample(3)
     assert s.shape == (3, 5)
+
+
+def test_sample_func():
+    # Tests the sample() function.
+
+    tol = 1e-10
+
+    # Deterministic constants.
+
+    s = sample(1)
+    assert s.shape == tuple()
+    assert np.abs(s - 1) < tol
+
+    s = sample(1, 3)
+    assert s.shape == (3,)
+    assert np.max(np.abs(s - 1)) < tol
+
+    s1, s2 = sample([1, 2])
+    assert s1.shape == tuple()
+    assert np.abs(s1 - 1) < tol
+    assert s2.shape == tuple()
+    assert np.abs(s2 - 2) < tol
+
+    s1, s2, s3 = sample([1, np.ones(shape=(2, 4)), np.ones(shape=(3, 2))], 3)
+    assert s1.shape == (3,)
+    assert np.max(np.abs(s1 - 1)) < tol
+    assert s2.shape == (3, 2, 4)
+    assert np.max(np.abs(s2 - 1)) < tol
+    assert s3.shape == (3, 3, 2)
+    assert np.max(np.abs(s3 - 1)) < tol
+
+    # Random variables.
+
+    for sh in [tuple(), (3, 2), (3, 2, 4)]:
+        for dt in [np.float64, np.complex128]:
+            x = random_normal(shape=sh, dtype=dt)
+            
+            s = sample(x)
+            assert s.shape == sh
+            assert s.dtype == dt
+
+            s = sample(x, 4)
+            assert s.shape == (4,) + sh
+            assert s.dtype == dt
+
+            s, = sample([x])
+            assert s.shape == sh
+            assert s.dtype == dt
+
+            s1, s2 = sample((x, 2), 4)  # Tuple input.
+            assert s1.shape == (4,) + sh
+            assert s1.dtype == dt
+            assert s2.shape == (4,)
+
+            # Single sample, sequence input.
+            s1, s2, s3, s4 = sample([x, np.stack([x, x]), 2, x.real])
+            assert s1.shape == sh
+            assert s1.dtype == dt
+            assert s2.shape == (2,) + sh
+            assert s2.dtype == dt
+            assert s3.shape == tuple()
+            assert np.abs(s3 - 2) < tol
+            assert s4.shape == sh
+
+            # Checks that the variables sampled together are correlated. 
+            assert np.max(np.abs(s2[0, ...] - s1)) < tol
+            assert np.max(np.abs(s2[1, ...] - s1)) < tol
+            assert np.max(np.abs(s4 - s1.real)) < tol
+
+            # Checks the preservation of real data types with complex variables.
+            if x.iscomplex:
+                assert np.isrealobj(s3)
+                assert np.isrealobj(s4)
+                checked_heterogeneous_1 = True
+
+            # Multiple samples, sequence input.
+            s1, s2, s3, s4 = sample((x, np.stack([x, x]), 2, x.real), 4)
+            assert s1.shape == (4,) + sh
+            assert s1.dtype == dt
+            assert s2.shape == (4,) + (2,) + sh
+            assert s2.dtype == dt
+            assert s3.shape == (4,)
+            assert np.max(np.abs(s3 - 2)) < tol
+            assert s4.shape == (4,) + sh
+
+            # Checks that the variables sampled together are correlated. 
+            assert np.max(np.abs(s2[:, 0, ...] - s1)) < tol
+            assert np.max(np.abs(s2[:, 1, ...] - s1)) < tol
+            assert np.max(np.abs(s4 - s1.real)) < tol
+
+            # Checks the preservation of real data types with complex variables.
+            if x.iscomplex:
+                assert np.isrealobj(s3)
+                assert np.isrealobj(s4)
+                checked_heterogeneous_2 = True
+
+    assert checked_heterogeneous_1
+    assert checked_heterogeneous_2
 
 
 def test_stack():

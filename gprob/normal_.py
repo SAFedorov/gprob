@@ -438,6 +438,32 @@ def cov(x, y):
     return cov2d.reshape(x.shape + y.shape)
 
 
+def sample(xs, n):
+    """Samples several normal random variables.
+    
+    Args:
+        xs: A sequence of normal variables.
+        n: The number of samples, integer or None.
+    
+    Returns:
+        A list of samples.
+    """
+
+    sizes = [x_.size for x_ in xs]
+    shapes = [x_.shape for x_ in xs]
+    if n is not None:
+        shapes = [(n,) + s for s in shapes]
+
+    xs_ = concatenate(Normal, [x.flatten() for x in xs])
+    samples = np.split(xs_.sample(n), np.cumsum(sizes), axis=-1)
+
+    samples = [s.reshape(sh) for s, sh in zip(samples, shapes)]
+    if xs_.iscomplex:
+        samples = [s if x.iscomplex else s.real for s, x in zip(samples, xs)]
+
+    return samples
+
+
 def dkl(x, y):
     """The normal implementation of the Kullback-Leibler divergence."""
 
