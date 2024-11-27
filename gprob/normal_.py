@@ -5,10 +5,13 @@ from operator import mul
 import numpy as np
 from numpy.linalg import LinAlgError
 
+from . import latent
+
 from .maps import (LatentMap, complete, lift, match_, concatenate, stack, 
     solve, asolve, call_linearized, fftfunc, fftfunc_n, bilinearfunc, 
     einsum_1, einsum_2, inner_1, inner_2, dot_1, dot_2, outer_1, outer_2, 
-    kron_1, kron_2, complete_tensordot_axes, tensordot_1, tensordot_2, a2d)
+    kron_1, kron_2, complete_tensordot_axes, tensordot_1, tensordot_2, a2d,
+    apply)
 
 from .func import condition, logp
 from .func import dkl as dkl_
@@ -226,14 +229,10 @@ class Normal(LatentMap):
             >>> v.sample(5).shape
             (5, 2, 3)
         """
-
-        if n is None:
-            nshape = tuple()
-        else:
-            nshape = (n,)
         
-        r = np.random.normal(size=nshape + (self.nlat,))
-        return (r @ a2d(self) + self.b.ravel()).reshape(nshape + self.shape)
+        sz = (self.nlat,) if n is None else (n, self.nlat)
+        r = np.random.normal(size=sz)
+        return apply(self, r)
     
     def logp(self, x):
         """Log likelihood of a sample.
@@ -449,19 +448,10 @@ def sample(xs, n):
         A list of samples.
     """
 
-    sizes = [x_.size for x_ in xs]
-    shapes = [x_.shape for x_ in xs]
-    if n is not None:
-        shapes = [(n,) + s for s in shapes]
-
-    xs_ = concatenate(Normal, [x.flatten() for x in xs])
-    samples = np.split(xs_.sample(n), np.cumsum(sizes), axis=-1)
-
-    samples = [s.reshape(sh) for s, sh in zip(samples, shapes)]
-    if xs_.iscomplex:
-        samples = [s if x.iscomplex else s.real for s, x in zip(samples, xs)]
-
-    return samples
+    ulat = latent.uunion(*[x.lat for x in xs])
+    sz = (len(ulat),) if n is None else (len(ulat), n)
+    s = np.random.normal(size=sz)
+    return [apply(x, s[[ulat[k] for k in x.lat]].T) for x in xs]
 
 
 def dkl(x, y):

@@ -633,6 +633,14 @@ def complete(seq):
         return lat, [extend_a(x, lat), pad_a(y, lat)]
     
     return lat, [pad_a(x, lat), extend_a(y, lat)]
+
+
+def apply(x, r):
+    """Applies the map ``x`` to the numerical realizations of latent 
+    variables ``r``. The shape of ``r`` must be (nlat,) to get a single 
+    realization, or (n, nlat) to get n realizations."""
+    
+    return (r @ a2d(x) + x.b.ravel()).reshape(r.shape[:-1] + x.shape)
     
     
 def lift(cls, x):
