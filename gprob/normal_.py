@@ -432,8 +432,15 @@ def safer_cholesky(x):
 def cov(x, y):
     """The normal implementation of the covariance between two variables."""
 
-    _, [ax, ay] = complete([x.ravel(), y.ravel()])
-    cov2d = ax.T @ ay.conj()
+    ilat = set(x.lat) & set(y.lat)  # The common latent variables.
+
+    idxx = [x.lat[k] for k in ilat]
+    ax = np.ascontiguousarray(x.a[idxx].reshape((len(ilat), x.size)))
+
+    idxy = [y.lat[k] for k in ilat]
+    ayconj = np.ascontiguousarray(y.a[idxy].conj().reshape((len(ilat), y.size)))
+
+    cov2d = ax.T @ ayconj
     return cov2d.reshape(x.shape + y.shape)
 
 
@@ -450,8 +457,8 @@ def sample(xs, n):
 
     ulat = latent.uunion(*[x.lat for x in xs])
     sz = (len(ulat),) if n is None else (len(ulat), n)
-    s = np.random.normal(size=sz)
-    return [apply(x, s[[ulat[k] for k in x.lat]].T) for x in xs]
+    r = np.random.normal(size=sz)
+    return [apply(x, r[[ulat[k] for k in x.lat]].T) for x in xs]
 
 
 def dkl(x, y):

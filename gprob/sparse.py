@@ -1034,8 +1034,12 @@ def cov(x, y):
     in_symb2.insert(0, lat_symb)
     
     subs = f"{''.join(in_symb1)},{''.join(in_symb2)}->{''.join(out_symb)}"
-    _, [ax, ay] = complete([x, y])
-    return np.einsum(subs, ax, ay.conj())
+
+    ilat = set(x.lat) & set(y.lat)  # The common latent variables.
+    ax = np.ascontiguousarray(x.a[[x.lat[k] for k in ilat]])
+    ayconj = np.ascontiguousarray(y.a[[y.lat[k] for k in ilat]].conj())
+
+    return np.einsum(subs, ax, ayconj)
 
 
 def apply(x, r):
