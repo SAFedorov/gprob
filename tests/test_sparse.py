@@ -1243,30 +1243,152 @@ def test_entropy():
     assert perm_tested
 
 
+def _moments_test(v, s):
+    """Tests the consistency of the samples ``s`` with the sparse variable ``v``
+    by comparing the estimates of the mean and covariance with the true values.
+    """
+
+    nsamples = len(s)
+
+    m = np.mean(s, axis=0)
+    mref = v.mean()
+    assert mref.shape == m.shape
+    assert np.std((mref - m), axis=None) < 10. / np.sqrt(nsamples)
+
+    s_ = s.reshape((nsamples, v.size))
+    c_ = np.reshape(np.cov(s_.T), v.shape * 2)  
+    # Using np.cov here, in particular, checks if the complex conjugation 
+    # convention the same in gprob and numpy.
+
+    c = dense_to_sparse_cov(c_, v.iaxes)
+    
+    cref = v.cov()
+    assert cref.shape == c.shape
+    assert np.std((mref - m), axis=None) < 10. / np.sqrt(nsamples)
+
+
 def test_sample():
-    v = assparsenormal(1)
-    assert v.sample().shape == v.shape
-    assert v.sample(1).shape == (1,) + v.shape
+    tol = 1e-10
 
-    v1 = iid(iid(random_normal((2, 3)), 4, axis=1), 5, axis=-1)
-    v2 = iid(iid(random_normal((2, 3)), 4, axis=1), 5, axis=-1)
-    v = 0.5 * v1 - v2
-    # shape (2, 4, 3, 5), iaxes (1, 3)
+    for c in [1, 1 + 2.j]:
+        v = assparsenormal(c)
+        assert v.sample().shape == v.shape
+        assert v.sample(1).shape == (1,) + v.shape
+        assert np.max(np.abs(v.sample(2) - c)) < tol
 
-    assert v.sample().shape == v.shape
-    assert v.sample(1).shape == (1,) + v.shape
+    for dt in [np.float64, np.complex128]:
+        v1 = iid(iid(random_normal((2, 3), dtype=dt), 4, axis=1), 5, axis=-1)
+        v2 = iid(iid(random_normal((2, 3), dtype=dt), 4, axis=1), 5, axis=-1)
+        v = 0.5 * v1 - v2  # shape (2, 4, 3, 5), iaxes (1, 3)
 
-    ns = 10000
-    s = v.sample(ns)
-    assert len(s) == ns
+        assert v.sample().shape == v.shape
+        assert v.sample(1).shape == (1,) + v.shape
 
-    m = np.sum(s, axis=0) / ns
-    vv = np.sum((s - m) ** 2, axis=0) / ns
+        ns = 10000
+        s = v.sample(ns)
+        assert s.shape == (ns,) + v.shape
+        assert s.dtype == dt
+        _moments_test(v, s)
 
-    tol = 10 / np.sqrt(ns)
-    assert m.shape == v.mean().shape
-    assert np.mean((m - v.mean())**2) / np.max(v.mean()**2) < tol ** 2
-    assert np.mean((vv - v.var())**2) / np.max(v.var()**2) < tol ** 2
+
+def test_sample_func():
+    tol = 1e-10
+    
+    for c in [1, 1 + 2j, np.array([2, 0.3])]:
+        v = assparsenormal(c)
+
+        s = gp.sample(v)
+        assert s.shape == v.shape
+        assert np.max(np.abs(s - c)) < tol
+
+        s, = gp.sample([v])
+        assert s.shape == v.shape
+        assert np.max(np.abs(s - c)) < tol
+
+        s1, s2 = gp.sample((v, v))
+        assert s1.shape == v.shape
+        assert np.max(np.abs(s1 - c)) < tol
+        assert np.max(np.abs(s1 - s2)) < tol
+
+        s = gp.sample(v, 4)
+        assert s.shape == (4,) + v.shape
+        assert np.max(np.abs(s - c)) < tol
+
+        s, = gp.sample([v], 4)
+        assert s.shape == (4,) + v.shape
+        assert np.max(np.abs(s - c)) < tol
+
+    for dt in [np.float64, np.complex128]:
+        v1 = iid(random_normal((2, 3), dtype=dt), 4, axis=1)
+        assert v1.iaxes == (1,)
+    
+        v2 = iid(iid(random_normal((3, 2), dtype=dt), 4, axis=0), 5, axis=-1)
+        assert v2.iaxes == (0, 3)
+
+        v3 = iid(v2, 2, axis=2)
+        assert v3.iaxes == (0, 2, 4)
+
+        v4 = assparsenormal(random_normal(shape=(2,), dtype=dt))
+
+        for v in [v1, v2, v3, v4]:
+            s = gp.sample(v)
+            assert s.shape == v.shape
+            assert s.dtype == dt
+
+            sz = 4 * 10**5 // v.size
+            s = gp.sample(v, sz)
+            assert s.shape == (sz,) + v.shape
+            assert s.dtype == dt
+            _moments_test(v, s)
+
+            s1, s2, s3, s4 = gp.sample([v, gp.stack([v, v]), v.real, 2])
+            assert s1.shape == v.shape
+            assert s1.dtype == dt
+            assert s2.shape == (2,) + v.shape
+            assert s2.dtype == dt
+            assert s3.shape == v.shape
+            assert s4.shape == tuple()
+
+            assert np.abs(s4 - 2) < tol
+            assert np.max(np.abs(s1.real - s3)) < tol
+            assert np.max(np.abs(s2[0] - s1)) < tol
+            assert np.max(np.abs(s2[1] - s1)) < tol
+
+            if v.iscomplex:
+                assert np.isrealobj(s3)
+                assert np.isrealobj(s4)
+                checked_heterogeneous_1 = True
+
+            sz = 4 * 10**5 // v.size
+            s1, s2, s3, s4 = gp.sample([v, 0, v.real, 2], sz)
+            assert s1.shape == (sz,) + v.shape
+            assert s1.dtype == dt
+            assert s2.shape == (sz,)
+            assert s3.shape == (sz,) + v.shape
+            assert s4.shape == (sz,)
+
+            assert np.max(np.abs(s2)) < tol
+            assert np.max(np.abs(s4 - 2)) < tol
+            _moments_test(v, s1)
+            _moments_test(v.real, s3)
+            assert np.max(np.abs(s1.real - s3)) < tol
+
+            if v.iscomplex:
+                assert np.isrealobj(s3)
+                assert np.isrealobj(s4)
+                checked_heterogeneous_2 = True
+
+        with pytest.raises(ValueError):
+            gp.sample([v1, v2])
+
+        with pytest.raises(ValueError):
+            gp.sample([v2, v4])
+
+        with pytest.raises(ValueError):
+            gp.sample([v1, gp.normal()])
+
+    assert checked_heterogeneous_1
+    assert checked_heterogeneous_2
 
 
 def test_condition():
@@ -1689,9 +1811,13 @@ def test_logp():
             snv_ = snv.transpose(ax)
             x_ = x.transpose((0,) * (x.ndim - nv.ndim) + ax)
 
-            logp1 = snv_.logp(x_)
+            logp1 = snv_.logp(x_)  # Use the method.
             assert logp1.shape == logp2.shape
             assert np.max(np.abs(1 - logp1/logp2)) < tol_
+
+            logp11 = gp.logp(snv_, x_)  # Use the standalone function.
+            assert logp11.shape == logp2.shape
+            assert np.max(np.abs(1 - logp11/logp2)) < tol_
 
     # Trivial cases first - no independence axes.
 

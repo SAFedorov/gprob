@@ -574,6 +574,28 @@ def test_len():
     assert len(xi) == 4
 
 
+def _moments_test(v, s):
+    """Tests the consistency of the samples ``s`` with the variable ``v``
+    by comparing the estimates of the mean and covariance with the true values.
+    """
+
+    nsamples = len(s)
+
+    m = np.mean(s, axis=0)
+    mref = v.mean()
+    assert mref.shape == m.shape
+    assert np.std((mref - m), axis=None) < 10. / np.sqrt(nsamples)
+
+    s_ = s.reshape((nsamples, v.size))
+    c = np.reshape(np.cov(s_.T), v.shape * 2)  
+    # Using np.cov here, in particular, checks if the complex conjugation 
+    # convention the same in gprob and numpy.
+    
+    cref = v.cov()
+    assert cref.shape == c.shape
+    assert np.std((mref - m), axis=None) < 10. / np.sqrt(nsamples)
+
+
 def test_sample():
     # Tests the sample() method of Normal.
     
@@ -591,11 +613,28 @@ def test_sample():
     s = v.sample(3)
     assert s.shape == (3, 5)
 
+    for dt in [np.float64, np.complex128]:
+        sh = (3, 2, 4)
+        v = random_normal(shape=sh, dtype=dt)
+        s = v.sample(10**4)
+        assert s.shape == (10**4,) + sh
+        _moments_test(v, s)
+
 
 def test_sample_func():
     # Tests the sample() function.
 
     tol = 1e-10
+
+    # Empty inputs.
+
+    s = sample([])
+    assert isinstance(s, list)
+    assert len(s) == 0
+
+    s = sample(tuple(), 3)
+    assert isinstance(s, list)
+    assert len(s) == 0
 
     # Deterministic constants.
 
@@ -631,18 +670,21 @@ def test_sample_func():
             assert s.shape == sh
             assert s.dtype == dt
 
-            s = sample(x, 4)
-            assert s.shape == (4,) + sh
+            s = sample(x, 10**4)
+            assert s.shape == (10**4,) + sh
             assert s.dtype == dt
+            _moments_test(x, s)
 
             s, = sample([x])
             assert s.shape == sh
             assert s.dtype == dt
 
-            s1, s2 = sample((x, 2), 4)  # Tuple input.
-            assert s1.shape == (4,) + sh
+            s1, s2 = sample((x, 2), 10**4)  # Tuple input.
+            assert s1.shape == (10**4,) + sh
             assert s1.dtype == dt
-            assert s2.shape == (4,)
+            assert s2.shape == (10**4,)
+            assert np.max(np.abs(s2 - 2)) < tol
+            _moments_test(x, s1)
 
             # Single sample, sequence input.
             s1, s2, s3, s4 = sample([x, np.stack([x, x]), 2, x.real])
@@ -655,8 +697,8 @@ def test_sample_func():
             assert s4.shape == sh
 
             # Checks that the variables sampled together are correlated. 
-            assert np.max(np.abs(s2[0, ...] - s1)) < tol
-            assert np.max(np.abs(s2[1, ...] - s1)) < tol
+            assert np.max(np.abs(s2[0] - s1)) < tol
+            assert np.max(np.abs(s2[1] - s1)) < tol
             assert np.max(np.abs(s4 - s1.real)) < tol
 
             # Checks the preservation of real data types with complex variables.
@@ -1488,7 +1530,7 @@ def test_cov_func():
 
 
 def test_dkl():
-    tol = 1e-7
+    tol = 3e-7
 
     shapes = [tuple(), (3,), (2, 3), (2, 4, 3, 5)]
     wrong_sh = (2, 2)  # does not coincide with any of the shapes

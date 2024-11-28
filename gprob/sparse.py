@@ -7,6 +7,7 @@ import numpy as np
 from numpy.linalg import LinAlgError
 from numpy.exceptions import AxisError
 
+from . import latent
 from . import normal_
 from .normal_ import (Normal, complete, lift, match_, complete_tensordot_axes,
                       validate_logp_samples, print_)
@@ -595,7 +596,7 @@ class SparseNormal(Normal):
         """
 
         symb = [einsubs.get_symbol(i) for i in range(2 * self.ndim + 1)]
-        elem_symb = symb[0]
+        lat_symb = symb[0]
         out_symb = symb[1:]
 
         in_symb1 = out_symb[:self.ndim]
@@ -609,36 +610,17 @@ class SparseNormal(Normal):
             in_symb2[i] = in_symb1[i]
         
         # Adds the symbol for the summation over the latent variables.
-        in_symb1.insert(0, elem_symb)
-        in_symb2.insert(0, elem_symb)
+        in_symb1.insert(0, lat_symb)
+        in_symb2.insert(0, lat_symb)
 
         subs = f"{''.join(in_symb1)},{''.join(in_symb2)}->{''.join(out_symb)}"
         return np.einsum(subs, self.a, self.a.conj())
 
     def sample(self, n=None):
-        if n is None:
-            nsh = tuple()
-        else:
-            nsh = (n,)
-
-        iaxsh = [m for m, b in zip(self.shape, self._iaxid) if b]
-        r = np.random.normal(size=(*nsh, *iaxsh, self.a.shape[0]))
-
-        symb = [einsubs.get_symbol(i) for i in range(self.ndim + 1 + len(nsh))]
-        
-        elem_symb = symb[0]
-        out_symb = symb[1:]
-
-        in_symb1 = out_symb[:len(nsh)]
-        in_symb2 = out_symb[len(nsh):]
-
-        in_symb1.extend(in_symb2[i] for i in self.iaxes)
-        in_symb1.append(elem_symb)
-
-        in_symb2.insert(0, elem_symb)
-
-        subs = f"{''.join(in_symb1)},{''.join(in_symb2)}->{''.join(out_symb)}"
-        return np.einsum(subs, r, self.a) + self.mean()
+        nsh = tuple() if n is None else (n,)
+        ish = [self.shape[self._iaxid.index(i + 1)] for i in range(self._niax)]
+        r = np.random.normal(size=(self.nlat, *nsh, *ish))
+        return apply(self, r)
         
     def logp(self, x):
         delta_x = x - self.mean()
@@ -1034,7 +1016,7 @@ def cov(x, y):
                          f"while operand 2 has the order {iax_ord_y}.")
 
     symb = [einsubs.get_symbol(i) for i in range(x.ndim + y.ndim + 1)]
-    elem_symb = symb[0]
+    lat_symb = symb[0]
     out_symb = symb[1:]
 
     in_symb1 = out_symb[:x.ndim]
@@ -1048,12 +1030,81 @@ def cov(x, y):
         in_symb2[j] = in_symb1[i]
     
     # Adds the symbol for the summation over the latent variables.
-    in_symb1.insert(0, elem_symb)
-    in_symb2.insert(0, elem_symb)
+    in_symb1.insert(0, lat_symb)
+    in_symb2.insert(0, lat_symb)
     
     subs = f"{''.join(in_symb1)},{''.join(in_symb2)}->{''.join(out_symb)}"
     _, [ax, ay] = complete([x, y])
     return np.einsum(subs, ax, ay.conj())
+
+
+def apply(x, r):
+    """Applies the sparse map ``x`` to the numerical realizations of latent 
+    variables ``r``. The shape of ``r`` must be (nlat, iax1, ax2, ...) to get 
+    a single realization, or (lat, n, iax1, ax2, ...) to get n realizations.
+    Here iax1, ax2, ... are the shapes of the independence axes ordered by 
+    their index in _iaxid."""
+
+    batch_dim = r.ndim - 1 - x._niax
+    symb = [einsubs.get_symbol(i) for i in range(x.ndim + 1 + batch_dim)]
+    
+    lat_symb = symb[0]
+    out_symb = symb[1:]
+
+    in_symb1 = out_symb[:batch_dim]
+    in_symb2 = out_symb[batch_dim:]
+
+    in_symb1.insert(0, lat_symb)
+    in_symb1.extend(in_symb2[x._iaxid.index(i + 1)] for i in range(x._niax))
+
+    in_symb2.insert(0, lat_symb)
+
+    subs = f"{''.join(in_symb1)},{''.join(in_symb2)}->{''.join(out_symb)}"
+    return np.einsum(subs, r, x.a) + x.b
+
+
+def sample(xs, n):
+    """Samples several sparse normal random variables.
+    
+    Args:
+        xs: A sequence of sparse normal variables.
+        n: The number of samples, integer or ``None``.
+    
+    Returns:
+        A list of samples.
+    """
+
+    def iaxshape(x):
+        return tuple([x.shape[x._iaxid.index(i + 1)] for i in range(x._niax)])
+    
+    def sample_constant(x, n):
+        if n is None:
+            return x.b
+        return np.broadcast_to(x.b, (n,) + x.shape)
+
+    iaxshs = set([iaxshape(x) for x in xs if x.nlat != 0])
+
+    if len(iaxshs) == 0:
+        # There are no non-trivial random variables in the input sequence.
+        return [sample_constant(x, n) for x in xs]
+    elif len(iaxshs) == 1:
+        iaxsh = iaxshs.pop()
+    else:
+        raise ValueError("Inconsistent ordered shapes of the independence "
+                         f"dimensions of the input variables: {iaxshs}.")
+
+    ulat = latent.uunion(*[x.lat for x in xs])
+    sz = (len(ulat),) if n is None else (len(ulat), n)
+    r = np.random.normal(size=sz + iaxsh)
+
+    samples = []
+    for x in xs:
+        if x.nlat == 0:
+            samples.append(sample_constant(x, n))
+        else:
+            samples.append(apply(x, r[[ulat[k] for k in x.lat]]))
+
+    return samples
 
 
 def dkl(x, y):
