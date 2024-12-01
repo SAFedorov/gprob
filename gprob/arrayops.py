@@ -76,12 +76,12 @@ def sample(x, n=None):
 
     Returns:
         - If ``x`` is a single variable, returns an array of samples.
-        - If ``x`` is a sequence of varaibles, returns a list of arrays 
+        - If ``x`` is a sequence of variables, returns a list of arrays 
         of samples.
 
         The arrays of samples have the same shape(s) as the variable(s) if 
         ``n`` is ``None``, and have one extra dimension of the size ``n`` if 
-        ``n`` is an integer. The extra dimensions are added as the 0-th axes.
+        ``n`` is an integer. The extra dimension is added as the 0-th axis.
     """
 
     if hasattr(x, "sample"):
