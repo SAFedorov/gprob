@@ -1418,6 +1418,7 @@ def test_condition():
             nvc = nv_.condition(nv_list[0] - 1.2 * nv_list[3])
             snvc = snv_.condition(snv_list[0] - 1.2 * snv_list[3])
             check_sparse_vs_normal(snvc, nvc)
+            assert snvc._iaxid == snv_._iaxid
             del snvc, nvc
 
             # Real-complex.
@@ -1428,6 +1429,7 @@ def test_condition():
             snvc = snv_.condition(snv_list[0] + 0.4j * snv_list[1]
                                   + (0.3 + 2j) * snv_list[3])
             check_sparse_vs_normal(snvc, nvc)
+            assert snvc._iaxid == snv_._iaxid
             del snvc, nvc
 
             # Complex-complex.
@@ -1438,6 +1440,7 @@ def test_condition():
             snvc = snv_.condition(snv_list[0] + 0.4j * snv_list[1]
                                   + (0.3 + 2j) * snv_list[3])
             check_sparse_vs_normal(snvc, nvc)
+            assert snvc._iaxid == snv_._iaxid
             del snvc, nvc
 
             # Complex-complex, with a transposed condition.
@@ -1450,6 +1453,7 @@ def test_condition():
                                     + (0.3 + 2j) * snv_list[3]) : 0,
                                    snv_list[4][..., 1].transpose((2, 0, 1)) : 0.1})
             check_sparse_vs_normal(snvc, nvc)
+            assert snvc._iaxid == snv_._iaxid
             del snvc, nvc
 
     # 0 independence axes. -----------------------------------------------------
@@ -1463,17 +1467,20 @@ def test_condition():
     nvc = (nv1 + nv2).condition(nv1 - 0.3 * nv2)
     snvc = (snv1 + snv2).condition(snv1 - 0.3 * snv2)
     check_sparse_vs_normal(snvc, nvc)
+    assert snvc._iaxid == snv1._iaxid
     del snvc, nvc
 
     # Trivial condition.
     nvc = (nv1 + nv2).condition(normal())
     snvc = (snv1 + snv2).condition(normal())
     check_sparse_vs_normal(snvc, nvc)
+    assert snvc._iaxid == snv1._iaxid
     del snvc, nvc
 
     nvc = (nv1 + nv2).condition({nv1 - 0.3 * nv2 : 0.5})
     snvc = (snv1 + snv2).condition({snv1 - 0.3 * snv2 : 0.5})
     check_sparse_vs_normal(snvc, nvc)
+    assert snvc._iaxid == snv1._iaxid
     del snvc, nvc
 
     # Multiple conditions.
@@ -1486,6 +1493,7 @@ def test_condition():
     snvc = (snv1 + snv2).condition({snv1 - 0.3 * snv2 : 0.5, 
                                     snv1 + 0.3 * snv2 : 0.1})
     check_sparse_vs_normal(snvc, nvc)
+    assert snvc._iaxid == snv1._iaxid
     del snvc, nvc
 
     # A multi-dimensional variable.
@@ -1497,12 +1505,14 @@ def test_condition():
     nvc = (nv1 + nv2).condition(nv1 - 0.3 * nv2)
     snvc = (snv1 + snv2).condition(snv1 - 0.3 * snv2)
     check_sparse_vs_normal(snvc, nvc)
+    assert snvc._iaxid == snv1._iaxid
     del snvc, nvc
 
     x = np.random.rand(2, 2, 2)
     nvc = (nv1 + nv2).condition({nv1 - 0.3 * nv2 : x})
     snvc = (snv1 + snv2).condition({snv1 - 0.3 * snv2 : x})
     check_sparse_vs_normal(snvc, nvc)
+    assert snvc._iaxid == snv1._iaxid
     del snvc, nvc
 
     # 1 independence axis. -----------------------------------------------------
@@ -1522,6 +1532,7 @@ def test_condition():
     nvc = sum(nv_list).condition(nv_list[0] + 0.4 * nv_list[1])
     snvc = sum(snv_list).condition(snv_list[0] + 0.4 * snv_list[1])
     check_sparse_vs_normal(snvc, nvc)
+    assert snvc._iaxid == sum(snv_list)._iaxid
     del snvc, nvc
 
     # Vector dense subspace.
@@ -1542,6 +1553,7 @@ def test_condition():
     nvc = nv.condition(nv_list[0] + 0.4 * nv_list[1])
     snvc = snv.condition(snv_list[0] + 0.4 * snv_list[1])
     check_sparse_vs_normal(snvc, nvc)
+    assert snvc._iaxid == snv._iaxid
     del snvc, nvc
 
     # Two conditions.
@@ -1550,6 +1562,7 @@ def test_condition():
     snvc = snv.condition({snv_list[0] + 0.2 * snv_list[-1]: 1, 
                           snv_list[2] - 0.2 * snv_list[-1]: -0.3})
     check_sparse_vs_normal(snvc, nvc)
+    assert snvc._iaxid == snv._iaxid
     del snvc, nvc
 
     # Two conditions, out of which one is transposed.
@@ -1558,6 +1571,7 @@ def test_condition():
     snvc = snv.condition({snv_list[0] + 0.2 * snv_list[-1]: 1, 
                           (snv_list[2] - 0.2 * snv_list[-1]).T: -0.3})
     check_sparse_vs_normal(snvc, nvc)
+    assert snvc._iaxid == snv._iaxid
     del snvc, nvc
 
     # Two conditions, out of which one is transposed, 
@@ -1567,6 +1581,7 @@ def test_condition():
     snvc = snv.condition({snv_list[0][:, 0] + 0.2 * snv_list[-1][:, 0]: 1, 
                           (snv_list[2] - 0.2 * snv_list[-1]).T: -0.3})
     check_sparse_vs_normal(snvc, nvc)
+    assert snvc._iaxid == snv._iaxid
     del snvc, nvc
 
     # Two conditions, out of which one is transposed, 
@@ -1576,6 +1591,7 @@ def test_condition():
     snvc = snv.T.condition({snv_list[0] + 0.2 * snv_list[-1]: 1, 
                             (snv_list[2] - 0.2 * snv_list[-1]).T: -0.3})
     check_sparse_vs_normal(snvc, nvc)
+    assert snvc._iaxid == snv.T._iaxid
     del snvc, nvc
 
     # Adds one complex condition.
@@ -1588,6 +1604,7 @@ def test_condition():
                             (snv_list[1] - 2j * snv_list[3] 
                              + (1 + 0.5j) * snv_list[4]): 1})
     check_sparse_vs_normal(snvc, nvc)
+    assert snvc._iaxid == snv.T._iaxid
     del snvc, nvc
 
     # 3-dimensional dense subspace.
@@ -1608,6 +1625,7 @@ def test_condition():
     nvc = nv.condition(nv_list[0] + 0.4 * nv_list[1])
     snvc = snv.condition(snv_list[0] + 0.4 * snv_list[1])
     check_sparse_vs_normal(snvc, nvc)
+    assert snvc._iaxid == snv._iaxid
     del snvc, nvc
 
     # Several conditions of different shapes.
@@ -1618,6 +1636,7 @@ def test_condition():
                           snv_list[2][:, 1] - 0.2 * snv_list[-1][:, 1]: -0.3,
                           snv_list[2][:, 1, 0] - 2.2 * snv_list[3][:, 1, 0]: 0})
     check_sparse_vs_normal(snvc, nvc)
+    assert snvc._iaxid == snv._iaxid
     del snvc, nvc
 
     # The variable is complex.
@@ -1627,6 +1646,7 @@ def test_condition():
     nvc = nv.condition(nv_list[0] + 0.4 * nv_list[1])
     snvc = snv.condition(snv_list[0] + 0.4 * snv_list[1])
     check_sparse_vs_normal(snvc, nvc)
+    assert snvc._iaxid == snv._iaxid
     del snvc, nvc
 
     nvc = nv.condition(nv_list[0] + 0.4j * nv_list[1] 
@@ -1634,6 +1654,7 @@ def test_condition():
     snvc = snv.condition(snv_list[0] + 0.4j * snv_list[1]
                          + (0.8 - 2.3j) * snv_list[2])
     check_sparse_vs_normal(snvc, nvc)
+    assert snvc._iaxid == snv._iaxid
     del snvc, nvc
 
     check_permutations(snv_list, nv_list)
@@ -1657,6 +1678,7 @@ def test_condition():
     nvc = nv.condition(nv_list[0] + 0.4 * nv_list[1])
     snvc = snv.condition(snv_list[0] + 0.4 * snv_list[1])
     check_sparse_vs_normal(snvc, nvc)
+    assert snvc._iaxid == snv._iaxid
     del snvc, nvc
 
     # One condition transposed.
@@ -1665,6 +1687,7 @@ def test_condition():
     snvc = snv.condition({(snv_list[0] + 0.4 * snv_list[1]): - 0.1,
                           (snv_list[1] - 0.4 * snv_list[2]).T: - 0.1})
     check_sparse_vs_normal(snvc, nvc)
+    assert snvc._iaxid == snv._iaxid
     del snvc, nvc
 
     # Higher-dimensional dense subspace.
@@ -1686,6 +1709,7 @@ def test_condition():
     nvc = nv.condition(nv_list[0] + 0.4 * nv_list[1])
     snvc = snv.condition(snv_list[0] + 0.4 * snv_list[1])
     check_sparse_vs_normal(snvc, nvc)
+    assert snvc._iaxid == snv._iaxid
     del snvc, nvc
 
     check_permutations(snv_list, nv_list)
@@ -1700,6 +1724,7 @@ def test_condition():
     snvc = snv1 | {snv1 : x}
     assert np.max(np.abs(snvc.mean() - x)) < tol 
     assert np.max(np.abs(snvc.var())) < tol
+    assert snvc._iaxid == snv1._iaxid
 
     # Conditioning a variable on an empty dictionary.
     snvc = snv1 | dict()
@@ -1747,6 +1772,7 @@ def test_condition():
         nvc = (nv1 + nv3) | {nv1 - 1.3 * nv3: 0.2}
         snvc = snv13 | {snv2: 1, snv1 - 1.3 * snv3: 0.2}
         check_sparse_vs_normal(snvc, nvc)
+        assert snvc._iaxid == snv13._iaxid
 
     # Degenerate cases.
     x = gp.iid(gp.normal(), 4)

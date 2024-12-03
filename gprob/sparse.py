@@ -465,11 +465,11 @@ class SparseNormal(Normal):
         # Moves the sparse axes first, reordering them in increasing order,
         # and flattens the dense subspaces.
 
-        s_sparse_ax = [i for i, b in enumerate(self._iaxid) if b]
-        s_dense_ax = [i for i, b in enumerate(self._iaxid) if not b]
-        dense_sz = reduce(mul, [self.shape[i] for i in s_dense_ax], 1)
+        sparse_ax = [i for i, b in enumerate(self._iaxid) if b]
+        dense_ax = [i for i, b in enumerate(self._iaxid) if not b]
+        dense_sz = reduce(mul, [self.shape[i] for i in dense_ax], 1)
 
-        self_fl = self.transpose(tuple(s_sparse_ax + s_dense_ax))
+        self_fl = self.transpose(tuple(sparse_ax + dense_ax))
         self_fl = self_fl.reshape(self_fl.shape[:niax] + (dense_sz,))
 
         mismatch_w_msg = ("Conditions with different numbers or sizes of "
@@ -482,12 +482,12 @@ class SparseNormal(Normal):
                 warn(mismatch_w_msg, SparseConditionWarning)
                 continue
 
-            sparse_ax = [c._iaxid.index(i) for i in iax_ord]
-            dense_ax = [i for i, b in enumerate(c._iaxid) if not b]
-            dense_sz = reduce(mul, [c.shape[i] for i in dense_ax], 1)
+            sparse_ax_ = [c._iaxid.index(i) for i in iax_ord]
+            dense_ax_ = [i for i, b in enumerate(c._iaxid) if not b]
+            dense_sz_ = reduce(mul, [c.shape[i] for i in dense_ax_], 1)
             
-            c = c.transpose(tuple(sparse_ax + dense_ax))
-            c = c.reshape(c.shape[:niax] + (dense_sz,))
+            c = c.transpose(tuple(sparse_ax_ + dense_ax_))
+            c = c.reshape(c.shape[:niax] + (dense_sz_,))
 
             if c.shape[:niax] != self_fl.shape[:niax]:
                 warn(mismatch_w_msg, SparseConditionWarning)
@@ -551,14 +551,14 @@ class SparseNormal(Normal):
             cond_a = cond_a[..., :n] + 1j * cond_a[..., n:]
             cond_m = cond_m[..., :n] + 1j * cond_m[..., n:]
 
-        fcv = SparseNormal(cond_a, cond_m, lat)
+        x = _finalize(SparseNormal(cond_a, cond_m, lat), self_fl._iaxid)
 
         dense_sh = tuple([n for n, i in zip(self.shape, self._iaxid) if not i])
-        fcv = fcv.reshape(fcv.shape[:niax] + dense_sh)
-        t_ax = tuple([i[0] for i in sorted(enumerate(s_sparse_ax + s_dense_ax), 
-                                           key=lambda x:x[1])])
+        x = x.reshape(x.shape[:niax] + dense_sh)
 
-        return _finalize(fcv.transpose(t_ax), self._iaxid)
+        t_ax = tuple([i[0] for i in sorted(enumerate(sparse_ax + dense_ax), 
+                                           key=lambda x:x[1])])
+        return x.transpose(t_ax)
 
     def cov(self):
         """Covariance, generalizing ``<outer((x-<x>), (x-<x>)^H)>``, 
