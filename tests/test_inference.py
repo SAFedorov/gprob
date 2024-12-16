@@ -415,3 +415,35 @@ def test_masked_conditioning():
         vc_ = vp1.condition({vd1: 0.1}).reshape(tuple())
         assert np.max(np.abs(vc.mean() - vc_.mean())) < tol
         assert np.max(np.abs(vc.cov() - vc_.cov())) < tol
+
+
+def test_ou_parametric_estimation():
+    # Parametric estimation of the damping constant of an 
+    # Ornstein–Uhlenbeck process.
+
+    def ou_process(gamma):
+        x = [None] * sz
+        x[0] = normal(0, 0.5)  # The initial condition.
+        for i in range(sz - 1):
+            x[i+1] = x[i] - gamma * x[i] * dt + normal(0, dt)
+        return stack(x)
+    
+    sz = 1001
+    t = np.linspace(0, 2, sz)                  # Temporal grid.
+    dt = (t[-1] - t[0]) / (len(t) - 1)         # Time step.
+    gamma0 = 1                                 # True value of gamma.
+
+    x = ou_process(gamma0)
+    s = x.sample()
+
+    gamma = normal(0, 1e12)       # Prior for the damping rate. 
+    w = normal(0, dt, size=sz-1)  # Noise model.
+
+    gamma_c = gamma | {- gamma * s[:-1] * dt + w: s[1:] - s[:-1]}
+
+    # The analytical formula for the maximum-likelihood estimate.
+    gamma_est = -np.sum(s[:-1] * (s[1:] - s[:-1])) / (np.sum(s[:-1]**2) * dt)
+    
+    tol = 1e-8
+    assert np.abs(gamma_c.mean() - gamma_est) < tol
+    assert gamma_c.var() < 2
