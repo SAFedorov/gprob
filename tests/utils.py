@@ -11,7 +11,7 @@ def assparsenormal(x):
     return sparse.lift(sparse.SparseNormal, x)
 
 
-def random_normal(shape, dtype=np.float64):
+def random_normal(rng, shape, dtype=np.float64):
     """Generates a normal variable with random mean and latent map. 
     The mean and the map coefficients are uniformly distributed over [-1, 1] 
     for real data types, or made of the real and imaginary parts 
@@ -22,16 +22,16 @@ def random_normal(shape, dtype=np.float64):
     if np.issubdtype(dtype, np.complexfloating):
         rdtype = dtype(0).real.dtype
 
-        rmu = (2. * np.random.rand(sz) - 1.).astype(rdtype)
-        ra = (2 * np.random.rand(2 * sz, sz) - 1.).astype(rdtype)
-        imu = (2. * np.random.rand(sz) - 1.).astype(rdtype)
-        ia = (2 * np.random.rand(2 * sz, sz) - 1.).astype(rdtype)
+        rmu = rng.uniform(-1, 1, sz).astype(rdtype)
+        ra = rng.uniform(-1, 1, (2 * sz, sz)).astype(rdtype)
+        imu = rng.uniform(-1, 1, sz).astype(rdtype)
+        ia = rng.uniform(-1, 1, (2 * sz, sz)).astype(rdtype)
 
         mu = rmu + 1j * imu
         a = ra + 1j * ia
     else:
-        mu = (2. * np.random.rand(sz) - 1.).astype(dtype)
-        a = (2 * np.random.rand(sz, sz) - 1.).astype(dtype)
+        mu = rng.uniform(-1, 1, sz).astype(dtype)
+        a = rng.uniform(-1, 1, (sz, sz)).astype(dtype)
 
     assert mu.dtype == dtype
     assert a.dtype == dtype
@@ -39,7 +39,7 @@ def random_normal(shape, dtype=np.float64):
     return normal_.Normal(a, mu).reshape(shape)
 
 
-def random_det_normal(shape, dtype=np.float64):
+def random_det_normal(rng, shape, dtype=np.float64):
     """Generates a random deterministic array lifted to the rank of a normal 
     variable with zero fluctuations."""
 
@@ -48,12 +48,12 @@ def random_det_normal(shape, dtype=np.float64):
     if np.issubdtype(dtype, np.complexfloating):
         rdtype = dtype(0).real.dtype
 
-        rmu = (2. * np.random.rand(sz) - 1.).astype(rdtype)
-        imu = (2. * np.random.rand(sz) - 1.).astype(rdtype)
+        rmu = rng.uniform(-1, 1, sz).astype(rdtype)
+        imu = rng.uniform(-1, 1, sz).astype(rdtype)
 
         mu = rmu + 1j * imu
     else:
-        mu = (2. * np.random.rand(sz) - 1.).astype(dtype)
+        mu = rng.uniform(-1, 1, sz).astype(dtype)
 
     v = asnormal(mu)
     assert v.b.dtype == dtype
@@ -62,11 +62,9 @@ def random_det_normal(shape, dtype=np.float64):
     return v.reshape(shape)
 
 
-def random_correlate(vs):
+def random_correlate(rng, vs):
     # Correlates the input variables by randomly mixing their latent keys.
     union_elems = set().union(*list(v.lat.keys() for v in vs))
-
-    rng = np.random.default_rng()
 
     for v in vs:
         new_ind  = rng.choice(list(union_elems), size=len(v.lat), 

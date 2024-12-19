@@ -8,6 +8,7 @@ from numpy.linalg import LinAlgError
 from numpy.exceptions import AxisError
 
 from . import latent
+from . import rn
 from . import normal_
 from .normal_ import (Normal, complete, lift, match_, complete_tensordot_axes,
                       validate_logp_samples, print_)
@@ -619,7 +620,7 @@ class SparseNormal(Normal):
     def sample(self, n=None):
         nsh = tuple() if n is None else (n,)
         ish = [self.shape[self._iaxid.index(i + 1)] for i in range(self._niax)]
-        r = np.random.normal(size=(self.nlat, *nsh, *ish))
+        r = rn.gen.standard_normal((self.nlat, *nsh, *ish))
         return apply(self, r)
         
     def logp(self, x):
@@ -1099,7 +1100,7 @@ def sample(xs, n):
 
     ulat = latent.uunion(*[x.lat for x in xs])
     sz = (len(ulat),) if n is None else (len(ulat), n)
-    r = np.random.normal(size=sz + iaxsh)
+    r = rn.gen.standard_normal(sz + iaxsh)
 
     samples = []
     for x in xs:

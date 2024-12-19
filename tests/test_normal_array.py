@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from gprob import maps
-from gprob import (normal,
+from gprob import (rn, normal,
                    stack, hstack, vstack, dstack, concatenate,
                    split, hsplit, vsplit, dsplit, squeeze, flip,
                    sum, cumsum, trace, diagonal, reshape, moveaxis, ravel, 
@@ -22,7 +22,8 @@ from gprob.linalg import solve, asolve
 from utils import random_normal, random_det_normal, random_correlate
 
 
-np.random.seed(0)
+rn.setgen(0)
+rng = rn.gen
 
 
 def _gts(ndim = None):
@@ -91,7 +92,7 @@ def _test_array_func(f, args=tuple(), pargs=tuple(), test_shapes=None,
         
     for sh in test_shapes:
         # The operation on random variables.
-        vin = random_normal(sh, test_dtype)
+        vin = random_normal(rng, sh, test_dtype)
         vout = f(*pargs, vin, *args, **kwargs)
 
         assert vin.a.shape[1:] == vin.b.shape
@@ -113,7 +114,7 @@ def _test_array_func(f, args=tuple(), pargs=tuple(), test_shapes=None,
             assert np.allclose(arout, aref, rtol=tol, atol=tol * np.max(np.abs(arin)))
 
         # The operation on deterministic variables.
-        vin = random_det_normal(sh, test_dtype)
+        vin = random_det_normal(rng, sh, test_dtype)
         vout = f(*pargs, vin, *args, **kwargs)
 
         assert vin.a.size == 0
@@ -381,19 +382,19 @@ def test_fftn():
 
 
 def test_solve():
-    a = 2 * np.random.rand(2, 2) - 1
+    a = rng.uniform(-1, 1, (2, 2))
     _test_array_func(solve, pargs=(a,), test_shapes=[(2,), (2, 3)], mod="linalg")
     
-    a = 2 * np.random.rand(5, 5) - 1
+    a = rng.uniform(-1, 1, (5, 5))
     _test_array_func(solve, pargs=(a,), test_shapes=[(5,), (5, 3)], mod="linalg")
     
-    a = 2 * np.random.rand(3, 2, 2) - 1
+    a = rng.uniform(-1, 1, (3, 2, 2))
     v = normal(size=(2,))
 
     with pytest.raises(ValueError):
         solve(a, v)  # Error because of the wrong number of dimensions of a.
 
-    a = 2 * np.random.rand(2, 2) - 1
+    a = rng.uniform(-1, 1, (2, 2))
     v = normal(size=(2, 2, 3))
 
     assert np.linalg.solve(a, v.mean()).shape == v.shape
@@ -402,17 +403,17 @@ def test_solve():
 
     # Some more erroneous cases.
 
-    a = 2 * np.random.rand(2, 2) - 1
+    a = rng.uniform(-1, 1, (2, 2))
     v = normal()
     with pytest.raises(ValueError):
         solve(a, v)
 
-    a = 2 * np.random.rand(2) - 1
+    a = rng.uniform(-1, 1, (2,))
     v = normal(size=(2,))
     with pytest.raises(ValueError):
         solve(a, v)
         
-    a = 2 * np.random.rand(3, 3) - 1
+    a = rng.uniform(-1, 1, (3, 3))
     v = normal(size=(2,))
     with pytest.raises(ValueError):
         solve(a, v)
@@ -422,29 +423,29 @@ def test_asolve():
     def asolve_ref(a, b):
         return np.linalg.solve(a, b[..., None]).squeeze(-1)
     
-    a = 2 * np.random.rand(2, 2) - 1
+    a = rng.uniform(-1, 1, (2, 2))
     _test_array_func(asolve, pargs=(a,), test_shapes=[(2,)], npf=asolve_ref)
     
-    a = 2 * np.random.rand(5, 5) - 1
+    a = rng.uniform(-1, 1, (5, 5))
     _test_array_func(asolve, pargs=(a,), test_shapes=[(5,)], npf=asolve_ref)
 
-    a = 2 * np.random.rand(4, 3, 2, 2) - 1
+    a = rng.uniform(-1, 1, (4, 3, 2, 2))
     _test_array_func(asolve, pargs=(a,), 
                      test_shapes=[(1, 1, 2,), (4, 3, 2)], npf=asolve_ref)
 
     # Some more erroneous cases.
 
-    a = 2 * np.random.rand(2, 2) - 1
+    a = rng.uniform(-1, 1, (2, 2))
     v = normal()
     with pytest.raises(ValueError):
         asolve(a, v)
 
-    a = 2 * np.random.rand(2) - 1
+    a = rng.uniform(-1, 1, (2,))
     v = normal(size=(2,))
     with pytest.raises(ValueError):
         asolve(a, v)
         
-    a = 2 * np.random.rand(3, 3) - 1
+    a = rng.uniform(-1, 1, (3, 3))
     v = normal(size=(2,))
     with pytest.raises(ValueError):
         asolve(a, v)
@@ -469,8 +470,8 @@ def _test_array_func2(f, op1_shape=None, op2_shape=None, *args, **kwargs):
 
     # Normal variable first.
 
-    vin = random_normal(op1_shape)
-    op2 = (2. * np.random.rand(*op2_shape) - 1)
+    vin = random_normal(rng, op1_shape)
+    op2 = rng.uniform(-1, 1, op2_shape)
     vout = f(*args, vin, op2, **kwargs)
     refmean = npf(*args, vin.b, op2, **kwargs)
 
@@ -492,8 +493,8 @@ def _test_array_func2(f, op1_shape=None, op2_shape=None, *args, **kwargs):
 
     # Normal variable second.
     
-    op1 = (2. * np.random.rand(*op1_shape) - 1)
-    vin = random_normal(op2_shape)
+    op1 = rng.uniform(-1, 1, op1_shape)
+    vin = random_normal(rng, op2_shape)
     vout = f(*args, op1, vin, **kwargs)
     refmean = npf(*args, op1, vin.b, **kwargs)
 
@@ -512,8 +513,8 @@ def _test_array_func2(f, op1_shape=None, op2_shape=None, *args, **kwargs):
 
     # Both variables are normal. 
 
-    vin1 = random_normal(op1_shape)
-    vin2 = random_normal(op2_shape)
+    vin1 = random_normal(rng, op1_shape)
+    vin2 = random_normal(rng, op2_shape)
     vout = f(*args, vin1, vin2, **kwargs)
     refmean = npf(*args, vin1.b, vin2.b, **kwargs)
 
@@ -533,8 +534,8 @@ def _test_array_func2(f, op1_shape=None, op2_shape=None, *args, **kwargs):
 
     # Both variables are deterministic promoted to Normal.
 
-    vin1 = random_det_normal(op1_shape)
-    vin2 = random_det_normal(op2_shape)
+    vin1 = random_det_normal(rng, op1_shape)
+    vin2 = random_det_normal(rng, op2_shape)
     vout = f(*args, vin1, vin2, **kwargs)
     refmean = npf(*args, vin1.b, vin2.b, **kwargs)
 
@@ -757,7 +758,7 @@ def _test_array_method(name, *args, test_shapes=None, **kwargs):
         test_shapes = _gts(test_shapes)
 
     for sh in test_shapes:
-        vin = random_normal(sh)
+        vin = random_normal(rng, sh)
         vout = getattr(vin, name)(*args, **kwargs)
 
         assert vin.a.shape[1:] == vin.b.shape
@@ -798,37 +799,38 @@ def _test_concat_func(f, *args, test_shapes=None, vins_list=None, **kwargs):
     if vins_list is None:
         vins_list = []
         for sh in test_shapes:
-            vins_max = random_correlate([random_normal(sh) 
-                                          for _ in range(ns[-1])])
+            vins_max = random_correlate(rng, [random_normal(rng, sh) 
+                                              for _ in range(ns[-1])])
             vins_list += [vins_max[:n] for n in ns]
             
             # Adds special cases of two inputs with different numbers of 
             # the latent variables, because there are separate evaluation
             # branches for the optimization of those.
-            vins2 = random_correlate([random_normal(sh) for _ in range(2)])
-            vins2[0] = vins2[0] + np.random.rand(*sh) * normal(0.1, 0.9)
+            vins2 = random_correlate(rng, [random_normal(rng, sh) 
+                                           for _ in range(2)])
+            vins2[0] = vins2[0] + rng.uniform(0, 1, sh) * normal(0.1, 0.9)
 
             vins_list += [[vins2[0], vins2[1]], [vins2[1], vins2[0]]]
 
             # Adds a cace of deterministic arrays promoted to Normals.
-            vins_list += [[random_det_normal(sh) for _ in range(1)],
-                          [random_det_normal(sh) for _ in range(2)],
-                          [random_det_normal(sh) for _ in range(3)]]
+            vins_list += [[random_det_normal(rng, sh) for _ in range(1)],
+                          [random_det_normal(rng, sh) for _ in range(2)],
+                          [random_det_normal(rng, sh) for _ in range(3)]]
             
             # Cases with one of the input arrays being complex.
-            vins3 = random_correlate([random_normal(sh), 
-                                      random_normal(sh, dtype=np.complex64)])
-            vins3[0] = vins3[0] + np.random.rand(*sh) * normal(-0.1, 0.8)
+            vins3 = random_correlate(rng, [random_normal(rng, sh), 
+                                           random_normal(rng, sh, np.complex64)])
+            vins3[0] = vins3[0] + rng.uniform(0, 1, sh) * normal(-0.1, 0.8)
             vins_list += [[vins3[0], vins3[1]], [vins3[1], vins3[0]]]
 
-            vins4 = random_correlate([random_normal(sh),
-                                      random_normal(sh), 
-                                      random_normal(sh, dtype=np.complex64)])
+            vins4 = random_correlate(rng, [random_normal(rng, sh),
+                                           random_normal(rng, sh), 
+                                           random_normal(rng, sh, np.complex64)])
             vins_list += [vins4]
 
             # A case to check the optimization branch for two operands, 
             # where the latent variables are the same.
-            vin = random_normal(sh, dtype=np.complex64)
+            vin = random_normal(rng, sh, dtype=np.complex64)
             assert vin.real.lat is vin.imag.lat
             vins_list += [[vin.real, vin.imag], [vin.imag, vin.imag]]
 
@@ -899,16 +901,16 @@ def test_concatenate():
     ts = _gts("2dmin")
     ax = 2
     for s in ts:
-        vins = random_correlate([random_normal((*s[:ax], i, *s[ax:]))
-                                  for i in range(1, 4)])
+        vins = random_correlate(rng, [random_normal(rng, (*s[:ax], i, *s[ax:]))
+                                      for i in range(1, 4)])
         _test_concat_func(concatenate, axis=ax, vins_list=[vins])
 
     ts = _gts("2dmin")
     ax = -2
     for s in ts:
-        print(s)
-        vins = random_correlate([random_normal((*s[:ax+1], i, *s[ax+1:]))
-                                  for i in range(1, 4)])
+        vins_ = [random_normal(rng, (*s[:ax+1], i, *s[ax+1:])) 
+                 for i in range(1, 4)]
+        vins = random_correlate(rng, vins_)
         _test_concat_func(concatenate, axis=ax, vins_list=[vins])
 
 
@@ -930,7 +932,7 @@ def _test_split_func(f, test_shapes="1dmin", test_axis=None, **kwargs):
             args_lists += [[[sz//3, 2*sz//3]]]
 
         for args in args_lists:
-            vin = random_normal(sh)
+            vin = random_normal(rng, sh)
             vouts = f(vin, *args, **kwargs)
 
             refmeans = npf(vin.b, *args, **kwargs)
@@ -1006,16 +1008,16 @@ def test_dtype_promotion():
     sh = (2, 3)
 
     # Real types
-    v1 = random_normal(sh)
+    v1 = random_normal(rng, sh)
     v1.a = v1.a.astype(np.float16)
     v1.b = v1.b.astype(np.float16)
 
-    v2 = random_normal(sh, dtype=np.float32)
-    v3 = random_normal(sh, dtype=np.float64)
+    v2 = random_normal(rng, sh, dtype=np.float32)
+    v3 = random_normal(rng, sh, dtype=np.float64)
 
     # Complex types
-    v5 = random_normal(sh, dtype=np.complex64)
-    v6 = random_normal(sh, dtype=np.complex128)
+    v5 = random_normal(rng, sh, dtype=np.complex64)
+    v6 = random_normal(rng, sh, dtype=np.complex128)
 
     funcs = [stack, concatenate, 
              lambda a: add(a[0], a[1]), lambda a: add(a[1], a[0]),
@@ -1101,8 +1103,8 @@ def test_divide():
                        [(5, 1, 2) + bsh, (5, 3, 1) + bsh]]
         
         for sh1, sh2 in test_shapes:
-            v = random_normal(sh1)
-            ar = np.random.rand(*sh2)
+            v = random_normal(rng, sh1)
+            ar = rng.uniform(0, 1, sh2)
 
             _assert_normals_close(divide(v, ar), multiply(v, 1/ar))
 
@@ -1114,8 +1116,8 @@ def test_power():
     for sh in test_shapes:
 
         # normal-constant
-        v = 1.001 + random_normal(sh)
-        x = (2 * np.random.rand(*sh) - 1)
+        v = 1.001 + random_normal(rng, sh)
+        x = rng.uniform(-1, 1, sh)
 
         v_ = power(v, x)
         v_ref = power(v.mean(), x) * (1 + x * v.delta / v.mean())
@@ -1134,8 +1136,8 @@ def test_power():
         _assert_normals_close(v_, v_ref)
         
         # constant-normal
-        v = random_normal(sh)
-        x = np.random.rand(*sh) + 0.001
+        v = random_normal(rng, sh)
+        x = rng.uniform(0, 1, sh) + 0.001
 
         v_ = power(x, v)
         v_ref = power(x, v.mean()) * (1 + np.log(x) * v.delta)
@@ -1150,8 +1152,8 @@ def test_power():
         _assert_normals_close(v_, v_ref)
 
         # normal-normal
-        v = 1.001 + random_normal(sh)
-        v2 = random_normal(sh)
+        v = 1.001 + random_normal(rng, sh)
+        v2 = random_normal(rng, sh)
         v_ = power(v, v2)
 
         y, z = v.mean(), v2.mean()
@@ -1160,7 +1162,7 @@ def test_power():
         _assert_normals_close(v_, v_ref)
 
     # Another case for broadcasting over the second operand.
-    v = random_normal(tuple())
+    v = random_normal(rng, tuple())
     v_ = power(v, [2, 3, 4])
     v_ref = stack([v * v, v * v * v, v * v * v * v])
     _assert_normals_close(v_, v_ref)

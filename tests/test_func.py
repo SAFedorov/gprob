@@ -2,17 +2,17 @@ import pytest
 import numpy as np
 from scipy.stats import multivariate_normal as mvn
 
-from gprob import normal, hstack
+from gprob import rn, normal, hstack
 from gprob.func import logp, logp_lstsq, dlogp, d2logp, fisher, dkl
 
 from reffunc import logp as logp_
 from reffunc import dlogp_eigh as dlogp_
 from reffunc import d2logp as d2logp_
 from reffunc import dkl as dkl_
-from reffunc import dkl_qr
 
 
-np.random.seed(0)
+rn.setgen(0)
+rng = rn.gen
 
 
 def num_dlogp(x, m, cov, dm, dcov, delta=1e-7):
@@ -69,11 +69,11 @@ def random_d(sz):
         Tuple: (x, m, cov) - sample, mean, and covariance.
     """
 
-    mat1 = 2 * np.random.rand(sz, sz) - 1
+    mat1 = rng.uniform(-1, 1, size=(sz, sz))
     msq1 = mat1 @ mat1.T
     
-    v = 2 * np.random.rand(sz) - 1
-    v1 = 2 * np.random.rand(sz) - 1
+    v = rng.uniform(-1, 1, size=(sz,))
+    v1 = rng.uniform(-1, 1, size=(sz,))
 
     return v, v1, msq1
 
@@ -86,9 +86,9 @@ def random_d1(sz, npar):
         Tuple: (x, m, cov, dm, dcov)
     """
 
-    mat2 = 2 * np.random.rand(npar, sz, sz) - 1
+    mat2 = rng.uniform(-1, 1, size=(npar, sz, sz))
     msq2 = np.einsum('ijk, ilk -> ijl', mat2, mat2)
-    v2 = 2 * np.random.rand(npar, sz) - 1
+    v2 = rng.uniform(-1, 1, size=(npar, sz))
 
     return random_d(sz) + (v2, msq2)
 
@@ -101,11 +101,11 @@ def random_d2(sz, npar):
         Tuple: (x, m, cov, dm, dcov, d2m, d2cov)
     """
 
-    mat3 = 2 * np.random.rand(npar, npar, sz, sz) - 1
+    mat3 = rng.uniform(-1, 1, size=(npar, npar, sz, sz))
     msq3 = np.einsum('ijkl, ijrl -> ijkr', mat3, mat3)
     msq3 = msq3.transpose(1, 0, 2, 3) + msq3  # Symmetrizes the Hessian of m
 
-    v3 = 2 * np.random.rand(npar, npar, sz) - 1
+    v3 = rng.uniform(-1, 1, size=(npar, npar, sz))
     v3 = v3.transpose(1, 0, 2) + v3  # Symmetrizes the Hessian of cov
 
     return random_d1(sz, npar) + (v3, msq3)
@@ -198,7 +198,7 @@ def test_dlogp():
 
     v, v1, msq1, v2, msq2 = random_d1(401, 1)
     g = dlogp(v, v1, msq1, v2, msq2)
-    num_g = num_dlogp(v, v1, msq1, v2, msq2, delta=1e-9)
+    num_g = num_dlogp(v, v1, msq1, v2, msq2, delta=1e-10)
     ref_g = dlogp_(v, v1, msq1, v2, msq2)
 
     assert np.abs((g - num_g)/num_g).max() < num_tol
@@ -276,11 +276,11 @@ def test_dkl():
         assert np.abs(val / ref - 1) < tol
 
         # Tests for the diagonal case.
-        m1 = 2 * np.random.rand(sz) - 1
-        m2 = 2 * np.random.rand(sz) - 1
+        m1 = rng.uniform(-1, 1, sz)
+        m2 = rng.uniform(-1, 1, sz)
 
-        cov_diag1 = (2 * np.random.rand(sz) - 1) ** 2
-        cov_diag2 = (2 * np.random.rand(sz) - 1) ** 2
+        cov_diag1 = (rng.uniform(-1, 1, sz)) ** 2
+        cov_diag2 = (rng.uniform(-1, 1, sz)) ** 2
 
         cov1 = np.diag(cov_diag1)
         cov2 = np.diag(cov_diag2)
@@ -293,11 +293,11 @@ def test_dkl():
         tol = 1e-5
         delta = 1e-5
 
-        m = 2 * np.random.rand(sz) - 1
-        dm = 2 * np.random.rand(sz) - 1
+        m = rng.uniform(-1, 1, sz)
+        dm = rng.uniform(-1, 1, sz)
 
-        a = 2 * np.random.rand(sz, sz) - 1
-        da = 2 * np.random.rand(sz, sz) - 1
+        a = rng.uniform(-1, 1, (sz, sz))
+        da = rng.uniform(-1, 1, (sz, sz))
 
         m1 = m + delta * dm
         m2 = m - delta * dm

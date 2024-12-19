@@ -4,13 +4,15 @@ from scipy.stats import multivariate_normal as mvn
 from numpy.linalg import LinAlgError
 from numpy.exceptions import ComplexWarning
 from gprob import (stack, hstack, vstack, icopy, broadcast_to, var, std, cov, 
-                   dkl, entropy, logp, sample)
+                   dkl, entropy, logp, sample, rn)
 from gprob.normal_ import normal, Normal, safer_cholesky
 from gprob.sparse import iid
 from utils import random_normal, random_correlate, asnormal, get_message
 from reffunc import dkl_qr
 
-np.random.seed(0)
+
+rn.setgen(0)
+rng = rn.gen
 
 
 def test_construction():
@@ -95,7 +97,7 @@ def test_creation():
     sh = (3, 7, 2)
     vsz = int(np.prod(sh))
 
-    a = np.random.rand(vsz * 2, *sh)
+    a = rng.uniform(0, 1, (2*vsz,) + sh)
     cov = np.einsum("ijkl, imno -> jklmno", a, a)
 
     tol = 10 * vsz * np.finfo(cov.dtype).eps
@@ -106,7 +108,7 @@ def test_creation():
     assert np.allclose(xi.cov(), cov, rtol=tol, atol=tol)
 
     # Complex
-    a = np.random.rand(vsz * 2, *sh) + 1j * np.random.rand(vsz * 2, *sh)
+    a = rng.uniform(0, 1, (2*vsz,) + sh) + 1j * rng.uniform(0, 1, (2*vsz,) + sh)
     cov = np.einsum("ijkl, imno -> jklmno", a, a.conj())
     xi = normal(mu, cov)
     assert xi.shape == sh
@@ -114,7 +116,9 @@ def test_creation():
     assert np.allclose(xi.cov(), cov, rtol=tol, atol=tol)
 
     # Degenerate complex
-    a = np.random.rand(vsz // 2, *sh) + 1j * np.random.rand(vsz // 2, *sh)
+    a = (rng.uniform(0, 1, (vsz // 2,) + sh) 
+         + 1j * rng.uniform(0, 1, (vsz // 2,) + sh))
+    
     cov = np.einsum("ijkl, imno -> jklmno", a, a.conj())
 
     with pytest.raises(LinAlgError):  # confirms the degeneracy
@@ -177,9 +181,9 @@ def test_creation_w_dtype():
         # Non-degenerate covariance matrix.
         sz = 11
         esz = 17
-        a = 2. * np.random.rand(esz, sz) - 1.
+        a = rng.uniform(-1, 1, (esz, sz))
         cov = (a.T @ a).astype(dt)
-        mu = np.random.rand(sz).astype(dt)
+        mu = rng.uniform(0, 1, (sz,)).astype(dt)
         xi = normal(mu, cov)
         assert xi.mean().dtype == dt
         assert (xi.mean() == mu).all()
@@ -187,7 +191,7 @@ def test_creation_w_dtype():
         assert np.allclose(xi.cov(), cov, rtol=tol, atol=tol)
 
         # Singly degenerate covariance matrix.
-        a = (2. * np.random.rand(esz, sz) - 1.)
+        a = rng.uniform(-1, 1, (esz, sz))
         cov_ = (a.T @ a).astype(dt)
         evals, evects = np.linalg.eigh(cov_)
         evals[1] = 0.
@@ -196,7 +200,7 @@ def test_creation_w_dtype():
         with pytest.raises(LinAlgError):  # confirms the degeneracy
             safer_cholesky(cov)
 
-        mu = np.random.rand(sz).astype(dt)
+        mu = rng.uniform(0, 1, (sz,)).astype(dt)
         xi = normal(mu, cov)
         assert xi.mean().dtype == dt
         assert (xi.mean() == mu).all()
@@ -209,7 +213,7 @@ def test_creation_w_dtype():
         with pytest.raises(LinAlgError):
             safer_cholesky(cov)
 
-        mu = np.random.rand(sz).astype(dt)
+        mu = rng.uniform(0, 1, (sz,)).astype(dt)
         xi = normal(mu, cov)
         assert xi.mean().dtype == dt
         assert (xi.mean() == mu).all()
@@ -223,10 +227,10 @@ def test_creation_w_dtype():
         # Non-degenerate covariance matrix.
         sz = 11
         esz = 17
-        a = ((2. * np.random.rand(esz, sz) - 1.) 
-             + 1j * (2. * np.random.rand(esz, sz) - 1.))
+        a = (rng.uniform(-1, 1, (esz, sz))
+             + 1j * rng.uniform(-1, 1, (esz, sz)))
         cov = (a.T @ a.conj()).astype(dt)
-        mu = (np.random.rand(sz) + 1j * np.random.rand(sz)).astype(dt)
+        mu = (rng.uniform(0, 1, sz) + 1j * rng.uniform(0, 1, sz)).astype(dt)
         xi = normal(mu, cov)
         assert xi.mean().dtype == dt
         assert (xi.mean() == mu).all()
@@ -234,8 +238,8 @@ def test_creation_w_dtype():
         assert np.allclose(xi.cov(), cov, rtol=tol, atol=tol)
 
         # Singly degenerate covariance matrix.
-        a = ((2. * np.random.rand(esz, sz) - 1.) 
-             + 1j * (2. * np.random.rand(esz, sz) - 1.))
+        a = (rng.uniform(-1, 1, (esz, sz)) 
+             + 1j * rng.uniform(-1, 1, (esz, sz)))
         cov_ = (a.T @ a.conj()).astype(dt)
         evals, evects = np.linalg.eigh(cov_)
         evals[1] = 0.
@@ -244,7 +248,7 @@ def test_creation_w_dtype():
         with pytest.raises(LinAlgError):  # confirms the degeneracy
             safer_cholesky(cov)
 
-        mu = (np.random.rand(sz) + 1j * np.random.rand(sz)).astype(dt)
+        mu = (rng.uniform(0, 1, sz) + 1j * rng.uniform(0, 1, sz)).astype(dt)
         xi = normal(mu, cov)
         assert xi.mean().dtype == dt
         assert (xi.mean() == mu).all()
@@ -257,7 +261,7 @@ def test_creation_w_dtype():
         with pytest.raises(LinAlgError):
             safer_cholesky(cov)
 
-        mu = (np.random.rand(sz) + 1j * np.random.rand(sz)).astype(dt)
+        mu = (rng.uniform(0, 1, sz) + 1j * rng.uniform(0, 1, sz)).astype(dt)
         xi = normal(mu, cov)
         assert xi.mean().dtype == dt
         assert (xi.mean() == mu).all()
@@ -269,7 +273,7 @@ def test_properties():
     # Checks the descriptive properties
     prop_names = ["size", "shape", "ndim"]
 
-    v = random_normal((3, 4))
+    v = random_normal(rng, (3, 4))
     for pn in prop_names:
         assert getattr(v, pn) == getattr(v.mean(), pn)
 
@@ -339,7 +343,7 @@ def test_logp():
     assert xi.logp([2, 1]) == (-(2-0.9)**2/(2 * 3.3)-(1-0.9)**2/(2 * 3.3) 
                                + 2 * np.log(1/np.sqrt(2 * np.pi * 3.3)))
     
-    assert xi.logp(np.random.rand(3, 2)).shape == (3,)
+    assert xi.logp(rng.uniform(0, 1, (3, 2))).shape == (3,)
 
     xi = normal(0.9, 3.3, size=2)
     with pytest.raises(ValueError):
@@ -353,11 +357,11 @@ def test_logp():
 
     # A higher-dimensional variable.
     sh = (3, 5)
-    xi = random_normal(sh, dtype=np.float64)
+    xi = random_normal(rng, sh, dtype=np.float64)
     xif = xi.ravel()
 
     tol_ = 1e-8  # increased tolerance margin
-    x = np.random.rand(*sh)
+    x = rng.uniform(0, 1, sh)
     logpref = mvn.logpdf(x.ravel(), xif.mean(), xif.cov())
     assert np.abs(xi.logp(x) - logpref) < tol_
     assert xi.logp(x).shape == x.shape[:-xi.ndim]
@@ -365,7 +369,7 @@ def test_logp():
     assert np.abs(logp(xi, x) - logpref) < tol_
     assert logp(xi, x).shape == x.shape[:-xi.ndim]
 
-    x = np.random.rand(3, *sh)
+    x = rng.uniform(0, 1, (3,) + sh)
     logpref = mvn.logpdf(x.reshape(-1, xif.size), xif.mean(), xif.cov())
     assert np.max(np.abs(xi.logp(x) - logpref)) < tol_
     assert xi.logp(x).shape == x.shape[:-xi.ndim]
@@ -414,14 +418,14 @@ def test_logp():
 
     # Self-consistency: doubling the dimension does not change logp
     sh = (2, 3, 1)
-    xi = random_normal(sh, dtype=np.float64)
+    xi = random_normal(rng, sh, dtype=np.float64)
     xi_ = vstack([xi, xi]) / np.sqrt(2)
     x = xi.sample()
     x_ = np.vstack([x, x]) / np.sqrt(2)
     assert np.abs(xi.logp(x) - xi_.logp(x_)) < tol_
 
     for sh in [tuple(), (5,), (3, 3), (3, 20, 4)]:
-        xi = random_normal(sh, dtype=np.float64)
+        xi = random_normal(rng, sh, dtype=np.float64)
         xi = vstack([xi, xi, xi, xi])
         xif = xi.ravel()
 
@@ -437,7 +441,7 @@ def test_logp():
         assert xi.logp(x).shape == x.shape[:-xi.ndim]
 
         # Single impossible sample.
-        x = np.random.rand(*xi.shape)
+        x = rng.uniform(0, 1, xi.shape)
         assert xi.logp(x) == float("-inf")
 
         # Multiple possible samples.
@@ -449,7 +453,7 @@ def test_logp():
         assert xi.logp(x).shape == x.shape[:-xi.ndim]
 
         # One impossible sample among several possible.
-        x[0] = np.random.rand(*xi.shape)
+        x[0] = rng.uniform(0, 1, xi.shape)
         xf = x.reshape(-1, xi.size)
         logpref = mvn.logpdf(xf, xif.mean(), xif.cov(), 
                              allow_singular=True)
@@ -494,26 +498,26 @@ def test_complex_logp():
     assert xi.logp([sa]).shape == (1,)
 
     sh = (6,)
-    xi = random_normal(sh, dtype=np.complex128)
+    xi = random_normal(rng, sh, dtype=np.complex128)
 
     a = xi.a
     m = xi.mean()
     cov = a.T @ a.conj()
     rel = a.T @ a
 
-    x = np.random.rand(*sh) + 1j * np.random.rand(*sh)
+    x = rng.uniform(0, 1, sh) + 1j * rng.uniform(0, 1, sh)
     logpref = complex_pdf(x, m, cov, rel)
     assert np.abs(xi.logp(x) - logpref) < tol
     assert xi.logp(x).shape == x.shape[:-xi.ndim]
 
-    x = np.random.rand(3, *sh)
+    x = rng.uniform(0, 1, (3,) + sh)
     logpref = np.array([complex_pdf(x_, m, cov, rel) for x_ in x])
     assert np.max(np.abs(xi.logp(x) - logpref)) < tol
     assert xi.logp(x).shape == x.shape[:-xi.ndim]
 
     # A higher-dimensional array.
     sh = (3, 2)
-    xi = random_normal(sh, dtype=np.complex128)
+    xi = random_normal(rng, sh, dtype=np.complex128)
     
     xif = xi.flatten()
     a = xif.a
@@ -521,13 +525,13 @@ def test_complex_logp():
     cov = a.T @ a.conj()
     rel = a.T @ a
 
-    x = np.random.rand(*sh) + 1j * np.random.rand(*sh)
+    x = rng.uniform(0, 1, sh) + 1j * rng.uniform(0, 1, sh)
     xf = x.flatten()
     logpref = complex_pdf(xf, m, cov, rel)
     assert np.abs(xi.logp(x) - logpref) < tol
     assert xi.logp(x).shape == x.shape[:-xi.ndim]
 
-    x = np.random.rand(3, *sh)
+    x = rng.uniform(0, 1, (3,) + sh)
     xf = x.reshape(3, -1)
     logpref = np.array([complex_pdf(x_, m, cov, rel) for x_ in xf])
     assert np.max(np.abs(xi.logp(x) - logpref)) < tol
@@ -535,7 +539,7 @@ def test_complex_logp():
 
     # A degenerate case.
     sh = (3,)
-    xi = random_normal(sh, dtype=np.complex128)
+    xi = random_normal(rng, sh, dtype=np.complex128)
     xi = hstack([xi, xi])
     x = xi.sample()
 
@@ -552,7 +556,7 @@ def test_complex_logp():
     assert np.abs(xi.logp(x) - logpref) < tol
 
     # An impossible sample.
-    x = np.random.rand(*xi.shape) + 1j * np.random.rand(*xi.shape)
+    x = rng.uniform(0, 1, xi.shape) + 1j * rng.uniform(0, 1, xi.shape)
     assert xi.logp(x) == float("-Inf")
 
 
@@ -615,7 +619,7 @@ def test_sample():
 
     for dt in [np.float64, np.complex128]:
         sh = (3, 2, 4)
-        v = random_normal(shape=sh, dtype=dt)
+        v = random_normal(rng, shape=sh, dtype=dt)
         s = v.sample(10**4)
         assert s.shape == (10**4,) + sh
         _moments_test(v, s)
@@ -664,7 +668,7 @@ def test_sample_func():
 
     for sh in [tuple(), (3, 2), (3, 2, 4)]:
         for dt in [np.float64, np.complex128]:
-            x = random_normal(shape=sh, dtype=dt)
+            x = random_normal(rng, shape=sh, dtype=dt)
             
             s = sample(x)
             assert s.shape == sh
@@ -792,9 +796,9 @@ def test_latent_ordering():
 
     # Shuffled lists of scalars
 
-    idx1 = np.random.randint(0, len(vl1), size=len(vl1))
-    idx12 = np.random.randint(0, len(vl1), size=len(vl1))
-    idx2 = np.random.randint(0, len(vl2), size=len(vl2))
+    idx1 = rng.integers(0, len(vl1), size=len(vl1))
+    idx12 = rng.integers(0, len(vl1), size=len(vl1))
+    idx2 = rng.integers(0, len(vl2), size=len(vl2))
     vl1_s = [vl1[i] for i in idx1]
     vl12_s = [vl1[i] for i in idx12]
     vl2_s = [vl2[i] for i in idx2]
@@ -844,9 +848,9 @@ def test_latent_ordering():
 
     # Shuffled lists of vectors
 
-    idx1 = np.random.randint(0, len(vl1), size=len(vl1))
-    idx12 = np.random.randint(0, len(vl1), size=len(vl1))
-    idx2 = np.random.randint(0, len(vl2), size=len(vl2))
+    idx1 = rng.integers(0, len(vl1), size=len(vl1))
+    idx12 = rng.integers(0, len(vl1), size=len(vl1))
+    idx2 = rng.integers(0, len(vl2), size=len(vl2))
     vl1_s = [vl1[i] for i in idx1]
     vl12_s = [vl1[i] for i in idx12]
     vl2_s = [vl2[i] for i in idx2]
@@ -1011,7 +1015,7 @@ def test_operations():
     assert np.max(np.abs(v1.cov() - v2.cov())) < tol 
 
     # Matrix multiplication.
-    v = random_normal((3, 3))
+    v = random_normal(rng, (3, 3))
     v1 = v @ [normal(0.1, 1), 2, normal(0.1, 1)]
     v2 = v @ hstack([normal(0.1, 1), 2, normal(0.1, 1)])
     assert isinstance(v1, Normal)
@@ -1027,7 +1031,7 @@ def test_operations():
     assert np.max(np.abs(v1.cov() - v2.cov())) < tol 
 
     # Power.
-    v = 2 + random_normal((2, 3))
+    v = 2 + random_normal(rng, (2, 3))
     v1 = v ** [normal(0.1, 1), 2, normal(0.1, 1)]
     v2 = v ** hstack([normal(0.1, 1), 2, normal(0.1, 1)])
     assert isinstance(v1, Normal)
@@ -1125,41 +1129,41 @@ def test_broadcasting():
                  np.array([0.3, -0.3]))
     
     # addition
-    sh = tuple(np.random.randint(1, 4, 8))
-    m = np.random.rand(*(sh + (2,)))
+    sh = tuple(rng.integers(1, 4, 8))
+    m = rng.uniform(0, 1, sh + (2,))
 
     xi2 = m + xi1
     assert xi2.shape == sh + (2,)
     assert xi2.a.shape == (3,) + sh + (2,)
-    rng = int(np.prod(sh))
-    a2_fl = np.reshape(xi2.a, (3, rng, 2))
-    for i in range(rng):
+    rnge = int(np.prod(sh))
+    a2_fl = np.reshape(xi2.a, (3, rnge, 2))
+    for i in range(rnge):
         assert np.abs(a2_fl[:, i, :] - xi1.a).max() < tol
 
     # multiplication
-    sh = tuple(np.random.randint(1, 4, 9))
-    m = np.random.rand(*(sh + (2,)))
+    sh = tuple(rng.integers(1, 4, 9))
+    m = rng.uniform(0, 1, sh + (2,))
 
     xi2 = m * xi1
     assert xi2.shape == sh + (2,)
     assert xi2.a.shape == (3,) + sh + (2,)
-    rng = int(np.prod(sh))
-    m_fl = np.reshape(m, (rng, 2))
-    a2_fl = np.reshape(xi2.a, (3, rng, 2))
-    for i in range(rng):
+    rnge = int(np.prod(sh))
+    m_fl = np.reshape(m, (rnge, 2))
+    a2_fl = np.reshape(xi2.a, (3, rnge, 2))
+    for i in range(rnge):
         assert np.abs(a2_fl[:, i, :] - m_fl[i] * xi1.a).max() < tol
 
     # division
-    sh = tuple(np.random.randint(1, 4, 7))
-    m = np.random.rand(*(sh + (2,))) + 0.1
+    sh = tuple(rng.integers(1, 4, 7))
+    m = rng.uniform(0, 1, sh + (2,)) + 0.1
 
     xi2 =  xi1 / m
     assert xi2.shape == sh + (2,)
     assert xi2.a.shape == (3,) + sh + (2,)
-    rng = int(np.prod(sh))
-    m_fl = np.reshape(m, (rng, 2))
-    a2_fl = np.reshape(xi2.a, (3, rng, 2))
-    for i in range(rng):
+    rnge = int(np.prod(sh))
+    m_fl = np.reshape(m, (rnge, 2))
+    a2_fl = np.reshape(xi2.a, (3, rnge, 2))
+    for i in range(rnge):
         assert np.abs(a2_fl[:, i, :] -  xi1.a / m_fl[i]).max() < tol
 
     # normal-normal operations
@@ -1251,7 +1255,7 @@ def test_setitem():
         tol = 100 * np.finfo(dt).eps
 
         sh = (2, 3, 4)
-        v = random_normal(sh, dtype=dt)
+        v = random_normal(rng, sh, dtype=dt)
 
         # A deterministic value
         c = 0.5
@@ -1275,7 +1279,7 @@ def test_setitem():
         tol = 100 * np.finfo(dt).eps
 
         sh = (2, 3, 4)
-        v = random_normal(sh, dtype=dt)
+        v = random_normal(rng, sh, dtype=dt)
 
         # A deterministic value
         c = 0.5 - 3j
@@ -1299,7 +1303,7 @@ def test_setitem():
         tol = 100 * np.finfo(dt).eps
 
         # A sub-array
-        v = random_normal(sh, dtype=dt)
+        v = random_normal(rng, sh, dtype=dt)
         cov_ref = v[:, :, [0, 1, 3]].cov()
         mean_ref = v[:, :, [0, 1, 3]].mean()
 
@@ -1311,11 +1315,11 @@ def test_setitem():
         assert np.max(np.abs(v[0, 0, 2].cov())) - x.cov() < tol
 
         # An independent variable
-        v = random_normal(sh, dtype=dt)
+        v = random_normal(rng, sh, dtype=dt)
         cov_ref = v[:, :, [0, 3]].cov()
         mean_ref = v[:, :, [0, 3]].mean()
 
-        x = random_normal((2,), dtype=dt)
+        x = random_normal(rng, (2,), dtype=dt)
         v[0, 0, 1:3] = x
         assert np.max(np.abs(v[:, :, [0, 3]].cov() - cov_ref)) < tol
         assert np.max(np.abs(v[:, :, [0, 3]].mean() - mean_ref)) < tol
@@ -1324,7 +1328,7 @@ def test_setitem():
 
         # With data type conversion
         tol_ = 100 * np.finfo(np.float32).eps
-        x = random_normal((2,), dtype=np.float32)
+        x = random_normal(rng, (2,), dtype=np.float32)
         v[0, 0, 1:3] = x
         assert np.max(np.abs(v[:, :, [0, 3]].cov() - cov_ref)) < tol_
         assert np.max(np.abs(v[:, :, [0, 3]].mean() - mean_ref)) < tol_
@@ -1332,7 +1336,7 @@ def test_setitem():
         assert np.max(np.abs(v[0, 0, 1:3].cov() - x.cov())) < tol_
 
         # With data type conversion 2
-        x = random_normal((2,), dtype=np.float64)
+        x = random_normal(rng, (2,), dtype=np.float64)
         v[0, 0, 1:3] = x
         assert np.max(np.abs(v[:, :, [0, 3]].cov() - cov_ref)) < tol
         assert np.max(np.abs(v[:, :, [0, 3]].mean() - mean_ref)) < tol
@@ -1342,9 +1346,9 @@ def test_setitem():
         # Checks if correlations are preserved
         sz = 50
         szv = 10
-        v1, v2, v3 = random_correlate([random_normal((sz,), dtype=dt),
-                                       random_normal((sz,), dtype=dt),
-                                       random_normal((szv,), dtype=dt)])
+        v1, v2, v3 = random_correlate(rng, [random_normal(rng, (sz,), dt),
+                                            random_normal(rng, (sz,), dt),
+                                            random_normal(rng, (szv,), dt)])
         
         # Asserts dependence.
         assert np.max(np.abs(cov(v1, v2))) > 0.1
@@ -1442,7 +1446,7 @@ def test_asnormal():
     tol = 1e-8
 
     for sh in [tuple(), (3,), (2, 3)]:
-        x = np.random.rand(*sh)
+        x = rng.uniform(0, 1, sh)
         v = asnormal(x)
         assert isinstance(v, Normal)
         assert np.max(np.abs(v.mean() - x)) < tol
@@ -1490,14 +1494,14 @@ def test_cov_func():
     for dt in [np.float64, np.complex128]:
 
         # A scalar.
-        v1 = random_normal(tuple(), dtype=dt)
+        v1 = random_normal(rng, tuple(), dtype=dt)
         assert np.max(np.abs(cov(v1) - v1.var())) < tol
         assert np.max(np.abs(cov(v1) - v1.cov())) < tol
         
         # 1D, same dimensions.
-        v1 = random_normal((sz,), dtype=dt)
-        v2 = random_normal((sz,), dtype=dt)
-        v1, v2 = random_correlate([v1, v2])
+        v1 = random_normal(rng, (sz,), dtype=dt)
+        v2 = random_normal(rng, (sz,), dtype=dt)
+        v1, v2 = random_correlate(rng, [v1, v2])
 
         c11 = cov(v1, v1)
         c12 = cov(v1, v2)
@@ -1508,9 +1512,9 @@ def test_cov_func():
         assert np.max(np.abs(c[:sz, sz:] - c12)) < tol
 
         # 2D, different dimensions.
-        v1 = random_normal((sz, 2), dtype=dt)
-        v2 = random_normal((sz, 3), dtype=dt)
-        v1, v2 = random_correlate([v1, v2])
+        v1 = random_normal(rng, (sz, 2), dtype=dt)
+        v2 = random_normal(rng, (sz, 3), dtype=dt)
+        v1, v2 = random_correlate(rng, [v1, v2])
 
         c11 = cov(v1, v1)
         c12 = cov(v1, v2)
@@ -1539,8 +1543,8 @@ def test_dkl():
         # Regular cases.
 
         # Real-real.
-        x = random_normal(shape=sh, dtype=np.float64)
-        y = random_normal(shape=sh, dtype=np.float64)
+        x = random_normal(rng, shape=sh, dtype=np.float64)
+        y = random_normal(rng, shape=sh, dtype=np.float64)
         val = dkl(x, y)
 
         x_ = x.ravel()
@@ -1550,8 +1554,8 @@ def test_dkl():
         assert np.abs(val / ref - 1) < tol
 
         # Complex-complex.
-        x = random_normal(shape=sh, dtype=np.complex128)
-        y = random_normal(shape=sh, dtype=np.complex128)
+        x = random_normal(rng, shape=sh, dtype=np.complex128)
+        y = random_normal(rng, shape=sh, dtype=np.complex128)
         val = dkl(x, y)
 
         x_ = x.ravel()
@@ -1563,8 +1567,8 @@ def test_dkl():
         assert np.abs(val / ref - 1) < tol
 
         # Heterogeneous data types.
-        x = random_normal(shape=sh, dtype=np.float64)
-        y = random_normal(shape=sh, dtype=np.complex128)
+        x = random_normal(rng, shape=sh, dtype=np.float64)
+        y = random_normal(rng, shape=sh, dtype=np.complex128)
 
         assert np.isposinf(dkl(x, y))
 
@@ -1576,11 +1580,11 @@ def test_dkl():
         for dt in [np.float64, np.complex128]:
 
             # Additivity for independent distributions.
-            x1 = random_normal(shape=sh, dtype=dt)
-            x2 = random_normal(shape=sh, dtype=dt)
+            x1 = random_normal(rng, shape=sh, dtype=dt)
+            x2 = random_normal(rng, shape=sh, dtype=dt)
 
-            y1 = random_normal(shape=sh, dtype=dt)
-            y2 = random_normal(shape=sh, dtype=dt)
+            y1 = random_normal(rng, shape=sh, dtype=dt)
+            y2 = random_normal(rng, shape=sh, dtype=dt)
 
             val = dkl(stack([x1, x2]), stack([y1, y2]))
             ref = dkl(x1, y1) + dkl(x2, y2)
@@ -1637,7 +1641,7 @@ def test_entropy():
     tol = 1e-8
 
     # A scalar variable - test against numerical integration.
-    v = random_normal(tuple())
+    v = random_normal(rng, tuple())
     ref = num_entropy_1d(v)
 
     val = v.entropy()
@@ -1655,8 +1659,8 @@ def test_entropy():
 
     for sh in shapes:
         # A real product distribution.
-        rs = (2 * np.random.rand(*sh) - 1)
-        ro = (2 * np.random.rand(*sh) - 1)
+        rs = rng.uniform(-1, 1, sh)
+        ro = rng.uniform(-1, 1, sh)
         v = ro + rs * normal(size=sh)
         ref = sum(num_entropy_1d(v_) for v_ in v.flatten())
 
@@ -1671,8 +1675,8 @@ def test_entropy():
         assert np.isneginf(v_.entropy())
 
         # A complex product distribution.
-        rs = (2 * np.random.rand(*sh) - 1)
-        ro = (2 * np.random.rand(*sh) - 1)
+        rs = rng.uniform(-1, 1, sh)
+        ro = rng.uniform(-1, 1, sh)
         vi = ro + rs * normal(size=sh)
         vc = v + 1j * vi
         ref += sum(num_entropy_1d(v_) for v_ in vi.flatten())
@@ -1689,8 +1693,8 @@ def test_entropy():
 
         for dt in [np.float64, np.complex128]:
             # Test additivity for independent distributions.
-            v1 = random_normal(sh, dtype=dt)
-            v2 = random_normal(sh, dtype=dt)
+            v1 = random_normal(rng, sh, dtype=dt)
+            v2 = random_normal(rng, sh, dtype=dt)
             ref = entropy(v1) + entropy(v2)
             val = entropy(stack([v1, v2]))
             assert np.abs(val / ref - 1) < tol
@@ -1699,7 +1703,7 @@ def test_entropy():
 def test_icopy():
     tol = 1e-8
 
-    v = random_normal((3, 4))
+    v = random_normal(rng, (3, 4))
     v_ = v.icopy()
 
     assert v.shape == v_.shape
@@ -1716,7 +1720,7 @@ def test_icopy():
     assert np.max(np.abs(v.mean() - v_.mean())) < tol
     assert np.max(np.abs(v.cov() - v_.cov())) < tol
 
-    v = random_normal((4, 3), dtype=np.complex64)
+    v = random_normal(rng, (4, 3), dtype=np.complex64)
     v_ = v.icopy()
 
     assert v.shape == v_.shape
@@ -1733,7 +1737,7 @@ def test_var():
 
     for sh in shapes:
         for dt in [np.float64, np.complex128]:
-            v = random_normal(sh, dtype=dt)
+            v = random_normal(rng, sh, dtype=dt)
             ref = np.diagonal(v.ravel().cov())
 
             val = v.var()
@@ -1754,7 +1758,7 @@ def test_std():
 
     for sh in shapes:
         for dt in [np.float64, np.complex128]:
-            v = random_normal(sh, dtype=dt)
+            v = random_normal(rng, sh, dtype=dt)
 
             assert np.max(np.abs(np.sqrt(v.var()) - v.std())) < tol
             assert np.max(np.abs(np.sqrt(var(v)) - std(v))) < tol

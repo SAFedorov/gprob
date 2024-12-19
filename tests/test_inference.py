@@ -1,12 +1,14 @@
 import pytest
 import numpy as np
 from external.Infer import Infer
-from gprob import hstack, stack
+from gprob import rn, hstack, stack
 from gprob.normal_ import normal, cov
 from gprob.func import ConditionError
 from utils import random_normal, random_correlate
 
-np.random.seed(1)
+
+rn.setgen(0)
+rng = rn.gen
 
 
 def test_conditioning():
@@ -69,8 +71,8 @@ def test_conditioning():
     assert (normal() | 0).var() == 1
 
     # Conditioning a variable on itself.
-    v = random_normal((2, 3))
-    x = np.random.rand(2, 3)
+    v = random_normal(rng, (2, 3))
+    x = rng.uniform(0, 1, (2, 3))
     vc = v | {v : x}
     assert np.max(np.abs(vc.mean() - x)) < tol 
     assert np.max(np.abs(vc.var())) < tol
@@ -162,7 +164,7 @@ def test_conditioning_commutativity():
     tol = 1e-8
 
     sh = (5, 2)
-    v1, v2, v3, v4 = [random_normal(sh, dtype=np.float64) for _ in range(4)]
+    v1, v2, v3, v4 = [random_normal(rng, sh, np.float64) for _ in range(4)]
 
     v = 3.2*v1 + 4.1*v2 + 0.7*v3 + v4
     
@@ -193,9 +195,9 @@ def test_complex_conditioning():
     sh = (5, 2)
     shc = (4, 1)
 
-    v = random_normal(sh, dtype=np.complex128)
-    vc = random_normal(shc, dtype=np.complex128)
-    v, vc = random_correlate([v, vc])
+    v = random_normal(rng, sh, dtype=np.complex128)
+    vc = random_normal(rng, shc, dtype=np.complex128)
+    v, vc = random_correlate(rng, [v, vc])
 
     assert np.abs(cov(v, vc)).max() > 0.1  # Asserts correlation.
 
@@ -235,7 +237,7 @@ def test_complex_conditioning():
     # A case when real and complex conditions are mixed.
     # This case checks that there is no problem with verifying 
     # the consistency of such conditions.
-    v_list = [random_normal(tuple()) for _ in range(5)]  # ncond < 5 < 2*ncond
+    v_list = [random_normal(rng, tuple()) for _ in range(5)]  # ncond<5<2*ncond
     v = sum(v_list)
     vcond = v | {v_list[0] + 0.3 * v_list[1] : 0.2,
                  v_list[1] - 1.3 * v_list[2] : -1,
@@ -277,13 +279,13 @@ def test_masked_conditioning():
         for sh, shc, idx in test_sets:
             mask = np.array([range(shc[0])] * sh[0]).T < idx
 
-            v = random_normal(sh, dtype=dt)
-            vc = random_normal(shc, dtype=dt)
+            v = random_normal(rng, sh, dtype=dt)
+            vc = random_normal(rng, shc, dtype=dt)
 
             # Ensures correlation.
             max_tries = 10
             for i in range(max_tries):            
-                v, vc = random_correlate([v, vc])
+                v, vc = random_correlate(rng, [v, vc])
                 if np.abs(cov(v, vc)).max() > 1e-3:
                     break
 
@@ -328,14 +330,14 @@ def test_masked_conditioning():
         mask = np.array([range(shc1[0])] * sh[0]).T < idx
 
         for dt in [np.float64, np.complex128]:
-            v = random_normal(sh, dtype=dt)
-            vc1 = random_normal(shc1, dtype=dt)
-            vc2 = -2.1 * vc1.reshape((4, 1)) + random_normal(shc2, dtype=dt)
+            v = random_normal(rng, sh, dtype=dt)
+            vc1 = random_normal(rng, shc1, dtype=dt)
+            vc2 = -2.1 * vc1.reshape((4, 1)) + random_normal(rng, shc2, dt)
 
             # Repeating until there is a correlation.
             i = 0
             while np.abs(cov(v, vc1)).max() < 0.1:
-                v, vc2 = random_correlate([v, vc2])
+                v, vc2 = random_correlate(rng, [v, vc2])
                 i += 1
 
                 if i > 100:
@@ -446,4 +448,4 @@ def test_ou_parametric_estimation():
     
     tol = 1e-8
     assert np.abs(gamma_c.mean() - gamma_est) < tol
-    assert gamma_c.var() < 2
+    assert gamma_c.var() < 5

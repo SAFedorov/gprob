@@ -2,10 +2,12 @@ import pytest
 import numpy as np
 from numpy.exceptions import ComplexWarning
 import gprob as gp
-from gprob import normal, iid
+from gprob import rn, normal, iid
 from utils import random_normal
 
-np.random.seed(0)
+
+rn.setgen(0)
+rng = rn.gen
 
 
 try:
@@ -43,7 +45,7 @@ def test_parametric_methods():
 
         # Single scalar input
         sh = tuple()
-        vin = random_normal(sh, dtype=dt)
+        vin = random_normal(rng, sh, dtype=dt)
         vp = pnormal(lambda p, v: p[1] * v + p[0], vin)
         p0 = [1., 2.]
         x = 0.1
@@ -52,7 +54,8 @@ def test_parametric_methods():
 
         # Two scalar inputs
         sh = tuple()
-        vin1, vin2 = random_normal(sh, dtype=dt), random_normal(sh, dtype=dt)
+        vin1 = random_normal(rng, sh, dtype=dt)
+        vin2 = random_normal(rng, sh, dtype=dt)
         vp = pnormal(lambda p, v: p[0] * v[0] + p[1] * v[1], [vin1, vin2])
         p0 = [1., 2.]
         x = 0.1
@@ -61,20 +64,20 @@ def test_parametric_methods():
 
         # Single multi-dimensional input
         sh = (3, 2, 4)
-        vin = random_normal(sh, dtype=dt)
+        vin = random_normal(rng, sh, dtype=dt)
         vp = pnormal(lambda p, v: v @ p, vin, jit=False)
         p0 = np.array([1., 2., 0.5, 0.1])
-        x = np.random.rand(3, 2)
+        x = rng.uniform(0, 1, (3, 2))
 
         call_methods(vp, p0, x)
 
         # Several multi-dimensional inputs with different sizes
         sh = (3, 1, 2)
-        vin1 = random_normal(sh, dtype=dt)
-        vin2 = random_normal((1,), dtype=dt)
+        vin1 = random_normal(rng, sh, dtype=dt)
+        vin2 = random_normal(rng, (1,), dtype=dt)
         vp = pnormal(lambda p, v: v[0] @ p + v[1] * p[0], [vin1, vin2], jit=False)
         p0 = np.array([1., 2.])
-        x = np.random.rand(3, 1)
+        x = rng.uniform(0, 1, (3, 1))
 
         call_methods(vp, p0, x)
 
@@ -108,7 +111,7 @@ def test_linearized_unaries_1():
 
     for dt in dt_list:
         for sh in sh_list:
-            vin = 0.99 * np.pi * random_normal(sh, dtype=dt)
+            vin = 0.99 * np.pi * random_normal(rng, sh, dtype=dt)
             
             vout1 = gp.abs(vin) ** 2
             vout2 = vin * gp.conj(vin)
@@ -146,7 +149,7 @@ def test_linearized_unaries_1():
             assert np.allclose(vout1.b, vout2.b, rtol=tol, atol=tol)
             assert np.allclose(vout1.a, vout2.a, rtol=tol, atol=tol)
 
-            vin = 0.49 * np.pi * random_normal(sh, dtype=dt)
+            vin = 0.49 * np.pi * random_normal(rng, sh, dtype=dt)
             vout1 = vin
             vout2 = gp.arcsin(gp.sin(vin))
 
@@ -159,14 +162,14 @@ def test_linearized_unaries_1():
             assert np.allclose(vout1.b, vout2.b, rtol=tol, atol=tol)
             assert np.allclose(vout1.a, vout2.a, rtol=tol, atol=tol)
 
-            vin = 0.49 * np.pi * (1 + random_normal(sh, dtype=dt))
+            vin = 0.49 * np.pi * (1 + random_normal(rng, sh, dtype=dt))
             vout1 = vin
             vout2 = gp.arccos(gp.cos(vin))
 
             assert np.allclose(vout1.b, vout2.b, rtol=tol, atol=tol)
             assert np.allclose(vout1.a, vout2.a, rtol=tol, atol=tol)
 
-            vin = random_normal(sh, dtype=dt)
+            vin = random_normal(rng, sh, dtype=dt)
             vout1 = vin
             vout2 = gp.arcsinh(gp.sinh(vin))
 
@@ -179,7 +182,7 @@ def test_linearized_unaries_1():
             assert np.allclose(vout1.b, vout2.b, rtol=tol, atol=tol)
             assert np.allclose(vout1.a, vout2.a, rtol=tol, atol=tol)
 
-            vin = 1 + random_normal(sh, dtype=dt)
+            vin = 1 + random_normal(rng, sh, dtype=dt)
             vout1 = vin
             vout2 = gp.arccosh(gp.cosh(vin))
 
@@ -202,7 +205,7 @@ def test_linearized_unaries_2():
                     # Cubic root in numpy is not supported for complex types.
                     continue
 
-                vin = 0.5 + random_normal(sh, dtype=dt) / 4  # scales to [0, 1]
+                vin = 0.5 + random_normal(rng, sh, dtype=dt) / 4  # in [0, 1]
                 vout = fn(vin)
                 vout_p = pnormal(lambda p, v: jfn(v), vin)(0.)
 
@@ -214,7 +217,7 @@ def test_linearized_unaries_2():
             # This function is special because it needs the inputs 
             # to be greater than 1.
             
-            vin = 1.5 + random_normal(sh) / 4
+            vin = 1.5 + random_normal(rng, sh) / 4
             vout = fn(vin)
             vout_p = pnormal(lambda p, v: jfn(v), vin)(0.)
 
@@ -225,8 +228,8 @@ def test_linearized_unaries_2():
 def test_sparse_linearized_unaries():
     tol = 1e-8
 
-    ro = np.random.rand(3, 2)  # should be in [0, 1] 
-    rs = np.random.rand(3, 2) - 0.5
+    ro = rng.uniform(0, 1, (3, 2))  # should be in [0, 1] 
+    rs = rng.uniform(0, 1, (3, 2)) - 0.5
 
     vin = ro + rs * normal(size=(3, 2))
     svin = ro + rs * iid(normal(size=2), 3)
@@ -240,8 +243,8 @@ def test_sparse_linearized_unaries():
         assert svout.iaxes == svin.iaxes
 
     # Complex numbers.
-    ro = np.random.rand(3, 2) + 1j * np.random.rand(3, 2)
-    rs = (np.random.rand(3, 2) - 0.5) + 1j * (np.random.rand(3, 2) - 0.5)
+    ro = rng.uniform(0, 1, (3, 2)) + 1j * rng.uniform(0, 1, (3, 2))
+    rs = rng.uniform(-0.5, 0.5, (3, 2)) + 1j * rng.uniform(-0.5, 0.5, (3, 2))
 
     vin = ro + rs * normal(size=(3, 2))
     svin = ro + rs * iid(normal(size=2), 3)
@@ -255,8 +258,8 @@ def test_sparse_linearized_unaries():
         assert svout.iaxes == svin.iaxes
 
     # arccosh - a special case because it needs the input mean to be > 1.
-    ro = 1 + np.random.rand(3, 2)
-    rs = np.random.rand(3, 2) - 0.5
+    ro = 1 + rng.uniform(0, 1, (3, 2))
+    rs = rng.uniform(0, 1, (3, 2)) - 0.5
 
     vin = ro + rs * normal(size=(3, 2))
     svin = ro + rs * iid(normal(size=2), 3)
@@ -268,8 +271,8 @@ def test_sparse_linearized_unaries():
     assert np.max(np.abs(vout.var() - svout.var())) < tol
     assert svout.iaxes == svin.iaxes
 
-    ro = 1 + np.random.rand(3, 2) + 1j * np.random.rand(3, 2)
-    rs = (np.random.rand(3, 2) - 0.5) + 1j * (np.random.rand(3, 2) - 0.5)
+    ro = 1 + rng.uniform(0, 1, (3, 2)) + 1j * rng.uniform(0, 1, (3, 2))
+    rs = rng.uniform(-0.5, 0.5, (3, 2)) + 1j * rng.uniform(-0.5, 0.5, (3, 2))
 
     vin = ro + rs * normal(size=(3, 2))
     svin = ro + rs * iid(normal(size=2), 3)

@@ -16,7 +16,8 @@ from gprob.sparse import (_item_iaxid, iid, _finalize,
 from utils import random_normal, get_message, asnormal, assparsenormal
 
 
-np.random.seed(0)
+gp.rn.setgen(0)
+rng = gp.rn.gen
 
 
 def dense_to_sparse_cov(cov, iaxes):
@@ -446,7 +447,7 @@ def test_properties():
 
     tol = 1e-8
 
-    v1 = iid(iid(normal(), 4), 8) * np.random.rand(8, 4)
+    v1 = iid(iid(normal(), 4), 8) * rng.uniform(0, 1, (8, 4))
     v2 = iid(iid(normal(), 4), 8)
 
     vc = v1 + 1j * v2
@@ -615,8 +616,8 @@ def test_setitem():
     v = iid(normal(size=(3, 2)), 4, axis=1)  
     # shape (3, 4, 2), iaxes (1,)
 
-    rs = 2 * np.random.rand(3, 4, 2) - 1
-    ro = 2 * np.random.rand(3, 4, 2) - 1
+    rs = rng.uniform(-1, 1, (3, 4, 2))
+    ro = rng.uniform(-1, 1, (3, 4, 2))
     v = ro + v * rs
 
     vm = v.mean()
@@ -640,8 +641,8 @@ def test_setitem():
     v = iid(normal(size=(3, 2)), 4, axis=1)  
     # shape (3, 4, 2), iaxes (1,)
 
-    rs = 2 * np.random.rand(3, 4, 2) - 1
-    ro = 2 * np.random.rand(3, 4, 2) - 1
+    rs = rng.uniform(-1, 1, (3, 4, 2))
+    ro = rng.uniform(-1, 1, (3, 4, 2))
     v = ro + v * rs
 
     vm = v.mean()
@@ -787,12 +788,12 @@ def test_broadcast_to():
 def test_cov():
     tol = 1e-10
 
-    nv = random_normal((2, 3))
+    nv = random_normal(rng, (2, 3))
     v = iid(iid(nv, 4, axis=1), 5, axis=-1)
     # shape (2, 4, 3, 5), iaxes (1, 3)
 
-    r1 = np.random.rand(1, 4, 1, 1)
-    r2 = np.random.rand(1, 1, 1, 5)
+    r1 = rng.uniform(0, 1, (1, 4, 1, 1))
+    r2 = rng.uniform(0, 1, (1, 1, 1, 5))
 
     v1 = r1 * r2 * v
 
@@ -816,8 +817,8 @@ def test_cov():
     v2 = iid(normal(), n)
     v = v1 + v2
 
-    r1 = 2 * np.random.rand(n) - 1
-    r2 = 2 * np.random.rand(n) - 1
+    r1 = rng.uniform(-1, 1, n)
+    r2 = rng.uniform(-1, 1, n)
 
     c1 = 2 * gp.cov(v * r1, v1 * r2)
     c2 = (v * r1 + v1 * r2).var() - (r1 ** 2) * v.var() - (r2 ** 2) * v1.var()
@@ -896,7 +897,7 @@ def test_cov_det():
 
     v = iid(iid(normal(), 4), 4)
 
-    r = np.random.rand(4, 4)
+    r = rng.uniform(0, 1, (4, 4))
     c = gp.cov(v, r)
     assert c.shape == (4, 4)
     assert np.max(np.abs(c)) < tol
@@ -950,7 +951,7 @@ def test_var():
 
     for sh in shapes:
         for dt in [np.float64, np.complex128]:
-            vn = random_normal(sh, dtype=dt)
+            vn = random_normal(rng, sh, dtype=dt)
             vnr = vn.ravel()
 
             v = assparsenormal(vn)
@@ -966,7 +967,7 @@ def test_var():
             assert np.isrealobj(val)
             assert np.max(np.abs(val.ravel() - ref)) < tol
 
-            rs = 2 * np.random.rand(4) - 1
+            rs = rng.uniform(-1, 1, 4)
             v = rs * iid(vn, 4, axis=-1)
             ref = np.ravel(np.diagonal(vnr.cov())[..., None] * rs**2)
 
@@ -980,7 +981,7 @@ def test_var():
             assert np.isrealobj(val)
             assert np.max(np.abs(val.ravel() - ref)) < tol
             
-            rs = 2 * np.random.rand(3, 2) - 1
+            rs = rng.uniform(-1, 1, (3, 2))
             v = rs * iid(iid(vn, 3, axis=-1), 2, axis=-1)
             ref = np.ravel(np.diagonal(vnr.cov())[..., None, None] * rs**2)
 
@@ -1023,7 +1024,7 @@ def test_std():
 
     for sh in shapes:
         for dt in [np.float64, np.complex128]:
-            vn = random_normal(sh, dtype=dt)
+            vn = random_normal(rng, sh, dtype=dt)
 
             v = assparsenormal(vn)
             assert np.max(np.abs(np.sqrt(v.var()) - v.std())) < tol
@@ -1055,8 +1056,8 @@ def test_dkl():
     for sh in shapes:
         # Heterogeneous data types.
         sparse_sz = 3
-        x = iid(random_normal(shape=sh, dtype=np.float64), sparse_sz)
-        y = iid(random_normal(shape=sh, dtype=np.complex128), sparse_sz)
+        x = iid(random_normal(rng, shape=sh, dtype=np.float64), sparse_sz)
+        y = iid(random_normal(rng, shape=sh, dtype=np.complex128), sparse_sz)
 
         assert np.isposinf(gp.dkl(x, y))
 
@@ -1066,8 +1067,8 @@ def test_dkl():
         assert "degenerate" in get_message(e)
 
         for dt in [np.float64, np.complex128]:
-            xn = random_normal(shape=sh, dtype=dt)
-            yn = random_normal(shape=sh, dtype=dt)
+            xn = random_normal(rng, shape=sh, dtype=dt)
+            yn = random_normal(rng, shape=sh, dtype=dt)
 
             # No iaxes.
             x = assparsenormal(xn)
@@ -1090,13 +1091,13 @@ def test_dkl():
             # One iaxis.
 
             sparse_sz = 4
-            rs = 2 * np.random.rand(sparse_sz, *sh) - 1
-            ro = 2 * np.random.rand(sparse_sz, *sh) - 1
+            rs = rng.uniform(-1, 1, (sparse_sz,) + sh)
+            ro = rng.uniform(-1, 1, (sparse_sz,) + sh)
             xns = [gp.icopy(o + s * xn) for o, s in zip(ro, rs)]
             x = ro + rs * iid(xn, sparse_sz)
 
-            rs = 2 * np.random.rand(sparse_sz, *sh) - 1
-            ro = 2 * np.random.rand(sparse_sz, *sh) - 1
+            rs = rng.uniform(-1, 1, (sparse_sz,) + sh)
+            ro = rng.uniform(-1, 1, (sparse_sz,) + sh)
             yns = [gp.icopy(o + s * yn) for o, s in zip(ro, rs)]
             y = ro + rs * iid(yn, sparse_sz)
 
@@ -1109,14 +1110,14 @@ def test_dkl():
             sparse_sz1 = 3
             sparse_sz2 = 4
 
-            rs = 2 * np.random.rand(sparse_sz1, sparse_sz2, *sh) - 1
-            ro = 2 * np.random.rand(sparse_sz1, sparse_sz2, *sh) - 1
+            rs = rng.uniform(-1, 1, (sparse_sz1, sparse_sz2) + sh)
+            ro = rng.uniform(-1, 1, (sparse_sz1, sparse_sz2) + sh)
             xns = [[gp.icopy(o + s * xn) for o, s in zip(ro_, rs_)] 
                    for ro_, rs_ in zip(ro, rs)]
             x = ro + rs * iid(iid(xn, sparse_sz2), sparse_sz1)
 
-            rs = 2 * np.random.rand(sparse_sz1, sparse_sz2, *sh) - 1
-            ro = 2 * np.random.rand(sparse_sz1, sparse_sz2, *sh) - 1
+            rs = rng.uniform(-1, 1, (sparse_sz1, sparse_sz2) + sh)
+            ro = rng.uniform(-1, 1, (sparse_sz1, sparse_sz2) + sh)
             yns = [[gp.icopy(o + s * yn) for o, s in zip(ro_, rs_)] 
                    for ro_, rs_ in zip(ro, rs)]
             y = ro + rs * iid(iid(yn, sparse_sz2), sparse_sz1)
@@ -1182,7 +1183,7 @@ def test_entropy():
 
     for sh in shapes:
         for dt in [np.float64, np.complex128]:
-            xn = random_normal(shape=sh, dtype=dt)
+            xn = random_normal(rng, shape=sh, dtype=dt)
 
             # No iaxes.
             x = assparsenormal(xn)
@@ -1199,8 +1200,8 @@ def test_entropy():
 
             # One iaxis.
             sparse_sz = 4
-            rs = 2 * np.random.rand(sparse_sz, *sh) - 1
-            ro = 2 * np.random.rand(sparse_sz, *sh) - 1
+            rs = rng.uniform(-1, 1, (sparse_sz,) + sh)
+            ro = rng.uniform(-1, 1, (sparse_sz,) + sh)
             xns = [gp.icopy(o + s * xn) for o, s in zip(ro, rs)]
             x = ro + rs * iid(xn, sparse_sz)
 
@@ -1218,8 +1219,8 @@ def test_entropy():
             sparse_sz1 = 3
             sparse_sz2 = 4
 
-            rs = 2 * np.random.rand(sparse_sz1, sparse_sz2, *sh) - 1
-            ro = 2 * np.random.rand(sparse_sz1, sparse_sz2, *sh) - 1
+            rs = rng.uniform(-1, 1, (sparse_sz1, sparse_sz2) + sh)
+            ro = rng.uniform(-1, 1, (sparse_sz1, sparse_sz2) + sh)
             xns = [[gp.icopy(o + s * xn) for o, s in zip(ro_, rs_)] 
                    for ro_, rs_ in zip(ro, rs)]
             x = ro + rs * iid(iid(xn, sparse_sz2), sparse_sz1)
@@ -1277,8 +1278,8 @@ def test_sample():
         assert np.max(np.abs(v.sample(2) - c)) < tol
 
     for dt in [np.float64, np.complex128]:
-        v1 = iid(iid(random_normal((2, 3), dtype=dt), 4, axis=1), 5, axis=-1)
-        v2 = iid(iid(random_normal((2, 3), dtype=dt), 4, axis=1), 5, axis=-1)
+        v1 = iid(iid(random_normal(rng, (2, 3), dtype=dt), 4, axis=1), 5, axis=-1)
+        v2 = iid(iid(random_normal(rng, (2, 3), dtype=dt), 4, axis=1), 5, axis=-1)
         v = 0.5 * v1 - v2  # shape (2, 4, 3, 5), iaxes (1, 3)
 
         assert v.sample().shape == v.shape
@@ -1319,16 +1320,16 @@ def test_sample_func():
         assert np.max(np.abs(s - c)) < tol
 
     for dt in [np.float64, np.complex128]:
-        v1 = iid(random_normal((2, 3), dtype=dt), 4, axis=1)
+        v1 = iid(random_normal(rng, (2, 3), dtype=dt), 4, axis=1)
         assert v1.iaxes == (1,)
     
-        v2 = iid(iid(random_normal((3, 2), dtype=dt), 4, axis=0), 5, axis=-1)
+        v2 = iid(iid(random_normal(rng, (3, 2), dtype=dt), 4, axis=0), 5, axis=-1)
         assert v2.iaxes == (0, 3)
 
         v3 = iid(v2, 2, axis=2)
         assert v3.iaxes == (0, 2, 4)
 
-        v4 = assparsenormal(random_normal(shape=(2,), dtype=dt))
+        v4 = assparsenormal(random_normal(rng, shape=(2,), dtype=dt))
 
         for v in [v1, v2, v3, v4]:
             s = gp.sample(v)
@@ -1508,7 +1509,7 @@ def test_condition():
     assert snvc._iaxid == snv1._iaxid
     del snvc, nvc
 
-    x = np.random.rand(2, 2, 2)
+    x = rng.uniform(0, 1, (2, 2, 2))
     nvc = (nv1 + nv2).condition({nv1 - 0.3 * nv2 : x})
     snvc = (snv1 + snv2).condition({snv1 - 0.3 * snv2 : x})
     check_sparse_vs_normal(snvc, nvc)
@@ -1523,8 +1524,8 @@ def test_condition():
     snv_list = []
 
     for _ in range(3):
-        rs = 2 * np.random.rand(sz) - 1
-        ro = 2 * np.random.rand(sz) - 1
+        rs = rng.uniform(-1, 1, sz)
+        ro = rng.uniform(-1, 1, sz)
         rv = normal(-0.3, 2.3)
         nv_list.append(gp.stack([o + s * rv.icopy() for o, s in zip(ro, rs)]))
         snv_list.append(ro + rs * iid(rv, sz))
@@ -1541,9 +1542,9 @@ def test_condition():
     snv_list = []
 
     for _ in range(5):
-        rs = 2 * np.random.rand(sz, 2) - 1
-        ro = 2 * np.random.rand(sz, 2) - 1
-        rv = random_normal((2,))
+        rs = rng.uniform(-1, 1, (sz, 2))
+        ro = rng.uniform(-1, 1, (sz, 2))
+        rv = random_normal(rng, (2,))
         nv_list.append(gp.stack([o + s * rv.icopy() for o, s in zip(ro, rs)]))
         snv_list.append(ro + rs * iid(rv, sz))
 
@@ -1613,9 +1614,9 @@ def test_condition():
     snv_list = []
 
     for _ in range(5):
-        rs = 2 * np.random.rand(sz, 2, 3, 4) - 1
-        ro = 2 * np.random.rand(sz, 2, 3, 4) - 1
-        rv = random_normal((2, 3, 4))
+        rs = rng.uniform(-1, 1, (sz, 2, 3, 4))
+        ro = rng.uniform(-1, 1, (sz, 2, 3, 4))
+        rv = random_normal(rng, (2, 3, 4))
         nv_list.append(gp.stack([o + s * rv.icopy() for o, s in zip(ro, rs)]))
         snv_list.append(ro + rs * iid(rv, sz))
 
@@ -1667,8 +1668,8 @@ def test_condition():
     snv_list = []
 
     for _ in range(5):
-        rs = 2 * np.random.rand(sz1, sz2) - 1
-        ro = 2 * np.random.rand(sz1, sz2) - 1
+        rs = rng.uniform(-1, 1, (sz1, sz2))
+        ro = rng.uniform(-1, 1, (sz1, sz2))
         nv_list.append(ro + rs * normal(size=(sz1, sz2)))
         snv_list.append(ro + rs * iid(iid(normal(), sz2), sz1))
 
@@ -1695,9 +1696,9 @@ def test_condition():
     snv_list = []
 
     for _ in range(5):
-        rs = 2 * np.random.rand(3, 4, 5, 2) - 1
-        ro = 2 * np.random.rand(3, 4, 5, 2) - 1
-        rv = random_normal((5, 2))
+        rs = rng.uniform(-1, 1, (3, 4, 5, 2))
+        ro = rng.uniform(-1, 1, (3, 4, 5, 2))
+        rv = random_normal(rng, (5, 2))
         nv = gp.stack([rv.icopy() for _ in range(4)])
         nv = gp.stack([nv.icopy() for _ in range(3)])    
         nv_list.append(ro + rs * nv)
@@ -1720,7 +1721,7 @@ def test_condition():
     snv2 = iid(normal(), 4)
 
     # Conditioning a variable on itself.
-    x = np.random.rand(5, 4)
+    x = rng.uniform(0, 1, (5, 4))
     snvc = snv1 | {snv1 : x}
     assert np.max(np.abs(snvc.mean() - x)) < tol 
     assert np.max(np.abs(snvc.var())) < tol
@@ -1852,15 +1853,15 @@ def test_logp():
     check_sparse_vs_normal(snv, nv, 1.9)
     check_sparse_vs_normal(snv, nv, [0.5, 1.9, -4.1])
 
-    nv = random_normal((3,))
+    nv = random_normal(rng, (3,))
     snv = assparsenormal(nv)
-    x = 2 * np.random.rand(2, 3) - 1
+    x = rng.uniform(-1, 1, (2, 3))
     check_sparse_vs_normal(snv, nv, x[0])
     check_sparse_vs_normal(snv, nv, x)
 
-    nv = random_normal((3, 2))
+    nv = random_normal(rng, (3, 2))
     snv = assparsenormal(nv)
-    x = 2 * np.random.rand(4, 3, 2) - 1
+    x = rng.uniform(-1, 1, (4, 3, 2))
     check_sparse_vs_normal(snv, nv, x[0])
     check_sparse_vs_normal(snv, nv, x)
 
@@ -1868,59 +1869,59 @@ def test_logp():
 
     # Scalar dense subspace.
     sz = 4
-    rs = 2 * np.random.rand(sz) - 1
-    ro = 2 * np.random.rand(sz) - 1
+    rs = rng.uniform(-1, 1, sz)
+    ro = rng.uniform(-1, 1, sz)
     nv = gp.stack([o + s * normal() for o, s in zip(ro, rs)])
     snv = ro + rs * iid(normal(), sz)
-    x = 2 * np.random.rand(3, sz) - 1
+    x = rng.uniform(-1, 1, (3, sz))
     check_sparse_vs_normal(snv, nv, x[0])
     check_sparse_vs_normal(snv, nv, x)
 
     # Scalar dense subspace, complex distribution.
     sz = 4
-    rs = 2 * np.random.rand(sz) - 1
-    ro = 2 * np.random.rand(sz) - 1
+    rs = rng.uniform(-1, 1, sz)
+    ro = rng.uniform(-1, 1, sz)
     nv = gp.stack([o + s * normal() for o, s in zip(ro, rs)])
     snv = ro + rs * iid(normal(), sz)
 
-    rs = 2 * np.random.rand(sz) - 1
-    ro = 2 * np.random.rand(sz) - 1
+    rs = rng.uniform(-1, 1, sz)
+    ro = rng.uniform(-1, 1, sz)
     nv += 1j * gp.stack([o + s * normal() for o, s in zip(ro, rs)])
     snv += 1j * (ro + rs * iid(normal(), sz))
 
-    x = (2 * np.random.rand(3, sz) - 1) + 1j * (2 * np.random.rand(3, sz) - 1)
+    x = rng.uniform(-1, 1, (3, sz)) + 1j * rng.uniform(-1, 1, (3, sz))
     check_sparse_vs_normal(snv, nv, x[0])
     check_sparse_vs_normal(snv, nv, x)
 
     # 1D dense subspace.
     sparse_sz = 4
     dense_sz = 3
-    rs = 2 * np.random.rand(sparse_sz, dense_sz) - 1
-    ro = 2 * np.random.rand(sparse_sz, dense_sz) - 1
-    rv = random_normal((dense_sz,))
+    rs = rng.uniform(-1, 1, (sparse_sz, dense_sz))
+    ro = rng.uniform(-1, 1, (sparse_sz, dense_sz))
+    rv = random_normal(rng, (dense_sz,))
     nv = gp.stack([o + s * rv.icopy() for o, s in zip(ro, rs)])
     snv = ro + rs * iid(rv, sparse_sz)
-    x = 2 * np.random.rand(2, sparse_sz, dense_sz) - 1
+    x = rng.uniform(-1, 1, (2, sparse_sz, dense_sz))
     check_sparse_vs_normal(snv, nv, x[0])
     check_sparse_vs_normal(snv, nv, x)
 
     # 1D dense subspace, complex distribution.
     sparse_sz = 4
     dense_sz = 3
-    rs = 2 * np.random.rand(sparse_sz, dense_sz) - 1
-    ro = 2 * np.random.rand(sparse_sz, dense_sz) - 1
-    rv = random_normal((dense_sz,))
+    rs = rng.uniform(-1, 1, (sparse_sz, dense_sz))
+    ro = rng.uniform(-1, 1, (sparse_sz, dense_sz))
+    rv = random_normal(rng, (dense_sz,))
     nv = gp.stack([o + s * rv.icopy() for o, s in zip(ro, rs)])
     snv = ro + rs * iid(rv, sparse_sz)
 
-    rs = 2 * np.random.rand(sparse_sz, dense_sz) - 1
-    ro = 2 * np.random.rand(sparse_sz, dense_sz) - 1
-    rv = random_normal((dense_sz,))
+    rs = rng.uniform(-1, 1, (sparse_sz, dense_sz))
+    ro = rng.uniform(-1, 1, (sparse_sz, dense_sz))
+    rv = random_normal(rng, (dense_sz,))
     nv += 1j * gp.stack([o + s * rv.icopy() for o, s in zip(ro, rs)])
     snv += 1j * (ro + rs * iid(rv, sparse_sz))
 
-    x = ((2 * np.random.rand(2, sparse_sz, dense_sz) - 1) 
-         + 1j * (2 * np.random.rand(2, sparse_sz, dense_sz) - 1))
+    x = (rng.uniform(-1, 1, (2, sparse_sz, dense_sz)) 
+         + 1j * rng.uniform(-1, 1, (2, sparse_sz, dense_sz)))
     check_sparse_vs_normal(snv, nv, x[0])
     check_sparse_vs_normal(snv, nv, x)
 
@@ -1929,78 +1930,78 @@ def test_logp():
     dense_sz = 3
     nv = gp.stack([o + s * rv.icopy() for o, s in zip(ro, rs)], axis=1)
     snv = ro.T + rs.T * iid(rv, sparse_sz, axis=1)
-    x = 2 * np.random.rand(2, dense_sz, sparse_sz) - 1
+    x = rng.uniform(-1, 1, (2, dense_sz, sparse_sz))
     check_sparse_vs_normal(snv, nv, x[0])
     check_sparse_vs_normal(snv, nv, x)
 
     # 2D dense subspace.
     sparse_sz = 4
     dense_sz = (3, 5)
-    rs = 2 * np.random.rand(sparse_sz, *dense_sz) - 1
-    ro = 2 * np.random.rand(sparse_sz, *dense_sz) - 1
-    rv = random_normal(dense_sz)
+    rs = rng.uniform(-1, 1, (sparse_sz,) + dense_sz) 
+    ro = rng.uniform(-1, 1, (sparse_sz,) + dense_sz) 
+    rv = random_normal(rng, dense_sz)
     nv = gp.stack([o + s * rv.icopy() for o, s in zip(ro, rs)])
     snv = ro + rs * iid(rv, sparse_sz)
-    x = 2 * np.random.rand(2, sparse_sz, *dense_sz) - 1
+    x = rng.uniform(-1, 1, (2, sparse_sz,) + dense_sz) 
     check_sparse_vs_normal(snv, nv, x[0])
     check_sparse_vs_normal(snv, nv, x)
 
     # Two independence axes.
 
     # Scalar dense subspace.
-    rs = 2 * np.random.rand(3, 4) - 1
-    ro = 2 * np.random.rand(3, 4) - 1
+    rs = rng.uniform(-1, 1, (3, 4))
+    ro = rng.uniform(-1, 1, (3, 4))
     nv = ro + rs * normal(size=(3, 4))
     snv = ro + rs * iid(iid(normal(), 4), 3)
-    x = 2 * np.random.rand(2, 3, 4) - 1
+    x = rng.uniform(-1, 1, (2, 3, 4))
     check_sparse_vs_normal(snv, nv, x[0])
     check_sparse_vs_normal(snv, nv, x)
 
     # 1D dense subspace.
-    rs = 2 * np.random.rand(3, 4, 5) - 1
-    ro = 2 * np.random.rand(3, 4, 5) - 1
-    rv = random_normal((5,))
+    rs = rng.uniform(-1, 1, (3, 4, 5))
+    ro = rng.uniform(-1, 1, (3, 4, 5))
+    rv = random_normal(rng, (5,))
     nv = gp.stack([rv.icopy() for _ in range(4)])
     nv = gp.stack([nv.icopy() for _ in range(3)])    
     nv = ro + rs * nv
     snv = ro + rs * iid(iid(rv, 4), 3)
-    x = 2 * np.random.rand(2, 3, 4, 5) - 1
+    x = rng.uniform(-1, 1, (2, 3, 4, 5))
     check_sparse_vs_normal(snv, nv, x[0])
     check_sparse_vs_normal(snv, nv, x)
 
     # 2D dense subspace.
-    rs = 2 * np.random.rand(3, 4, 5, 2) - 1
-    ro = 2 * np.random.rand(3, 4, 5, 2) - 1
-    rv = random_normal((5, 2))
+    rs = rng.uniform(-1, 1, (3, 4, 5, 2))
+    ro = rng.uniform(-1, 1, (3, 4, 5, 2))
+    rv = random_normal(rng, (5, 2))
     nv = gp.stack([rv.icopy() for _ in range(4)])
     nv = gp.stack([nv.icopy() for _ in range(3)])    
     nv = ro + rs * nv
     snv = ro + rs * iid(iid(rv, 4), 3)
-    x = 2 * np.random.rand(2, 3, 4, 5, 2) - 1
+    x = rng.uniform(-1, 1, (2, 3, 4, 5, 2))
     check_sparse_vs_normal(snv, nv, x[0])
     check_sparse_vs_normal(snv, nv, x)
 
     # Three independence axes.
 
     # Scalar dense subspace.
-    rs = 2 * np.random.rand(3, 4, 5) - 1
-    ro = 2 * np.random.rand(3, 4, 5) - 1
+    rs = rng.uniform(-1, 1, (3, 4, 5))
+    ro = rng.uniform(-1, 1, (3, 4, 5))
     nv = ro + rs * normal(size=(3, 4, 5))
     snv = ro + rs * iid(iid(iid(normal(), 5), 4), 3)
-    x = 2 * np.random.rand(2, 3, 4, 5) - 1
+    x = rng.uniform(-1, 1, (2, 3, 4, 5))
     check_sparse_vs_normal(snv, nv, x[0])
     check_sparse_vs_normal(snv, nv, x)
 
     # 1D dense subspace.
-    rs = 2 * np.random.rand(3, 4, 5, 2) - 1
-    ro = 2 * np.random.rand(3, 4, 5, 2) - 1
-    rv = random_normal((2,))
+    rs = rng.uniform(-1, 1, (3, 4, 5, 2))
+    ro = rng.uniform(-1, 1, (3, 4, 5, 2))
+    rv = random_normal(rng, (2,))
     nv = gp.stack([rv.icopy() for _ in range(5)])
     nv = gp.stack([nv.icopy() for _ in range(4)])
     nv = gp.stack([nv.icopy() for _ in range(3)])    
     nv = ro + rs * nv
     snv = ro + rs * iid(iid(iid(rv, 5), 4), 3)
-    x = 2 * np.random.rand(2, 3, 4, 5, 2) - 1
+    x = rng.uniform(-1, 1, (2, 3, 4, 5, 2))
     check_sparse_vs_normal(snv, nv, x[0])
     check_sparse_vs_normal(snv, nv, x)
 
@@ -2153,7 +2154,7 @@ def test_flip():
     
     # 0 independence axes.
     sz = 3
-    ro = 2 * np.random.rand(sz, 2 * sz) - 1
+    ro = rng.uniform(-1, 1, (sz, 2 * sz))
     nv = asnormal(ro)
     snv = assparsenormal(ro)
 
@@ -2162,8 +2163,8 @@ def test_flip():
     check_sparse_vs_normal(snv, nv, axis=(0, -1))
 
     sz = 3
-    rs = 2 * np.random.rand(sz, 2 * sz) - 1
-    ro = 2 * np.random.rand(sz, 2 * sz) - 1
+    rs = rng.uniform(-1, 1, (sz, 2 * sz))
+    ro = rng.uniform(-1, 1, (sz, 2 * sz))
     nv = ro + rs * normal(size=(sz, 2 * sz))
     snv = assparsenormal(nv)
 
@@ -2173,9 +2174,9 @@ def test_flip():
 
     # 1 independence axis, 1d dense subspace.
     sz1, sz2 = 4, 3
-    rs = 2 * np.random.rand(sz1, sz2) - 1
-    ro = 2 * np.random.rand(sz1, sz2) - 1
-    rn = random_normal((sz2,))
+    rs = rng.uniform(-1, 1, (sz1, sz2))
+    ro = rng.uniform(-1, 1, (sz1, sz2))
+    rn = random_normal(rng, (sz2,))
     snv = ro + rs * iid(rn, sz1)
     nv = gp.stack([o + s * rn for o, s in zip(ro, rs)])
     
@@ -2185,9 +2186,9 @@ def test_flip():
 
     # 1 independence axis, 2d dense subspace.
     sz1, sz2, sz3 = 4, 3, 5
-    rs = 2 * np.random.rand(sz1, sz2, sz3) - 1
-    ro = 2 * np.random.rand(sz1, sz2, sz3) - 1
-    rn = random_normal((sz2, sz3))
+    rs = rng.uniform(-1, 1, (sz1, sz2, sz3))
+    ro = rng.uniform(-1, 1, (sz1, sz2, sz3))
+    rn = random_normal(rng, (sz2, sz3))
     snv = ro + rs * iid(rn, sz1)
     nv = gp.stack([o + s * rn for o, s in zip(ro, rs)])
 
@@ -2200,9 +2201,9 @@ def test_flip():
 
     # 2 independence axes, 2d dense subspace.
     sz1, sz2, sz3, sz4 = 4, 3, 5, 2
-    rs = 2 * np.random.rand(sz1, sz2, sz3, sz4) - 1
-    ro = 2 * np.random.rand(sz1, sz2, sz3, sz4) - 1
-    rn = random_normal((sz3, sz4))
+    rs = rng.uniform(-1, 1, (sz1, sz2, sz3, sz4))
+    ro = rng.uniform(-1, 1, (sz1, sz2, sz3, sz4))
+    rn = random_normal(rng, (sz3, sz4))
     snv = ro + rs * iid(iid(rn, sz2), sz1)
     nv = gp.stack([gp.stack([o + s * rn for o, s in zip(ro_, rs_)]) 
                    for ro_, rs_ in zip(ro, rs)])
@@ -2415,7 +2416,7 @@ def test_reshape():
     # Checking the arrangement of elements.
     tol = 1e-10
 
-    v = iid(random_normal((8, 9)), 5)  # First axis.
+    v = iid(random_normal(rng, (8, 9)), 5)  # First axis.
 
     sh = (5, 3, 4, 2, 3)
     vvar = v.var()
@@ -2427,7 +2428,7 @@ def test_reshape():
     assert np.max(np.abs(v.reshape(sh, order="F").var() 
                          - vvar.reshape(sh, order="C"))) > tol
     
-    v = iid(random_normal((8, 9)), 5, axis=-1)  # Last axis.
+    v = iid(random_normal(rng, (8, 9)), 5, axis=-1)  # Last axis.
 
     sh = (3, 4, 2, 3, 5)
     vvar = v.var()
@@ -2440,7 +2441,7 @@ def test_reshape():
                          - vvar.reshape(sh, order="C"))) > tol
     
 
-    v = iid(random_normal((8, 9)), 5, axis=1)  # Middle axis.
+    v = iid(random_normal(rng, (8, 9)), 5, axis=1)  # Middle axis.
 
     sh = (2, 4, 5, 3, 3)
     vvar = v.var()
@@ -2706,7 +2707,7 @@ def test_split():
 
     tol = 1e-10
 
-    v = iid(iid(random_normal((4, 6, 5)), 2, axis=1), 3, axis=1)
+    v = iid(iid(random_normal(rng, (4, 6, 5)), 2, axis=1), 3, axis=1)
     # v.shape is (4, 3, 2, 6, 5), v.iaxes are (1, 2)
 
     assert len(v.split(3, axis=-2)) == 3
@@ -2750,7 +2751,7 @@ def test_transpose():
     assert v.iaxes == tuple()
 
     # A matrix variable with one independence axis.
-    v = iid(random_normal((4,)), 2, axis=1)
+    v = iid(random_normal(rng, (4,)), 2, axis=1)
     # v.shape is (4, 2), v.iaxes are (1,)
 
     assert v.transpose().iaxes == (0,)
@@ -2765,7 +2766,7 @@ def test_transpose():
     assert np.max(np.abs(vvar1 - vvar2)) < tol
     
     # A multi-dimensional variable.
-    v = iid(iid(random_normal((4, 6, 5)), 2, axis=1), 3, axis=1)
+    v = iid(iid(random_normal(rng, (4, 6, 5)), 2, axis=1), 3, axis=1)
     # v.shape is (4, 3, 2, 6, 5), v.iaxes are (1, 2)
 
     assert v.T.shape == (5, 6, 2, 3, 4)
@@ -2811,7 +2812,7 @@ def test_transpose():
     assert np.max(np.abs(vvar1 - vvar2)) < tol
     assert v.transpose(ax).iaxes == (2, 3)
 
-    v = iid(iid(random_normal((4, 5)), 2, axis=1), 3, axis=3)
+    v = iid(iid(random_normal(rng, (4, 5)), 2, axis=1), 3, axis=3)
     # v.shape is (4, 2, 5, 3), v.iaxes are (1, 3)
 
     ax = (2, 3, 0, 1)
@@ -2878,7 +2879,7 @@ def test_iaxes_compatibility():
     assert (v1.T - v2.T).shape == (3, 3)
     assert (v1.T - v2.T).iaxes == (0, 1)
 
-    v = iid(iid(random_normal((4, 5)), 3, axis=1), 3, axis=3)
+    v = iid(iid(random_normal(rng, (4, 5)), 3, axis=1), 3, axis=3)
     # v.shape is (4, 3, 5, 3), v.iaxes are (1, 3)
 
     v.mean() + v.mean().transpose((0, -1, 2, 1))  # Does not raise an error.
@@ -2941,7 +2942,7 @@ def test_trace():
 def test_concatenate():
     tol = 1e-10
 
-    xi = random_normal((8, 2))
+    xi = random_normal(rng, (8, 2))
     v = iid(xi, 7, axis=-1)
     
     v1 = v[:3]  # (3, 2, 7)
@@ -3029,7 +3030,7 @@ def test_concatenate():
 def test_stack():
     tol = 1e-10
 
-    xi = random_normal((8, 2))
+    xi = random_normal(rng, (8, 2))
     v = iid(xi, 7, axis=-1)
     v = iid(v, 3, axis=1)
 
@@ -3147,7 +3148,7 @@ def test_solve():
     tol = 1e-8
 
     # Lifted normal variables.
-    a = 2 * np.random.rand(3, 3) - 1
+    a = rng.uniform(-1, 1, (3, 3))
     v = assparsenormal(normal(1, 1, size=(3,)))
     v_ = gp.linalg.solve(a, v)
 
@@ -3202,7 +3203,7 @@ def test_asolve():
     tol = 1e-8
 
     # Lifted normal variables.
-    a = 2 * np.random.rand(3, 3) - 1
+    a = rng.uniform(-1, 1, (3, 3))
     v = assparsenormal(normal(1, 1, size=(3,)))
     v_ = gp.linalg.asolve(a, v)
 
@@ -3220,7 +3221,7 @@ def test_asolve():
     with pytest.raises(ValueError):
         gp.linalg.asolve(a, v)
 
-    a = 2 * np.random.rand(1, 3, 3) - 1
+    a = rng.uniform(-1, 1, (1, 3, 3))
     v = assparsenormal(normal(1, 1, size=(4, 3)))
     v_ = gp.linalg.asolve(a, v)
 
@@ -3231,7 +3232,7 @@ def test_asolve():
     assert np.abs(np.max(v.cov() - v2.cov())) < tol
 
     # 1 independence axis.
-    a = 2 * np.random.rand(4, 3, 3) - 1
+    a = rng.uniform(-1, 1, (4, 3, 3))
 
     v = iid(normal(1, 1), 3)
     with pytest.raises(ValueError):
@@ -3257,10 +3258,10 @@ def test_fft():
     fft_funcs = [gp.fft.fft, gp.fft.ifft, gp.fft.hfft, 
                  gp.fft.rfft, gp.fft.irfft, gp.fft.ihfft]
 
-    ro = np.random.rand(4, 6)
-    rs = np.random.rand(4, 6)
+    ro = rng.uniform(0, 1, (4, 6))
+    rs = rng.uniform(0, 1, (4, 6))
 
-    x = random_normal(shape=(6,))
+    x = random_normal(rng, shape=(6,))
     nx = ro + gp.stack([x] * 4) * rs
     sx = ro + iid(x, 4) * rs
 
@@ -3283,10 +3284,10 @@ def test_fft2():
 
     fft_funcs = [gp.fft.fft2, gp.fft.ifft2, gp.fft.rfft2, gp.fft.irfft2]
 
-    ro = np.random.rand(3, 4, 6)
-    rs = np.random.rand(3, 4, 6)
+    ro = rng.uniform(0, 1, (3, 4, 6))
+    rs = rng.uniform(0, 1, (3, 4, 6))
 
-    x = random_normal(shape=(3, 6))
+    x = random_normal(rng, shape=(3, 6))
     nx = ro + gp.stack([x] * 4, axis=1) * rs
     sx = ro + iid(x, 4, axis=1) * rs
 
@@ -3318,10 +3319,10 @@ def test_fftn():
 
     fft_funcs = [gp.fft.fftn, gp.fft.ifftn, gp.fft.rfftn, gp.fft.irfftn]
 
-    ro = np.random.rand(2, 3, 4, 5)
-    rs = np.random.rand(2, 3, 4, 5)
+    ro = rng.uniform(0, 1, (2, 3, 4, 5))
+    rs = rng.uniform(0, 1, (2, 3, 4, 5))
 
-    x = random_normal(shape=(2, 3, 5))
+    x = random_normal(rng, shape=(2, 3, 5))
     nx = ro + gp.stack([x] * 4, axis=2) * rs
     sx = ro + iid(x, 4, axis=2) * rs
 
@@ -3385,7 +3386,7 @@ def test_matmul():
 
     v = assparsenormal(normal(1, 1, size=(3,)))
     for sh in [(3, 3), (2, 3, 3)]:
-        a = 2 * np.random.rand(*sh) - 1
+        a = rng.uniform(-1, 1, sh)
         w = a @ v
         assert w.shape == a.shape[:-1]
         assert w.iaxes == tuple()
@@ -3407,7 +3408,7 @@ def test_matmul():
     
     v = iid(normal(1, 1, size=(3,)), 4, axis=-1)
     for sh in [(3, 3), (2, 3, 3)]:
-        a = 2 * np.random.rand(*sh) - 1
+        a = rng.uniform(-1, 1, sh)
         w = a @ v
         assert w.shape == a.shape[:-1] + (4,)
         assert w.iaxes == (w.ndim - 1,)
@@ -3510,10 +3511,10 @@ def test_matmul():
 
     # An example with two random variables.
     
-    v1 = iid(iid(random_normal((3, 5)), 7), 4)
+    v1 = iid(iid(random_normal(rng, (3, 5)), 7), 4)
     # shape (4, 7, 3, 5), iaxes (0, 1)
 
-    v2 = iid(iid(random_normal((5, 1)), 7), 4)
+    v2 = iid(iid(random_normal(rng, (5, 1)), 7), 4)
     # shape (4, 7, 5, 1), iaxes (0, 1)
 
     v2 += v1[:, :, 0, 0, None, None]  # for establishing correlation.
@@ -3552,10 +3553,10 @@ def test_einsum():
 
     # Tests against matrix multiplication.
 
-    xi = random_normal((3, 2))
+    xi = random_normal(rng, (3, 2))
     v = iid(xi, 5, axis=1)  # shape (3, 5, 2), iaxes (1,)
     
-    x = np.random.rand(2)  # 1D
+    x = rng.uniform(0, 1, 2)  # 1D
 
     v_ei = gp.einsum("rij, j -> ri", v, x)
     v_mm = gp.matmul(v, x)
@@ -3577,7 +3578,7 @@ def test_einsum():
     v_mm = gp.matmul(x.T, v.transpose((0, 2, 1))[1, ...])
     assert_equal(v_ei.T, v_mm)
 
-    x = np.random.rand(2, 8)  # 2D
+    x = rng.uniform(0, 1, (2, 8))  # 2D
 
     v_ei = gp.einsum("rij, jk -> rik", v, x)
     v_mm = gp.matmul(v, x)
@@ -3608,7 +3609,7 @@ def test_einsum():
     assert_equal(v_ei, v_mm)
 
     # Attempts contracting over an independence axis.
-    x = np.random.rand(5, 8)
+    x = rng.uniform(0, 1, (5, 8))
     gp.einsum("rji, jk -> rik", v.mean(), x)  # No error because of the shapes.
     with pytest.raises(ValueError):
         gp.einsum("rji, jk -> rik", v, x)
@@ -3617,10 +3618,10 @@ def test_einsum():
     with pytest.raises(ValueError):
         gp.einsum("j, jk -> k", v[1, :, 1], x)
 
-    xi = random_normal((3, 2))
+    xi = random_normal(rng, (3, 2))
     v = iid(xi, 5, axis=1)  # shape (3, 5, 2), iaxes (1,)
 
-    x = np.random.rand(4, 3, 2, 8)  # 4D
+    x = rng.uniform(0, 1, (4, 3, 2, 8))  # 4D
 
     v_ei = gp.einsum("ijk, liko -> lijo", v, x)
     v_mm = gp.matmul(v, x)
@@ -3632,10 +3633,10 @@ def test_einsum():
 
     # Tests agains inner.
 
-    xi = random_normal((3, 2))
+    xi = random_normal(rng, (3, 2))
     v = iid(xi, 5, axis=1)  # shape (3, 5, 2), iaxes (1,)
 
-    x = np.random.rand(4, 3, 8, 2)  # 4D
+    x = rng.uniform(0, 1, (4, 3, 8, 2))  # 4D
 
     v_ei = gp.einsum("ij, j -> i", v[1], x[0, 0, 0])
     v_in = gp.inner(v[1], x[0, 0, 0])
@@ -3660,7 +3661,7 @@ def test_einsum():
     # Tests against outer.
 
     v = iid(normal(0.5, 0.1), 5)
-    x = np.random.rand(4)
+    x = rng.uniform(0, 1, 4)
 
     v_ei = gp.einsum("i, j -> ij", x, v)
     v_ou = gp.outer(x, v)
@@ -3674,9 +3675,9 @@ def test_einsum():
     v_ou = gp.outer(v, x)
     assert_equal(v_ei, v_ou)
 
-    xi = random_normal((1,))
+    xi = random_normal(rng, (1,))
     v = iid(xi, 5, axis=1)  # shape (1, 5), iaxes (1,)
-    x = np.random.rand(1, 3)  # 4D
+    x = rng.uniform(0, 1, (1, 3))  # 4D
 
     v_ei = gp.einsum("ij, kl -> jl", v, x)
     v_ou = gp.outer(v, x)
@@ -3688,8 +3689,8 @@ def test_einsum():
 
     # A purely deterministic input.
 
-    v = assparsenormal(2 * np.random.rand(2, 4, 3, 2) - 1)
-    x = 2 * np.random.rand(4, 3, 2, 5) - 1
+    v = assparsenormal(rng.uniform(-1, 1, (2, 4, 3, 2)))
+    x = rng.uniform(-1, 1, (4, 3, 2, 5))
 
     v_ei = gp.einsum("ijkl, jklm", v, x)
     v_td = gp.tensordot(v, x, axes=3)
@@ -3749,8 +3750,8 @@ def test_dot():
     assert v_.var() < tol
     assert np.abs(v_.mean() - 14) < tol
 
-    v = assparsenormal(2 * np.random.rand(2, 3, 4, 5) - 1)
-    x = 2 * np.random.rand(6, 7, 5, 4) - 1
+    v = assparsenormal(rng.uniform(-1, 1, (2, 3, 4, 5)))
+    x = rng.uniform(-1, 1, (6, 7, 5, 4))
 
     v_ = gp.dot(v, x)
     assert v_.shape == (2, 3, 4, 6, 7, 4)
@@ -3769,8 +3770,8 @@ def test_dot():
     # - 1-d sparse variable.
     sz = 5
     v = iid(normal(), sz)
-    rs = 2 * np.random.rand(sz) - 1
-    ro = 2 * np.random.rand(sz) - 1
+    rs = rng.uniform(-1, 1, sz)
+    ro = rng.uniform(-1, 1, sz)
     v = ro + rs * v
 
     # -- 0-d operand 2.
@@ -3787,8 +3788,8 @@ def test_dot():
 
     # - Adds one dense dimension.
     v = iid(normal(size=3), sz)  # shape (5, 3), iaxes (0,)
-    rs = 2 * np.random.rand(sz, 1) - 1
-    ro = 2 * np.random.rand(sz, 1) - 1
+    rs = rng.uniform(-1, 1, (sz, 1))
+    ro = rng.uniform(-1, 1, (sz, 1))
     v = ro + rs * v
 
     # -- 0-d operand 2.
@@ -3846,8 +3847,8 @@ def test_dot():
     # - Two dense dimensions.
     nv = normal(size=(2, 3))
     v = iid(nv, sz, axis=1)  # shape (2, 5, 3), iaxes (1,)
-    rs = 2 * np.random.rand(sz, 1) - 1
-    ro = 2 * np.random.rand(sz, 1) - 1
+    rs = rng.uniform(-1, 1, (sz, 1))
+    ro = rng.uniform(-1, 1, (sz, 1))
     v = ro + rs * v
 
     # -- 0-d operand 2.
@@ -3938,8 +3939,8 @@ def test_dot():
     sz1 = 5
     sz2 = 6
     v = iid(iid(normal(), sz1), sz2)  # shape (6, 5)
-    rs = 2 * np.random.rand(sz2, sz1) - 1
-    ro = 2 * np.random.rand(sz2, sz1) - 1
+    rs = rng.uniform(-1, 1, (sz2, sz1))
+    ro = rng.uniform(-1, 1, (sz2, sz1))
     v = ro + rs * v
 
     # -- 0-d operand 2.
@@ -3971,8 +3972,8 @@ def test_dot():
     dsz = 7
     nv = normal(size=dsz)
     v = iid(iid(nv, sz1), sz2)  # shape (6, 5, 7)
-    rs = 2 * np.random.rand(sz2, sz1, dsz) - 1
-    ro = 2 * np.random.rand(sz2, sz1, dsz) - 1
+    rs = rng.uniform(-1, 1, (sz2, sz1, dsz))
+    ro = rng.uniform(-1, 1, (sz2, sz1, dsz))
     v = ro + rs * v
 
     # -- 0-d operand 2.
@@ -4036,8 +4037,8 @@ def test_dot():
     # A more complex example with correlations between elements.
     nv = normal(size=(3, 2))
     v1 = iid(iid(nv, 4, axis=-1), 5)  # shape (5, 3, 2, 4)
-    rs = 2 * np.random.rand(5, 3, 2, 4) - 1
-    ro = 2 * np.random.rand(5, 3, 2, 4) - 1
+    rs = rng.uniform(-1, 1, (5, 3, 2, 4))
+    ro = rng.uniform(-1, 1, (5, 3, 2, 4))
     v1 = ro + rs * v1
     v1 = v1.sum(axis=2)
 
@@ -4047,8 +4048,8 @@ def test_dot():
 
     nv = normal(size=(3, 2))
     v2 = iid(iid(nv, 4, axis=-1), 5)  # shape (5, 3, 2, 4)
-    rs = 2 * np.random.rand(5, 3, 2, 4) - 1
-    ro = 2 * np.random.rand(5, 3, 2, 4) - 1
+    rs = rng.uniform(-1, 1, (5, 3, 2, 4))
+    ro = rng.uniform(-1, 1, (5, 3, 2, 4))
     v2 = ro + rs * v2
     v2 = v2.sum(axis=2)
 
@@ -4059,7 +4060,7 @@ def test_dot():
     v = v1 - v2
     nv_ref = nv1_ref - nv2_ref
 
-    x = 2 * np.random.rand(7, 4, 3) - 1
+    x = rng.uniform(-1, 1, (7, 4, 3))
     v_ = gp.dot(x, v)
     nv_ref_ = gp.dot(x, nv_ref)
 
@@ -4123,8 +4124,8 @@ def test_inner():
     assert v_.var() < tol
     assert np.abs(v_.mean() - 14) < tol
 
-    v = assparsenormal(2 * np.random.rand(2, 3, 4, 5) - 1)
-    x = 2 * np.random.rand(6, 7, 4, 5) - 1
+    v = assparsenormal(rng.uniform(-1, 1, (2, 3, 4, 5)))
+    x = rng.uniform(-1, 1, (6, 7, 4, 5))
 
     v_ = gp.inner(v, x)
     assert v_.shape == (2, 3, 4, 6, 7, 4)
@@ -4143,8 +4144,8 @@ def test_inner():
     # - 1-d sparse variable.
     sz = 5
     v = iid(normal(), sz)
-    rs = 2 * np.random.rand(sz) - 1
-    ro = 2 * np.random.rand(sz) - 1
+    rs = rng.uniform(-1, 1, sz)
+    ro = rng.uniform(-1, 1, sz)
     v = ro + rs * v
 
     # -- 0-d operand 2.
@@ -4161,8 +4162,8 @@ def test_inner():
 
     # - 2-d variable with one sparse axis.
     v = iid(normal(size=3), 5)  # shape (5, 3), iaxes (0,)
-    rs = 2 * np.random.rand(5, 3) - 1
-    ro = 2 * np.random.rand(5, 3) - 1
+    rs = rng.uniform(-1, 1, (5, 3))
+    ro = rng.uniform(-1, 1, (5, 3))
     v = ro + rs * v
 
     # -- 0-d operand 2.
@@ -4220,8 +4221,8 @@ def test_inner():
     # - Two dense and one sparse dimensions.
     nv = normal(size=(2, 3))
     v = iid(nv, 5, axis=1)  # shape (2, 5, 3), iaxes (1,)
-    rs = 2 * np.random.rand(2, 5, 3) - 1
-    ro = 2 * np.random.rand(2, 5, 3) - 1
+    rs = rng.uniform(-1, 1, (2, 5, 3))
+    ro = rng.uniform(-1, 1, (2, 5, 3))
     v = ro + rs * v
 
     # -- 0-d operand 2.
@@ -4309,8 +4310,8 @@ def test_inner():
 
     # - 2-d sparse variable.
     v = iid(iid(normal(), 5), 6)  # shape (6, 5)
-    rs = 2 * np.random.rand(6, 5) - 1
-    ro = 2 * np.random.rand(6, 5) - 1
+    rs = rng.uniform(-1, 1, (6, 5))
+    ro = rng.uniform(-1, 1, (6, 5))
     v = ro + rs * v
 
     # -- 0-d operand 2.
@@ -4339,8 +4340,8 @@ def test_inner():
     # - Adds one dense dimension.
     nv = normal(size=7)
     v = iid(iid(nv, 5), 6)  # shape (6, 5, 7)
-    rs = 2 * np.random.rand(6, 5, 7) - 1
-    ro = 2 * np.random.rand(6, 5, 7) - 1
+    rs = rng.uniform(-1, 1, (6, 5, 7))
+    ro = rng.uniform(-1, 1, (6, 5, 7))
     v = ro + rs * v
 
     # -- 0-d operand 2.
@@ -4453,10 +4454,10 @@ def test_outer():
 
     # 0 independence axes.
 
-    nv = random_normal((4, 2))
+    nv = random_normal(rng, (4, 2))
     v = assparsenormal(nv)
 
-    x = 2 * np.random.rand(3) - 1
+    x = rng.uniform(-1, 1, 3)
 
     nv_ = gp.outer(nv, x)
     v_ = gp.outer(v, x)
@@ -4476,8 +4477,8 @@ def test_outer():
 
     # 1 independence axis.
     v = iid(normal(), 5)
-    rs = 2 * np.random.rand(5) - 1
-    ro = 2 * np.random.rand(5) - 1
+    rs = rng.uniform(-1, 1, 5)
+    ro = rng.uniform(-1, 1, 5)
     v = ro + rs * v
 
     nv = ro + rs * normal(size=5)
@@ -4556,10 +4557,10 @@ def test_kron():
     assert np.max(np.abs(v_.mean() - np.kron([2, 3, 4], [1, 2, 3]))) < tol
 
     # 0 independence axes.
-    nv = random_normal((4, 2))
+    nv = random_normal(rng, (4, 2))
     v = assparsenormal(nv)
 
-    x = 2 * np.random.rand(3, 5) - 1
+    x = rng.uniform(-1, 1, (3, 5))
 
     nv_ = gp.kron(nv, x)
     v_ = gp.kron(v, x)
@@ -4580,11 +4581,11 @@ def test_kron():
     # 1 independence axis.
 
     v = iid(normal(size=2), 5, axis=-1)
-    rs = 2 * np.random.rand(2, 5) - 1
-    ro = 2 * np.random.rand(2, 5) - 1
+    rs = rng.uniform(-1, 1, (2, 5))
+    ro = rng.uniform(-1, 1, (2, 5))
     v = ro + rs * v
 
-    x = 2 * np.random.rand(3, 5) - 1
+    x = rng.uniform(-1, 1, (3, 5))
 
     nv = ro + rs * normal(size=(2, 5))
 
@@ -4617,13 +4618,13 @@ def test_kron():
     v = iid(iid(normal(size=(2, 3)), 5, axis=1), 6, axis=-1)
     # shape (2, 5, 3, 6), iaxes (1, 3)
 
-    rs = 2 * np.random.rand(2, 5, 3, 6) - 1
-    ro = 2 * np.random.rand(2, 5, 3, 6) - 1
+    rs = rng.uniform(-1, 1, (2, 5, 3, 6))
+    ro = rng.uniform(-1, 1, (2, 5, 3, 6))
     v = ro + rs * v
 
     nv = ro + rs * normal(size=(2, 5, 3, 6))
 
-    x = 2 * np.random.rand(4, 1, 3) - 1  # x.ndim < v.ndim
+    x = rng.uniform(-1, 1, (4, 1, 3))  # x.ndim < v.ndim
 
     nv_ = gp.kron(nv, x)
     v_ = gp.kron(v, x)
@@ -4647,7 +4648,7 @@ def test_kron():
     assert np.max(np.abs(v_.cov() - 
                          dense_to_sparse_cov(nv_.cov(), (1, 3)))) < tol
     
-    x = 2 * np.random.rand(2, 1, 3, 1, 2) - 1  # x.ndim > v.ndim
+    x = rng.uniform(-1, 1, (2, 1, 3, 1, 2))  # x.ndim > v.ndim
 
     nv_ = gp.kron(nv, x)
     v_ = gp.kron(v, x)
@@ -4703,8 +4704,8 @@ def test_tensordot():
     assert v_.var() < tol
     assert np.abs(v_.mean() - 14) < tol
 
-    v = assparsenormal(2 * np.random.rand(2, 3, 4, 5) - 1)
-    x = 2 * np.random.rand(3, 4, 5, 7) - 1
+    v = assparsenormal(rng.uniform(-1, 1, (2, 3, 4, 5)))
+    x = rng.uniform(-1, 1, (3, 4, 5, 7))
 
     v_ = gp.tensordot(v, x, axes=3)
     assert v_.shape == (2, 7)
@@ -4725,11 +4726,11 @@ def test_tensordot():
 
     v = iid(normal(size=(2, 3)), 5, 1)  # shape (2, 5, 3), iaxes (1,)
 
-    rs = 2 * np.random.rand(2, 5, 3) - 1
-    ro = 2 * np.random.rand(2, 5, 3) - 1
+    rs = rng.uniform(-1, 1, (2, 5, 3))
+    ro = rng.uniform(-1, 1, (2, 5, 3))
     v = ro + rs * v
 
-    x = 2 * np.random.rand(3, 2, 6) - 1
+    x = rng.uniform(-1, 1, (3, 2, 6))
 
     # - Contraction over 0 axes.
 
@@ -4847,11 +4848,11 @@ def test_tensordot():
     v = iid(iid(normal(size=(2, 3)), 5, axis=1), 6, axis=-1)
     # shape (2, 5, 3, 6), iaxes (1, 3)
 
-    rs = 2 * np.random.rand(2, 5, 3, 6) - 1
-    ro = 2 * np.random.rand(2, 5, 3, 6) - 1
+    rs = rng.uniform(-1, 1, (2, 5, 3, 6))
+    ro = rng.uniform(-1, 1, (2, 5, 3, 6))
     v = ro + rs * v
 
-    x = 2 * np.random.rand(3, 2, 4, 6) - 1
+    x = rng.uniform(-1, 1, (3, 2, 4, 6))
 
     v_ = gp.tensordot(v, x, axes=((2,), (0,)))
     mean_ref = np.tensordot(v.mean(), x, axes=((2,), (0,)))
@@ -4882,13 +4883,13 @@ def test_tensordot():
     v = iid(iid(normal(size=(2, 3)), 5, axis=1), 5, axis=-1)
     # shape (2, 5, 3, 5), iaxes (1, 3)
 
-    rs = 2 * np.random.rand(2, 5, 3, 5) - 1
-    ro = 2 * np.random.rand(2, 5, 3, 5) - 1
+    rs = rng.uniform(-1, 1, (2, 5, 3, 5))
+    ro = rng.uniform(-1, 1, (2, 5, 3, 5))
     v = ro + rs * v
 
     w = iid(iid(normal(), 5), 5, axis=-1)
 
-    x = 2 * np.random.rand(3, 2) - 1
+    x = rng.uniform(-1, 1, (3, 2))
 
     v_ = gp.tensordot(x, v, axes=((1, 0), (0, 2)))
     mean_ref = np.tensordot(x, v.mean(), axes=((1, 0), (0, 2)))
@@ -4907,7 +4908,7 @@ def test_tensordot():
 def test_icopy():
     tol = 1e-10
 
-    v = iid(random_normal((3, 4)), 5, axis=1)
+    v = iid(random_normal(rng, (3, 4)), 5, axis=1)
     v = iid(v, 6, axis=-1)
     v_ = v.icopy()
 
@@ -4917,7 +4918,7 @@ def test_icopy():
     assert np.max(np.abs(v.mean() - v_.mean())) < tol
     assert np.max(np.abs(v.cov() - v_.cov())) < tol
 
-    v = iid(random_normal((4, 3), dtype=np.complex64), 5, axis=1)
+    v = iid(random_normal(rng, (4, 3), dtype=np.complex64), 5, axis=1)
     v = iid(v, 6, axis=-2)
     v_ = v.icopy()
 

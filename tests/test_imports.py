@@ -2,7 +2,7 @@ import gprob as gp
 
 
 def test_module_imports():
-    names = ["fft", "linalg", "func", "maps", "normal_", "sparse"]
+    names = ["fft", "linalg", "func", "maps", "normal_", "sparse", "rn"]
 
     for name in names:
         assert hasattr(gp, name)

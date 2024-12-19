@@ -6,6 +6,7 @@ import numpy as np
 from numpy.linalg import LinAlgError
 
 from . import latent
+from . import rn
 
 from .maps import (LatentMap, complete, lift, match_, concatenate, stack, 
     solve, asolve, call_linearized, fftfunc, fftfunc_n, bilinearfunc, 
@@ -231,7 +232,7 @@ class Normal(LatentMap):
         """
         
         sz = (self.nlat,) if n is None else (n, self.nlat)
-        r = np.random.normal(size=sz)
+        r = rn.gen.standard_normal(sz)
         return apply(self, r)
     
     def logp(self, x):
@@ -457,7 +458,7 @@ def sample(xs, n):
 
     ulat = latent.uunion(*[x.lat for x in xs])
     sz = (len(ulat),) if n is None else (len(ulat), n)
-    r = np.random.normal(size=sz)
+    r = rn.gen.standard_normal(sz)
     return [apply(x, r[[ulat[k] for k in x.lat]].T) for x in xs]
 
 
