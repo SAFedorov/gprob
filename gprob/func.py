@@ -85,10 +85,12 @@ def dkl(m1, cov1, m2, cov2):
         return float("inf")
 
     s = sp.linalg.solve_triangular(ltr2, ltr1, check_finite=False, lower=True)
-    strace = np.einsum("ij, ij -> ", s, s)
+    sf = s.reshape((-1))
+    # The reshaping is to be able to use matrix multiplication instead 
+    # of einsum, which seems to have smaller roundoff error (as of numpy 2.1).
     
-    log_det = 2 * np.sum(np.log(np.diagonal(ltr1)) - np.log(np.diagonal(ltr2)))
-    return 0.5 * (strace + z @ z - log_det - len(dm))
+    log_det = 2 * np.sum(np.log(np.diagonal(s)))
+    return 0.5 * (sf @ sf + z @ z - log_det - len(dm))
 
 
 def dlogp(x, m, cov, dm, dcov):
@@ -273,6 +275,7 @@ def logp_lstsq(x, m, cov):
 
     if rank == cov.shape[0]:
         # The covariance matrix has full rank, all solutions must be good.
+        # Under such conditions, using logp_cho would likely be a better choice.
         return llk
     
     # Otherwise checks the residual errors.
@@ -354,7 +357,7 @@ def condition_qr(m, a, mc, ac, mask=None):
     tol = np.finfo(tri.dtype).eps
     if (diatri < (tol * np.max(diatri))).any():
         raise ConditionError("Conditioning via QR decomposition does not work "
-                             "with degenerate constraints. Use SVD instead.")
+                             "with degenerate constraints.")
 
     es = sp.linalg.solve_triangular(tri.T, -mc, lower=(qtri is qu),
                                     check_finite=False)

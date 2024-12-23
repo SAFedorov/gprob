@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 from scipy.stats import multivariate_normal as mvn
 
-from gprob import rn, normal, hstack
+from gprob import rn, normal, hstack, cumsum
 from gprob.func import logp, logp_lstsq, dlogp, d2logp, fisher, dkl
 
 from reffunc import logp as logp_
@@ -317,6 +317,37 @@ def test_dkl():
         fi = fisher(cov, dm, dcov)[0, 0]
         fi_num = (dkl(m, cov, m1, cov1) + dkl(m, cov, m2, cov2)) / delta**2
         assert np.abs(1 - fi_num / fi) < tol
+
+
+def test_dkl_roundoff():
+    # Test for the roundoff error.
+
+    def dkl_loc(x, y):
+        m1, cov1, m2, cov2 = x.b, x.cov(), y.b, y.cov()
+        return  dkl(m1, cov1, m2, cov2)
+
+    def ou_process(t, x0, gamma):
+        """A discrete approximation of the Ornstein-Uhlenbeck process."""
+        sz = len(t)
+        dt = (t[-1] - t[0]) / (sz - 1)
+        w = normal(0, dt, size=(sz-1))
+        green = np.exp(-gamma * t)
+        s = cumsum(0.5 * (1/green[1:] + 1/green[:-1]) * w)
+        s = x0 + hstack([[0], s])
+        return green * s
+
+    sz = 1001
+    t = np.linspace(0, 2, sz)
+    x0 = 0.1 * normal()
+    gamma0 = 1
+    alpha = 1e-4
+
+    x = ou_process(t, x0, gamma0)
+    xp = ou_process(t, x0, gamma0 + alpha)
+    xm = ou_process(t, x0, gamma0 - alpha)
+
+    assert np.abs((dkl_loc(x, xp) - dkl_loc(x, xm)) / (2 * alpha)) < 3e-10
+    # Before switching from einsum to @, this error would be more like 3e-9.
 
 
 def test_logp_batch():

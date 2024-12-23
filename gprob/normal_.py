@@ -450,7 +450,7 @@ def sample(xs, n):
     
     Args:
         xs: A sequence of normal variables.
-        n: The number of samples, integer or None.
+        n: The number of samples, integer or ``None``.
     
     Returns:
         A list of samples.
