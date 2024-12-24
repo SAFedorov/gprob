@@ -60,6 +60,34 @@ def logp(x, m, cov):
     return - z @ z / 2 - norm
 
 
+def logp_qr(x, m, a):
+    """Calculates the logarithmic probability density of an n-dimensional 
+    normal distribution at the sample value using QR decomposition. This 
+    function is slower than the Cholesky-decomposition-based 
+    implementation of logp, but has a much lower roundoff error for large 
+    strongly-correlated distributions.
+    
+    Args:
+        x: The sample(s) at which the likelihood is evaluated. Should be a 
+            scalar or an array with the shape (ns,), (n,) or (ns, n), where ns 
+            is the number of samples and n is the dimension of the distribution.
+        m: The mean vector of the variable to be conditioned, an (n,) array.
+        a: The map matrix of the variable to be conditioned, a (ne, n) 2d array.
+            It must have the full rank of n.
+        
+    Returns:
+        The value of logp, or an array of values for each of the input samples.
+    """
+
+    dx = (x - m)
+    r = np.linalg.qr(a, mode="r")
+    z = sp.linalg.solve_triangular(r.T, dx.T, check_finite=False, lower=True)
+    rank = len(m)
+    log_sqrt_det = np.sum(np.log(np.diagonal(np.abs(r))))
+    norm = 0.5 * np.log(2 * np.pi) * rank + log_sqrt_det
+    return -0.5 * np.einsum("i..., i... -> ...", z, z) - norm
+
+
 def dlogp_eigh(x, m, cov, dm, dcov):
 
     eigvals, eigvects = np.linalg.eigh(cov)
