@@ -90,7 +90,7 @@ def sde(t, a, df, x0):
     dia = np.concatenate([dia, np.zeros((n-1, k))], axis=-1)
     dia = np.reshape(dia, ((n-1)*k, 3 * k))[:, :-1].T
 
-    x = _solve_banded((2*k - 1, k-1), dia, df.flatten() + v)
+    x = _solve_banded((2*k - 1, k-1), dia, df.T.flatten() + v)
     x = x.reshape((n-1, k)).T
 
     return concatenate([x0.reshape((k, 1)), x], axis=1)
@@ -104,11 +104,11 @@ def _sde_scalar(t, a, df, x0):
     dta_ = np.roll(dta, -1)
 
     dia = np.stack([(1 - dta / 2), (-1 - dta_ / 2)])
-    v = np.zeros(shape=(len(t)-1,))
-    v[0] = 1 + dta[0] / 2
+    v0 = (1 + dta[0] / 2) * x0
+    v = concatenate([v0.reshape((1,)), np.zeros(shape=(len(t)-2,))])
 
-    x_ = _solve_banded((1, 0), dia, df + x0 * v)
-    return concatenate([[x0], x_])
+    x_ = _solve_banded((1, 0), dia, df + v)
+    return concatenate([x0.reshape((1,)), x_])
 
 
 def _solve_banded(sig, x, y):
