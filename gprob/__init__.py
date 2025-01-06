@@ -5,6 +5,7 @@ from . import maps
 from . import normal_
 from . import sparse
 from . import rn
+from . import integrate
 
 from .normal_ import Normal, normal
 from .sparse import iid

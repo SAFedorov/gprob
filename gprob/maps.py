@@ -88,8 +88,8 @@ class LatentMap:
         b = self.b + other.b
 
         if self.lat is other.lat:
-            # An optimization primarily made to speed up in-place 
-            # additions to array elements.
+            # An optimization e.g to speed up in-place operations 
+            # with array elements.
 
             a = _unsq(self.a, other.ndim) + _unsq(other.a, self.ndim)
             return self.__class__(a, b, self.lat)
@@ -644,9 +644,9 @@ def apply(x, r):
     
     
 def lift(cls, x):
-    """Converts ``x`` to a variable of class ``cls``. If ``x`` is such 
-    a variable already, returns it unchanged. If the conversion cannot be done, 
-    raises a ``TypeError``."""
+    """Converts ``x`` to a variable of class ``cls``. If ``x`` is already 
+    a variable of this class, returns ``x`` unchanged. If the conversion 
+    cannot be done, raises a ``TypeError``."""
 
     if x.__class__ is cls:
         return x
