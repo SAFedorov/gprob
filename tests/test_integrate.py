@@ -221,7 +221,7 @@ def test_real_vector_sde():
 
 
 def test_complex_vector_sde():
-    # A test for complex SDE.
+    # A test for a complex SDE with non-diagonal evolution matrix.
 
     sz = 200
     t = (np.linspace(0, 1, sz) - 1)**3 + 1  # Temporal grid.

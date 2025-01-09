@@ -17,7 +17,8 @@ def sde(t, a, df, x0):
 
     Args:
         t (array):
-            The times at which the solution is evaluated, shape (n,).
+            The times at which the solution is evaluated, shape (n,). Must
+            be sorted in ascending order.
         a (array):
             The deterministic evolution factor(s). When x is scalar, ``a`` 
             can be: 
@@ -34,7 +35,7 @@ def sde(t, a, df, x0):
             t[i] and t[i+1]. The shape is (n,) when x is scalar and 
             (k, n-1) when x is a vector of the length k.
         x0 (Normal):
-            The initial condition.
+            The initial condition, a scalar or a 1D vector.
     
     Returns:
         Normal: A solution of the SDE x(t[i]) with the shape (n,) or 

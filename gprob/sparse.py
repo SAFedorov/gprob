@@ -1113,7 +1113,7 @@ def sample(xs, n):
 
 
 def dkl(x, y):
-    """The sparse implementation of the the Kullback-Leibler divergence 
+    """The sparse implementation of the Kullback-Leibler divergence 
     between two variables."""
 
     iaxid = _validate_iaxid([x, y])
