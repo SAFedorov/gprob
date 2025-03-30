@@ -5,83 +5,80 @@ from .normal_ import Normal, lift
 from .arrayops import concatenate
 
 
-def sde(t, a, df, x0):
+def sde(x0, t, a, df):
     """Solves an initial value problem for a system of linear stochastic 
     differential equations (SDE),
     
-    ``dx = a @ x * dt + df,  x[0] = x0,``
+    ``dx = a(t) @ x * dt + df,  x[0] = x0,``
 
-    where x can be a scalar or a vector of the shape (k,). The shapes of ``a``, 
-    ``df`` and ``x0`` must be consistent with the shapes of x and ``t``. 
-    The solution error is second order in dt. 
+    where ``x`` is a scalar or vector sulution of the SDE, ``x0`` is the initial
+    condition, and ``df`` is the Wiener increments of the driving force over 
+    the intervals between the points of the time grid ``t``. 
+    The error of the solution is second order in dt. 
 
     Args:
+        x0 (Normal):
+            The initial condition, a scalar or a 1D vector with the shape (k,).
         t (array):
             The times at which the solution is evaluated, shape (n,). Must
             be sorted in ascending order.
-        a (array):
-            The deterministic evolution factor(s). When x is scalar, ``a`` 
-            can be: 
-            1. A scalar, giving the time-independent anti-damping constant.
-            2. An array of the shape (n,), giving the anti-damping constant at  
-            each point in time.
-            When x is a vector of the length k, ``a`` can be:
-            1. An array of the shape (k, k), giving the time-independent 
-            system evolution matrix.
-            2. An array of the shape (k, k, n), giving the system 
-            matrix at each point in time.   
+        a (callable):
+            The function giving the deterministic evolution factors 
+            at every moment of time. The value returned by this function 
+            can be a scalar or a (k, k) matrix, compatible with 
+            the shape of ``x``.
         df (Normal):
-            The integral input noises: df[i] is the integral of f(t) between 
-            t[i] and t[i+1]. The shape is (n,) when x is scalar and 
-            (k, n-1) when x is a vector of the length k.
-        x0 (Normal):
-            The initial condition, a scalar or a 1D vector.
+            The force increments. ``df[i]`` is the integral of ``f(t)`` 
+            from ``t[i]`` to ``t[i+1]``. The shape of ``df`` is (n-1,) 
+            when ``x`` is scalar and (k, n-1) 
+            when ``x`` is a vector of the length k.
     
     Returns:
-        Normal: A solution of the SDE x(t[i]) with the shape (n,) or 
-        (k, n) depending on the dimensionality of x.
+        Normal: A solution of the SDE ``x(t[i])`` with the shape (n,) or 
+        (k, n) depending on the dimension of ``x``.
     """
 
-    t = np.asanyarray(t)
-    a = np.asanyarray(a)
-    df = lift(Normal, df)
     x0 = lift(Normal, x0)
+    shx0 = x0.shape
 
     if x0.ndim > 1:
         raise ValueError(f"x0 has {x0.ndim} dimensions, while it must be "
                          "a scalar or a vector.")
-
+    
+    t = np.asanyarray(t)
     n = len(t)
-    shx0 = x0.shape
+
+    if n < 2:
+        raise ValueError("The time grid must have at least two points. "
+                         f"Now it has {n}.")
+
+    df = lift(Normal, df)
 
     if df.shape != shx0 + (n-1,):
-        raise ValueError(f"The shape of df {df.shape} is inconsistent "
-                         f"with the shape of x0 {shx0} and t {t.shape} "
-                         f"- expecting {shx0 + (n-1,)}.")
+        raise ValueError(f"The shape of df is inconsistent "
+                         f"with the shape of x0, {shx0}, and t, {t.shape}, "
+                         f"- expecting {shx0 + (n-1,)}, got {df.shape}.")
     
-    if (a.shape != shx0 + shx0) and (a.shape != shx0 + shx0 + (n,)):
-        raise ValueError(f"The shape of a {a.shape} is inconsistent "
-                         f"with the shape of x0 {shx0} and t {t.shape} "
-                         f"- expecting {shx0 + shx0} or {shx0 + shx0 + (n,)}.")
+    a_ = np.array([a(tp) for tp in t])
+
+    if a_[0].shape != shx0 + shx0:
+        raise ValueError(f"The shape of a is inconsistent "
+                         f"with the shape of x0, {shx0}, "
+                         f"- expecting {shx0 + shx0}, got {a_[0].shape}.")
 
     if x0.ndim == 0:
-        return _sde_scalar(t, a, df, x0)
+        return _sde_scalar(x0, t, a_, df)
 
-    k = len(x0)
-
-    if a.ndim == 2:
-        a_ = np.broadcast_to(a, (n, k, k))
-    else:  
-        # a.ndim == 3
-        a_ = np.transpose(a, (2, 0, 1))
+    # x0 is a vector in the following
 
     dta = 0.5 * (a_[1:] + a_[:-1]) * np.reshape(t[1:] - t[:-1], (n-1, 1, 1))
     dta_ = np.roll(dta, -1, axis=0)
 
+    k = len(x0)
     e = np.eye(k)
 
     v0 = (e + dta[0] / 2) @ x0
-    v = concatenate([v0, np.zeros(((n - 2) * k, ))])
+    v = concatenate([v0, np.zeros(((n - 2) * k,))])
 
     dia = np.concatenate([(e - dta / 2), (-e - dta_ / 2)], axis=-2)
     dia = np.transpose(dia, (0, 2, 1))
@@ -97,11 +94,10 @@ def sde(t, a, df, x0):
     return concatenate([x0.reshape((k, 1)), x], axis=1)
 
 
-def _sde_scalar(t, a, df, x0):
+def _sde_scalar(x0, t, a, df):
     """Solves an initial value problem for a scalar SDE."""
 
-    a_ = np.broadcast_to(a, (len(t),))
-    dta = 0.5 * (t[1:] - t[:-1]) * (a_[1:] + a_[:-1])
+    dta = 0.5 * (t[1:] - t[:-1]) * (a[1:] + a[:-1])
     dta_ = np.roll(dta, -1)
 
     dia = np.stack([(1 - dta / 2), (-1 - dta_ / 2)])

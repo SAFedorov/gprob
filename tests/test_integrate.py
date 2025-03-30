@@ -64,14 +64,15 @@ def test_sde():
     sol_ref =  np.exp(-t_) + (np.exp(g *t_) - np.exp(-t_)) / (g + 1)
 
     # (2,) vector.
-    x = gp.integrate.sde(t, [[-1, 0], [0, -1]], [1.5 * df, df], [1, 2])
+    a = lambda t: [[-1, 0], [0, -1]]
+    x = gp.integrate.sde([1, 2], t, a, [1.5 * df, df])
     sol_ref =  [np.exp(-t_) + 1.5 * (np.exp(g *t_) - np.exp(-t_)) / (g + 1),
                 2. * np.exp(-t_) + (np.exp(g *t_) - np.exp(-t_)) / (g + 1)]
     assert np.max(np.abs(x.mean() / sol_ref - 1)) < 4.9e-5  # 4.812e-05
     assert np.max(np.abs(x.cov())) < 1e-15
 
     # Scalar.
-    x = gp.integrate.sde(t, -1, df, 1)
+    x = gp.integrate.sde(1, t, lambda t: -1, df)
     sol_ref =  np.exp(-t_) + (np.exp(g *t_) - np.exp(-t_)) / (g + 1)
     assert np.max(np.abs(x.mean() / sol_ref - 1)) < 4.7e-5  # 4.62e-05
     assert np.max(np.abs(x.cov())) < 1e-15
@@ -80,60 +81,49 @@ def test_sde():
 
     # Zero force - free decay.
 
-    # (1,) vector - I.
+    # (1,) vector.
     df = [0 for _ in range(sz-1)]
-    x = gp.integrate.sde(t, [[-1]], [df], [1]).squeeze(0)
+    x = gp.integrate.sde([1], t, lambda t: [[-1]], [df]).squeeze(0)
 
     assert np.max(np.abs(x.mean() * np.exp(t) - 1)) < 1.7e-5  # 1.60e-05
     assert np.max(np.abs(x.cov())) < 1e-15
-
-    # (1,) vector - II.
-    df = [0 for _ in range(sz-1)]
-    x = gp.integrate.sde(t, [[[-1 for _ in range(sz)]]], [df], [1]).squeeze(0)
 
     assert np.max(np.abs(x.mean() * np.exp(t) - 1)) < 1.7e-5  # 1.60e-05
     assert np.max(np.abs(x.cov())) < 1e-15
     
     # Scalar.
     df = [0 for _ in range(sz-1)]
-    x = gp.integrate.sde(t, -1, df, 1)
+    x = gp.integrate.sde(1, t, lambda t: -1, df)
 
     assert np.max(np.abs(x.mean() * np.exp(t) - 1)) < 1.7e-5  # 1.60e-05
     assert np.max(np.abs(x.cov())) < 1e-15
 
     # Wrong dimension of x0:
     with pytest.raises(ValueError) as e:
-        gp.integrate.sde(t, -1, df, [[1]])
+        gp.integrate.sde([[1]], t, lambda t: -1, df)
 
     assert "2 dimensions" in get_message(e)
 
-    # Incompatible a and t
-    with pytest.raises(ValueError) as e:
-        gp.integrate.sde(t, [-1, -1], df, 1)
-
-    # Checks that the size hint is right.
-    assert (f"()" in get_message(e)) and (f"({sz},)" in get_message(e))
-
     # Incompatible a and x0
     with pytest.raises(ValueError) as e:
-        gp.integrate.sde(t, -1, [df], [1])
+        gp.integrate.sde([1], t, lambda t: -1, [df])
     
-    assert ("(1, 1)" in get_message(e)) and (f"(1, 1, {sz})" in get_message(e))
+    assert "expecting (1, 1), got ()" in get_message(e)
 
     with pytest.raises(ValueError) as e:
-        gp.integrate.sde(t, [[-1]], df, 1)
+        gp.integrate.sde(1, t, lambda t: [[-1]], df)
     
-    assert (f"()" in get_message(e)) and (f"({sz},)" in get_message(e))
+    assert "expecting (), got (1, 1)" in get_message(e)
 
     # Incompatible df and t
     with pytest.raises(ValueError) as e:
-        gp.integrate.sde(t, -1, df[:-1], 1)
+        gp.integrate.sde(1, t, lambda t: -1, df[:-1])
 
     assert f"({sz-1},)" in get_message(e)
 
     # Incompatible df and x0
     with pytest.raises(ValueError) as e:
-        gp.integrate.sde(t, [[-1]], df, [1])
+        gp.integrate.sde([1], t, lambda t: [[-1]], df)
 
     assert f"(1, {sz-1})" in get_message(e)
 
@@ -151,12 +141,12 @@ def test_scalar_sde():
 
     # (1,) vector.
     df = gp.normal(size=(1, len(dt))) * np.sqrt(dt)
-    x = gp.integrate.sde(t, [[-1]], df, x0.flatten()).squeeze()
+    x = gp.integrate.sde(x0.flatten(), t, lambda t: [[-1]], df).squeeze()
     assert _error(tcov, x.cov()) < 1.5e-7  # 1.4424086458575403e-07
 
     # Scalar.
     df = gp.normal(size=len(dt)) * np.sqrt(dt)
-    x = gp.integrate.sde(t, -1, df, x0)
+    x = gp.integrate.sde(x0, t, lambda t: -1, df)
     assert _error(tcov, x.cov()) < 1.5e-7
 
     # Time-dependent diffusion constant.
@@ -165,32 +155,32 @@ def test_scalar_sde():
     tcov = _true_cov_ou_td(t, x0)
     
     # (1,) vector.
-    a = np.reshape(t, (1, 1, sz))
+    a = lambda t: [[t]]
     df = gp.normal(size=(1, len(dt))) * np.sqrt(dt) * dcsq
-    x = gp.integrate.sde(t, a, df, x0.flatten()).squeeze()
+    x = gp.integrate.sde(x0.flatten(), t, a, df).squeeze()
     assert _error(tcov, x.cov()) < 1.2e-7  # 1.1717172809788678e-07
 
     # Scalar.
-    a = t
+    a = lambda t: t
     df = gp.normal(size=len(dt)) * np.sqrt(dt) * dcsq
-    x = gp.integrate.sde(t, a, df, x0)
+    x = gp.integrate.sde(x0, t, a, df)
     assert _error(tcov, x.cov()) < 1.2e-7
 
     # Time-depent non-white driving noise.
     tcov = _true_cov_ou_cn(t, x0)
 
     # (1,) vector.
-    a = np.reshape(t, (1, 1, sz))
+    a = lambda t: [[t]]
     f = gp.normal(0, _noise_cov_cn(t))
     df = gp.reshape((f[1:] + f[:-1]) * dt / 2, (1, len(dt)))
-    x = gp.integrate.sde(t, a, df, x0.flatten()).squeeze()
+    x = gp.integrate.sde(x0.flatten(), t, a, df).squeeze()
     assert _error(tcov, x.cov()) < 1.7e-6  # 1.629043777873207e-06
 
     # Scalar.
-    a = t
+    a = lambda t: t
     f = gp.normal(0, _noise_cov_cn(t))
     df = (f[1:] + f[:-1]) * dt / 2
-    x = gp.integrate.sde(t, a, df, x0)
+    x = gp.integrate.sde(x0, t, a, df)
     assert _error(tcov, x.cov()) < 1.7e-6
 
 
@@ -208,8 +198,9 @@ def test_real_vector_sde():
            gp.normal(0, 0.8, size=sz-1) * np.sqrt(dt) - 0.6 * dt]
     x0l = [gp.normal(1, 2), gp.normal(-1, 0.5), gp.normal(-0.4, 1.5)]
 
-    sols = [gp.integrate.sde(t, a, df, x0) for a, df, x0 in zip(al, dfl, x0l)]
-    solv = gp.integrate.sde(t, np.diag(al), dfl, x0l)
+    sols = [gp.integrate.sde(x0, t, lambda t: a, df) 
+            for a, df, x0 in zip(al, dfl, x0l)]
+    solv = gp.integrate.sde(x0l, t, lambda t: np.diag(al), dfl)
 
     assert solv.shape == (3, sz)
 
@@ -240,7 +231,8 @@ def test_complex_vector_sde():
 
     # The solutions for the three scalar equations for the principle components
     # are the reference.
-    sols = [gp.integrate.sde(t, a, df, x0) for a, df, x0 in zip(al, dfl, x0l)]
+    sols = [gp.integrate.sde(x0, t, lambda t: a, df) 
+            for a, df, x0 in zip(al, dfl, x0l)]
 
     # A transformation matrix.
     trmat = np.array([[1, 0.2, 1.3], 
@@ -255,7 +247,7 @@ def test_complex_vector_sde():
     amat = trmat @ np.diag(al) @ trmati
     v0 = trmat @ gp.stack(x0l)
     dfv = trmat @ gp.stack(dfl)
-    solv = gp.integrate.sde(t, amat, dfv, v0)
+    solv = gp.integrate.sde(v0, t, lambda t: amat, dfv)
 
     assert solv.shape == (3, sz)
     assert sols_.shape == (3, sz)
@@ -288,16 +280,15 @@ def test_convergence_order():
         tmean = np.exp(t**2 / 2) * (x0.mean() + (np.exp(g * t) - 1) / g)
 
         # Scalar.
-        a = t
-        x = gp.integrate.sde(t, a, df, x0)
+        a = lambda t: t
+        x = gp.integrate.sde(x0, t, a, df)
         
         err_s.append(np.max(np.abs(x.mean() / tmean) - 1) 
                      + _error(tcov, x.cov()))
 
         # (2,) vector.
-        z = np.zeros(shape=(len(t),))
-        a = np.array([[t, z], [z, t]])
-        x = gp.integrate.sde(t, a, [df, 2*df], [x0, 2*x0])
+        a = lambda t: np.array([[t, 0], [0, t]])
+        x = gp.integrate.sde([x0, 2*x0], t, a, [df, 2*df])
         
         err_v.append(np.max(np.abs(x.mean() / [tmean, 2 * tmean]) - 1) 
                      + _error(tcov, x[0].cov())+ _error(4 * tcov, x[1].cov()))
