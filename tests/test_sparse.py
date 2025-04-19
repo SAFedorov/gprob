@@ -16,7 +16,7 @@ from gprob.sparse import (_item_iaxid, iid, _finalize,
 from utils import random_normal, get_message, asnormal, assparsenormal
 
 
-gp.rn.setgen(0)
+gp.rn.seed(0)
 rng = gp.rn.gen
 
 

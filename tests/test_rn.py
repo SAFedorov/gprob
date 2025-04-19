@@ -19,16 +19,16 @@ def test_setgen():
     assert isinstance(gp.rn.gen, Generator)
     _get_samples()
 
-    gp.rn.setgen(SFC64())
+    gp.rn.seed(SFC64())
     assert isinstance(gp.rn.gen, Generator)
     assert isinstance(gp.rn.gen.bit_generator, SFC64)
     _get_samples()
 
-    gp.rn.setgen(0)
+    gp.rn.seed(0)
     assert isinstance(gp.rn.gen, Generator)
     sl1 = _get_samples()
 
-    gp.rn.setgen(0)
+    gp.rn.seed(0)
     assert isinstance(gp.rn.gen, Generator)
     sl2 = _get_samples()
 

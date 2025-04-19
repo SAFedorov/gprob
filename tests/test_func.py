@@ -11,7 +11,7 @@ from reffunc import d2logp as d2logp_
 from reffunc import dkl as dkl_
 
 
-rn.setgen(0)
+rn.seed(0)
 rng = rn.gen
 
 

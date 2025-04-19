@@ -22,7 +22,7 @@ from gprob.linalg import solve, asolve
 from utils import random_normal, random_det_normal, random_correlate
 
 
-rn.setgen(0)
+rn.seed(0)
 rng = rn.gen
 
 

@@ -17,7 +17,7 @@ def sde(x0, t, a, df):
     The error of the solution is second order in dt. 
 
     Args:
-        x0 (Normal):
+        x0 (numeric or Normal):
             The initial condition, a scalar or a 1D vector with the shape (k,).
         t (array):
             The times at which the solution is evaluated, shape (n,). Must
@@ -27,7 +27,7 @@ def sde(x0, t, a, df):
             at every moment of time. The value returned by this function 
             can be a scalar or a (k, k) matrix, compatible with 
             the shape of ``x``.
-        df (Normal):
+        df (numeric or Normal):
             The force increments. ``df[i]`` is the integral of ``f(t)`` 
             from ``t[i]`` to ``t[i+1]``. The shape of ``df`` is (n-1,) 
             when ``x`` is scalar and (k, n-1) 

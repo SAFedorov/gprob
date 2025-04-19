@@ -6,18 +6,17 @@ import numpy as np
 gen = np.random.default_rng()
 
 
-def setgen(seed):
-    """Updates the random number generator used for sampling, `gprob.rn.gen`, 
-    to a new instance of `numpy.random.Generator`.
+def seed(s):
+    """Updates the generator used for all random sampling in `gprob`.
     
     Args:
-        seed (None, int, Generator, ...): 
+        s (None, int, Generator, ...): 
             The seed, whose type can be anything that `numpy.random.default_rng`
-            can accept as the seed. It can be, e.g., ``None``, meaning that a 
-            random seed is drawn from the OS, an integer, setting the generator
-            to a reproducible state, or a numpy ``Generator``, which 
-            allows using a generator of a type different from the default.
+            can accept as the seed. It can be, e.g., 
+            an integer, for initializing the generator in a reproducible state, 
+            ``None``, for drawing a random seed from the OS, 
+            or a pre-configured ``numpy.random.Generator`` of any kind.
     """
 
     global gen
-    gen = np.random.default_rng(seed)
+    gen = np.random.default_rng(s)

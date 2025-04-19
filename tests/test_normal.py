@@ -11,7 +11,7 @@ from utils import random_normal, random_correlate, asnormal, get_message
 from reffunc import dkl_qr
 
 
-rn.setgen(0)
+rn.seed(0)
 rng = rn.gen
 
 

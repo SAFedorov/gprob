@@ -6,7 +6,7 @@ from gprob import rn, normal, iid
 from utils import random_normal
 
 
-rn.setgen(0)
+rn.seed(0)
 rng = rn.gen
 
 
