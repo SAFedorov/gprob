@@ -235,6 +235,18 @@ def dkl(x, y):
 
 
 @fallback_to_normal
+def real(x):
+    """Returns the real part of the input as a new random variable."""
+    return x.real
+
+
+@fallback_to_normal
+def imag(x):
+    """Returns the imaginary part of the input as a new random variable."""
+    return x.imag
+
+
+@fallback_to_normal
 def diagonal(x, offset=0, axis1=0, axis2=1):
     """Extracts a diagonal from a multi-dimensional random variable.
 

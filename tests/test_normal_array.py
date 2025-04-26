@@ -6,7 +6,7 @@ import pytest
 from gprob import maps
 from gprob import (rn, normal,
                    stack, hstack, vstack, dstack, concatenate,
-                   split, hsplit, vsplit, dsplit, squeeze, flip,
+                   split, hsplit, vsplit, dsplit, squeeze, flip,  real, imag,
                    sum, cumsum, trace, diagonal, reshape, moveaxis, ravel, 
                    transpose, add, subtract, multiply, divide, power, 
                    einsum, dot, matmul, inner, outer, kron, tensordot)
@@ -160,6 +160,14 @@ def test_trace():
     _test_array_func(trace, offset=1, axis1=1, axis2=0, test_shapes="3dmin")
     _test_array_func(trace, offset=1, axis1=1, axis2=-1, test_shapes="4dmin")
     _test_array_func(trace, offset=1, axis1=-3, axis2=-2, test_shapes="4dmin")
+
+
+def test_real():
+    _test_array_func(real)
+
+
+def test_imag():
+    _test_array_func(imag)
 
 
 def test_diagonal():

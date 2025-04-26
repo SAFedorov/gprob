@@ -2019,6 +2019,129 @@ def test_logp():
                          - snv.logp([[0.1, 0.2, 0.3], [1, 2, 3]]))) < tol
 
 
+def test_real_imag():  
+    # Tests both gp.real and gp.imag.
+
+    def check_var(v):
+        tol = 1e-10
+        
+        rv = gp.real(v)
+        assert isinstance(rv, SparseNormal)
+        assert np.isrealobj(rv.a)
+        assert np.isrealobj(rv.b)
+        assert np.max(np.abs(v.a.real - rv.a)) < tol
+        assert np.max(np.abs(v.b.real - rv.b)) < tol
+
+        iv = gp.imag(v)
+        assert isinstance(iv, SparseNormal)
+        assert np.isrealobj(iv.a)
+        assert np.isrealobj(iv.b)
+        assert np.max(np.abs(v.a.imag - iv.a)) < tol
+        assert np.max(np.abs(v.b.imag - iv.b)) < tol
+
+    # No independence axes.
+
+    snv = assparsenormal(normal(0.2, 3.4))
+    check_var(snv)
+
+    snv = assparsenormal(random_normal(rng, (3,)))
+    check_var(snv)
+
+    snv = assparsenormal(random_normal(rng, (3, 2)))
+    check_var(snv)
+
+    # One independence axis.
+
+    # Scalar dense subspace.
+    sz = 4
+    rs = rng.uniform(-1, 1, sz)
+    ro = rng.uniform(-1, 1, sz)
+    snv = ro + rs * iid(normal(), sz)
+    check_var(snv)
+
+    # Scalar dense subspace, complex distribution.
+    sz = 4
+    rs = rng.uniform(-1, 1, sz)
+    ro = rng.uniform(-1, 1, sz)
+    snv = ro + rs * iid(normal(), sz)
+
+    rs = rng.uniform(-1, 1, sz)
+    ro = rng.uniform(-1, 1, sz)
+    snv += 1j * (ro + rs * iid(normal(), sz))
+
+    check_var(snv)
+
+    # 1D dense subspace.
+    sparse_sz = 4
+    dense_sz = 3
+    rs = rng.uniform(-1, 1, (sparse_sz, dense_sz))
+    ro = rng.uniform(-1, 1, (sparse_sz, dense_sz))
+    rv = random_normal(rng, (dense_sz,))
+    snv = ro + rs * iid(rv, sparse_sz)
+    check_var(snv)
+
+    # 1D dense subspace, complex distribution.
+    sparse_sz = 4
+    dense_sz = 3
+    rs = rng.uniform(-1, 1, (sparse_sz, dense_sz))
+    ro = rng.uniform(-1, 1, (sparse_sz, dense_sz))
+    rv = random_normal(rng, (dense_sz,))
+    snv = ro + rs * iid(rv, sparse_sz)
+
+    rs = rng.uniform(-1, 1, (sparse_sz, dense_sz))
+    ro = rng.uniform(-1, 1, (sparse_sz, dense_sz))
+    rv = random_normal(rng, (dense_sz,))
+    snv += 1j * (ro + rs * iid(rv, sparse_sz))
+
+    check_var(snv)
+
+    # 2D dense subspace.
+    sparse_sz = 4
+    dense_sz = (3, 5)
+    rs = rng.uniform(-1, 1, (sparse_sz,) + dense_sz) 
+    ro = rng.uniform(-1, 1, (sparse_sz,) + dense_sz) 
+    rv = random_normal(rng, dense_sz)
+    snv = ro + rs * iid(rv, sparse_sz)
+    check_var(snv)
+
+    # Two independence axes.
+
+    # Scalar dense subspace.
+    rs = rng.uniform(-1, 1, (3, 4))
+    ro = rng.uniform(-1, 1, (3, 4))
+    snv = ro + rs * iid(iid(normal(), 4), 3)
+    check_var(snv)
+
+    # 1D dense subspace.
+    rs = rng.uniform(-1, 1, (3, 4, 5))
+    ro = rng.uniform(-1, 1, (3, 4, 5))
+    rv = random_normal(rng, (5,))
+    snv = ro + rs * iid(iid(rv, 4), 3)
+    check_var(snv)
+
+    # 2D dense subspace.
+    rs = rng.uniform(-1, 1, (3, 4, 5, 2))
+    ro = rng.uniform(-1, 1, (3, 4, 5, 2))
+    rv = random_normal(rng, (5, 2))
+    snv = ro + rs * iid(iid(rv, 4), 3)
+    check_var(snv)
+
+    # Three independence axes.
+
+    # Scalar dense subspace.
+    rs = rng.uniform(-1, 1, (3, 4, 5))
+    ro = rng.uniform(-1, 1, (3, 4, 5))
+    snv = ro + rs * iid(iid(iid(normal(), 5), 4), 3)
+    check_var(snv)
+
+    # 1D dense subspace.
+    rs = rng.uniform(-1, 1, (3, 4, 5, 2))
+    ro = rng.uniform(-1, 1, (3, 4, 5, 2))
+    rv = random_normal(rng, (2,))
+    snv = ro + rs * iid(iid(iid(rv, 5), 4), 3)
+    check_var(snv)
+
+
 def test_diagonal():
     v = iid(iid(normal(size=(4, 5)), 2, axis=0), 3, axis=0)
     # v.shape is (3, 2, 4, 5), v.iaxes are (0, 1)
