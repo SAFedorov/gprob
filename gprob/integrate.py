@@ -23,18 +23,18 @@ def sde(x0, t, a, df):
             The times at which the solution is evaluated, shape (n,). Must
             be sorted in ascending order.
         a (callable):
-            The function giving the deterministic evolution factors 
-            at every moment of time. The value returned by this function 
-            can be a scalar or a (k, k) matrix, compatible with 
-            the shape of ``x``.
+            The deterministic evolution factor as function of time. 
+            The value returned by the function ``a`` should be a scalar 
+            if ``x`` is scalar or a (k, k) matrix if ``x`` is a (k,) vector.
         df (numeric or Normal):
-            The force increments. ``df[i]`` is the integral of ``f(t)`` 
-            from ``t[i]`` to ``t[i+1]``. The shape of ``df`` is (n-1,) 
-            when ``x`` is scalar and (k, n-1) 
-            when ``x`` is a vector of the length k.
+            The force increments. When ``x`` is scalar, the shape of ``df`` 
+            is (n-1,) and ``df[i]`` is the integral of ``f(t)`` from ``t[i]`` 
+            to ``t[i+1]``. When ``x`` is a vector of the length k, the shape 
+            of ``df`` is (k, n-1), and ``df[j, i]`` is the integral 
+            of ``f[j](t)`` from ``t[i]`` to ``t[i+1]``.
     
     Returns:
-        Normal: A solution of the SDE ``x(t[i])`` with the shape (n,) or 
+        Normal: A solution of the SDE, ``x(t[i])``, with the shape (n,) or 
         (k, n) depending on the dimension of ``x``.
     """
 
